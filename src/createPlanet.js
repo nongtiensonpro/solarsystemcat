@@ -4,8 +4,11 @@ import { AU } from './constants.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
-import { createSunCorona, createSunSurfaceMaterial } from './sun.js';
+import { createSunCorona, createSunSurfaceMaterial, createChromosphere } from './sun.js';
 import { createCometTail, createCometComa } from './comets.js';
+import { createMagneticField } from './magneticField.js';
+import { createHeliumRain } from './heliumRain.js';
+import { createDiamondRain } from './diamondRain.js';
 
 // Lấy fallback color từ data (đã normalize bởi dataLoader.js)
 function getFallbackColor(data) {
@@ -95,6 +98,12 @@ export function createPlanet(data) {
     } else if (data.id === 'io') {
       emissiveColor = new THREE.Color(0x331100); // Núi lửa phát sáng mờ đỏ/cam
       emissiveInt = 0.15;
+    } else if (data.id === 'saturn') {
+      emissiveColor = new THREE.Color(0x332211); // Nhiệt thặng dư do mưa Heli
+      emissiveInt = 0.2;
+    } else if (data.id === 'neptune') {
+      emissiveColor = new THREE.Color(0x112244); // Nhiệt thặng dư x2.6 (Đối lưu dữ dội)
+      emissiveInt = 0.25;
     } else if (data.type === 'comet') {
       emissiveColor = new THREE.Color(0x88ccff); // Phát sáng mờ màu xanh
       emissiveInt = 0.2;
@@ -132,11 +141,16 @@ export function createPlanet(data) {
   tiltGroup.rotation.z = THREE.MathUtils.degToRad(data.axialTilt || 0);
   tiltGroup.add(mesh);
 
-  // 4b. Corona riêng cho Mặt Trời
+  // 4b. Corona và Chromosphere riêng cho Mặt Trời
   let coronaMesh = null;
+  let chromosphereMesh = null;
   if (data.type === 'star') {
     coronaMesh = createSunCorona(r, ob);
     tiltGroup.add(coronaMesh);
+
+    // Lớp sắc quyển (chromosphere) — H-alpha đỏ-hồng giữa bề mặt và corona
+    chromosphereMesh = createChromosphere(r, ob);
+    tiltGroup.add(chromosphereMesh);
   }
 
   // 4c. Lớp mây dày của Sao Kim che gần toàn bộ surface texture.
@@ -201,6 +215,28 @@ export function createPlanet(data) {
     tiltGroup.add(ringMesh);
   }
 
+  // 4g. Từ trường (Magnetic Field)
+  let magneticFieldMesh = createMagneticField(r, data.id);
+  if (magneticFieldMesh) {
+    tiltGroup.add(magneticFieldMesh);
+  }
+
+  // 4h. Mưa Heli (Jupiter, Saturn)
+  let heliumRainMesh = null;
+  if (data.id === 'jupiter' || data.id === 'saturn') {
+    const startRadius = data.id === 'jupiter' ? 0.8 : 0.7; // Saturn mưa rộng hơn
+    heliumRainMesh = createHeliumRain(r, startRadius, 3000);
+    tiltGroup.add(heliumRainMesh);
+  }
+
+  // 4i. Mưa Kim Cương (Uranus, Neptune)
+  let diamondRainMesh = null;
+  if (data.id === 'uranus' || data.id === 'neptune') {
+    const startRadius = data.id === 'uranus' ? 0.70 : 0.75;
+    diamondRainMesh = createDiamondRain(r, startRadius, 1500);
+    tiltGroup.add(diamondRainMesh);
+  }
+
   // 5. Pivot — vị trí trên quỹ đạo (sẽ được cập nhật bởi Kepler engine)
   const pivot = new THREE.Object3D();
   pivot.name = `${data.id}_pivot`;
@@ -232,8 +268,12 @@ export function createPlanet(data) {
     ringMesh,
     cloudMesh,
     coronaMesh,
+    chromosphereMesh,
     tailMesh,
     comaMesh,
+    magneticFieldMesh,
+    heliumRainMesh,
+    diamondRainMesh,
     data
   };
 }

@@ -9,8 +9,10 @@ import { initUI } from './ui.js';
 import { createOrbitLine } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
+import { updateCrossSectionPlane, toggleCrossSection } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
 import { AU } from './constants.js';
+import { selfRegulatingFactor } from './sunInterior.js';
 
 // ═══ Bootstrap — Tải dữ liệu trước khi khởi tạo ═══
 async function bootstrap() {
@@ -40,6 +42,7 @@ async function bootstrap() {
   let simulationTime = 0;
   let timeScale = 1000; // Giá trị mặc định, sẽ được UI slider ghi đè
   let isPaused = false;
+  let isCrossSectionOn = false;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
@@ -63,6 +66,10 @@ async function bootstrap() {
   // 4. Khởi tạo UI với callbacks (planetData đã được populate)
   // Hàm dùng chung để chọn hành tinh từ cả UI lẫn double-tap mobile
   function selectPlanet(planetId) {
+    if (isCrossSectionOn && trackedBody) {
+      toggleCrossSection(trackedBody, false);
+      isCrossSectionOn = false;
+    }
     cameraMode = 'follow';
     trackedBody = bodyById.get(planetId);
     if (trackedBody) {
@@ -79,6 +86,10 @@ async function bootstrap() {
     onPauseToggle: (paused) => { isPaused = paused; },
     onPlanetSelect: (planetId) => { selectPlanet(planetId); },
     onOverview: () => {
+      if (isCrossSectionOn && trackedBody) {
+        toggleCrossSection(trackedBody, false);
+        isCrossSectionOn = false;
+      }
       cameraMode = 'overview';
       trackedBody = null;
       // Fly back to overview (Sun focused)
@@ -96,6 +107,12 @@ async function bootstrap() {
     onToggleLabels: (show) => {
       toggleLabels(show);
     },
+    onToggleCrossSection: (on) => {
+      isCrossSectionOn = on;
+      if (trackedBody) {
+        toggleCrossSection(trackedBody, on);
+      }
+    }
   });
 
   // 5. Tạo tất cả thiên thể theo hierarchy
@@ -304,11 +321,35 @@ async function bootstrap() {
       // D. Cập nhật shader Mặt Trời độc lập với tốc độ mô phỏng.
       if (body.mesh.material.userData?.isSunSurfaceShader) {
         body.mesh.material.uniforms.uTime.value += deltaTime;
+        // Cơ chế tự cân bằng nhiệt hạch từ sunInterior.js
+        body.mesh.material.uniforms.uSelfRegFactor.value = selfRegulatingFactor(
+          body.mesh.material.uniforms.uTime.value
+        );
       }
 
       if (body.coronaMesh?.material.userData?.isSunCoronaShader) {
         body.coronaMesh.material.uniforms.uTime.value += deltaTime;
         body.coronaMesh.rotation.y += deltaTime * 0.03;
+      }
+
+      // D2. Cập nhật sắc quyển (chromosphere)
+      if (body.chromosphereMesh?.material.userData?.isSunChromosphereShader) {
+        body.chromosphereMesh.material.uniforms.uTime.value += deltaTime;
+      }
+
+      // D3. Cập nhật từ trường
+      if (body.magneticFieldMesh?.material.userData?.isMagneticFieldShader) {
+        body.magneticFieldMesh.material.uniforms.uTime.value += deltaTime;
+      }
+
+      // D4. Cập nhật mưa Heli
+      if (body.heliumRainMesh?.material.userData?.isHeliumRainShader) {
+        body.heliumRainMesh.material.uniforms.uTime.value += deltaTime;
+      }
+
+      // D5. Cập nhật mưa Kim Cương
+      if (body.diamondRainMesh?.material.userData?.isDiamondRainShader) {
+        body.diamondRainMesh.material.uniforms.uTime.value += deltaTime;
       }
     }
 
@@ -333,6 +374,11 @@ async function bootstrap() {
         // Di chuyển cả target và camera theo targetPos mới
         controls.target.copy(targetPos);
         camera.position.copy(targetPos).add(offset);
+        
+        // Cập nhật vị trí mặt cắt (luôn đi qua tâm)
+        if (isCrossSectionOn) {
+          updateCrossSectionPlane(trackedBody.pivot);
+        }
       }
     }
     controls.update();

@@ -1,6 +1,10 @@
 // UI Module — Tạo và quản lý giao diện người dùng
 import { planetData } from './planetData.js';
 import { QUALITY_PRESETS, getCurrentPresetKey, applyPreset } from './renderConfig.js';
+import { SUN_LAYERS } from './sunInterior.js';
+import { TERRESTRIAL_INTERIORS } from './terrestrialInterior.js';
+import { GAS_GIANT_INTERIORS } from './gasGiantInterior.js';
+import { ICE_GIANT_INTERIORS } from './iceGiantInterior.js';
 
 /**
  * Chuyển hex number 0xRRGGBB sang CSS hex string "#RRGGBB"
@@ -149,6 +153,7 @@ export function initUI(callbacks) {
     <div class="info-actions">
       <button class="btn-action" id="btn-overview">🌐 Toàn cảnh</button>
       <button class="btn-action active" id="btn-follow">🎯 Bám sát</button>
+      <button class="btn-action" id="btn-cross-section" title="Mặt Cắt">🔬 Cắt</button>
     </div>
   `;
   container.appendChild(infoPanel);
@@ -331,6 +336,13 @@ export function initUI(callbacks) {
       // Auto switch to Follow mode when selecting a body
       btnFollow.classList.add('active');
       btnOverview.classList.remove('active');
+
+      // Tắt cross section nếu chọn hành tinh mới
+      if (isCrossSectionActive) {
+        isCrossSectionActive = false;
+        btnCrossSection.classList.remove('active');
+        // Không gọi callback ở đây vì onPlanetSelect đã reset ở main
+      }
     }
   }
 
@@ -338,11 +350,13 @@ export function initUI(callbacks) {
   function closeInfoPanel() {
     infoPanel.classList.remove('visible');
     infoPanel.style.transform = ''; // Reset inline transform từ swipe
-    // Vẫn giữ active planet button để user biết đang follow cái gì
-    // allBtns.forEach(b => b.classList.remove('active')); 
     
-    // KHÔNG gọi onOverview ở đây để tránh fly-back khó chịu
-    // if (callbacks.onOverview) callbacks.onOverview();
+    // Tắt mặt cắt nếu đang mở
+    if (isCrossSectionActive) {
+      isCrossSectionActive = false;
+      btnCrossSection.classList.remove('active');
+      if (callbacks.onToggleCrossSection) callbacks.onToggleCrossSection(false);
+    }
   }
   document.getElementById('btn-close-info').addEventListener('click', closeInfoPanel);
 
@@ -385,6 +399,8 @@ export function initUI(callbacks) {
   // Camera Mode Buttons
   const btnOverview = document.getElementById('btn-overview');
   const btnFollow = document.getElementById('btn-follow');
+  const btnCrossSection = document.getElementById('btn-cross-section');
+  let isCrossSectionActive = false;
   
   btnOverview.addEventListener('click', () => {
     btnOverview.classList.add('active');
@@ -398,6 +414,14 @@ export function initUI(callbacks) {
     const activeBtn = Array.from(allBtns).find(b => b.classList.contains('active'));
     if (activeBtn && callbacks.onFollow) {
       callbacks.onFollow(activeBtn.dataset.id);
+    }
+  });
+
+  btnCrossSection.addEventListener('click', () => {
+    isCrossSectionActive = !isCrossSectionActive;
+    btnCrossSection.classList.toggle('active', isCrossSectionActive);
+    if (callbacks.onToggleCrossSection) {
+      callbacks.onToggleCrossSection(isCrossSectionActive);
     }
   });
 
@@ -465,9 +489,91 @@ export function initUI(callbacks) {
       summaryHtml = `<div class="info-summary">${data.info.summaryVi}</div>`;
     }
 
+    // Thêm thông tin nội hàm Mặt Trời
+    let interiorHtml = '';
+    if (data.type === 'star') {
+      interiorHtml = `
+        <div class="info-section-title">🔬 Cấu trúc Nội hàm</div>
+        ${SUN_LAYERS.map(layer => `
+          <div class="info-layer">
+            <div class="info-layer-header">
+              <span class="layer-dot" style="background: ${layer.colorHex}"></span>
+              <strong>${layer.name}</strong>
+              <span class="layer-range">${(layer.radiusMin * 100).toFixed(0)}% → ${(layer.radiusMax * 100).toFixed(0)}% R☉</span>
+            </div>
+            ${layer.temperatureCenter ? `<div class="info-row sub"><span class="label">Nhiệt độ tâm</span><span class="value">${(layer.temperatureCenter/1e6).toFixed(1)} triệu K</span></div>` : ''}
+            ${layer.temperature ? `<div class="info-row sub"><span class="label">Nhiệt độ</span><span class="value">${layer.temperature.toLocaleString()} K</span></div>` : ''}
+            ${layer.densityCenter ? `<div class="info-row sub"><span class="label">Mật độ tâm</span><span class="value">${layer.densityCenter} g/cm³</span></div>` : ''}
+            ${layer.mechanismVi ? `<div class="info-row sub"><span class="label">Cơ chế</span><span class="value">${layer.mechanismVi}</span></div>` : ''}
+          </div>
+        `).join('')}
+      `;
+    } else if (data.type === 'terrestrial' && TERRESTRIAL_INTERIORS[data.id]) {
+      const pData = TERRESTRIAL_INTERIORS[data.id];
+      interiorHtml = `
+        <div class="info-section-title">🔬 Cấu trúc Nội hàm</div>
+        <div class="info-layer">
+          <div class="info-row sub"><span class="label">Từ trường</span><span class="value">${pData.magneticField}</span></div>
+          <div class="info-row sub"><span class="label">Dynamo</span><span class="value">${pData.dynamoMechanism}</span></div>
+          <div class="info-row sub"><span class="label">Kết tinh</span><span class="value">${pData.crystallization}</span></div>
+        </div>
+        ${pData.layers.map(layer => `
+          <div class="info-layer">
+            <div class="info-layer-header">
+              <span class="layer-dot" style="background: ${layer.colorHex}"></span>
+              <strong>${layer.name}</strong>
+              <span class="layer-range">${(layer.min * 100).toFixed(0)}% → ${(layer.max * 100).toFixed(0)}% R</span>
+            </div>
+            <div class="info-row sub"><span class="label">Mô tả</span><span class="value">${layer.desc}</span></div>
+          </div>
+        `).join('')}
+      `;
+    } else if (data.type === 'gas-giant' && GAS_GIANT_INTERIORS[data.id]) {
+      const pData = GAS_GIANT_INTERIORS[data.id];
+      interiorHtml = `
+        <div class="info-section-title">🔬 Cấu trúc Nội hàm</div>
+        <div class="info-layer">
+          <div class="info-row sub"><span class="label">Lõi</span><span class="value">${pData.coreType}</span></div>
+          <div class="info-row sub"><span class="label">Từ trường</span><span class="value">${pData.magneticField}</span></div>
+          <div class="info-row sub"><span class="label">Đặc trưng</span><span class="value">${pData.specialFeature}</span></div>
+        </div>
+        ${pData.layers.map(layer => `
+          <div class="info-layer">
+            <div class="info-layer-header">
+              <span class="layer-dot" style="background: ${layer.colorHex}"></span>
+              <strong>${layer.name}</strong>
+              <span class="layer-range">${(layer.min * 100).toFixed(0)}% → ${(layer.max * 100).toFixed(0)}% R</span>
+            </div>
+            <div class="info-row sub"><span class="label">Mô tả</span><span class="value">${layer.desc}</span></div>
+          </div>
+        `).join('')}
+      `;
+    } else if (data.type === 'ice-giant' && ICE_GIANT_INTERIORS[data.id]) {
+      const pData = ICE_GIANT_INTERIORS[data.id];
+      interiorHtml = `
+        <div class="info-section-title">🔬 Cấu trúc Nội hàm</div>
+        <div class="info-layer">
+          <div class="info-row sub"><span class="label">Lõi</span><span class="value">${pData.coreType}</span></div>
+          <div class="info-row sub"><span class="label">Từ trường</span><span class="value">${pData.magneticField}</span></div>
+          <div class="info-row sub"><span class="label">Dynamo</span><span class="value">${pData.dynamoMechanism}</span></div>
+          <div class="info-row sub"><span class="label">Đặc trưng</span><span class="value">${pData.specialFeature}</span></div>
+        </div>
+        ${pData.layers.map(layer => `
+          <div class="info-layer">
+            <div class="info-layer-header">
+              <span class="layer-dot" style="background: ${layer.colorHex}"></span>
+              <strong>${layer.name}</strong>
+              <span class="layer-range">${(layer.min * 100).toFixed(0)}% → ${(layer.max * 100).toFixed(0)}% R</span>
+            </div>
+            <div class="info-row sub"><span class="label">Mô tả</span><span class="value">${layer.desc}</span></div>
+          </div>
+        `).join('')}
+      `;
+    }
+
     content.innerHTML = rows.map(([label, value]) =>
       `<div class="info-row"><span class="label">${label}</span><span class="value">${value}</span></div>`
-    ).join('') + summaryHtml;
+    ).join('') + interiorHtml + summaryHtml;
 
     infoPanel.classList.add('visible');
   }

@@ -34,6 +34,7 @@ export function initScene(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.maxPixelRatio));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
+  renderer.localClippingEnabled = true; // Kích hoạt mặt cắt
 
   // 4. Controls
   const controls = new OrbitControls(camera, renderer.domElement);
