@@ -84,9 +84,10 @@ function generateRingTexture(planetId) {
 /**
  * Tạo mesh vành đai cho hành tinh
  * @param {Object} data - Dữ liệu hành tinh từ planetData.js
+ * @param {THREE.Texture|null} ringTextureAsset - Texture ring tùy chọn, fallback sang texture thủ tục
  * @returns {THREE.Mesh} - Ring mesh
  */
-export function createRings(data) {
+export function createRings(data, ringTextureAsset = null) {
   const ringConfig = data.rings;
   const innerR = data.radius * ringConfig.innerRadius;
   const outerR = data.radius * ringConfig.outerRadius;
@@ -106,8 +107,9 @@ export function createRings(data) {
   }
   uv.needsUpdate = true;
 
-  // Tạo texture thủ tục
-  const ringTexture = generateRingTexture(data.id);
+  const ringTexture = ringTextureAsset || generateRingTexture(data.id);
+  ringTexture.wrapS = THREE.ClampToEdgeWrapping;
+  ringTexture.wrapT = THREE.ClampToEdgeWrapping;
 
   const material = new THREE.MeshStandardMaterial({
     map: ringTexture,

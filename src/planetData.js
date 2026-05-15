@@ -159,8 +159,7 @@ export const planetData = [
     rotationPeriod: -17.24,
     oblateness: 0.02293,
     textures: {
-      albedo: '/textures/planets/uranus/albedo.jpg',
-      ring: '/textures/planets/uranus/ring.png'
+      albedo: '/textures/planets/uranus/albedo.jpg'
     },
     rings: {
       innerRadius: 1.5,

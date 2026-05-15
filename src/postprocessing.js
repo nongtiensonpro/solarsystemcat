@@ -7,7 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 /**
  * Khởi tạo EffectComposer với UnrealBloomPass
- * - Mặt Trời dùng MeshBasicMaterial → luôn full brightness → vượt bloom threshold
+ * - Mặt Trời dùng ShaderMaterial sáng mạnh → vượt bloom threshold
  * - Các hành tinh dùng MeshStandardMaterial → tối hơn → không bị bloom
  *
  * @param {THREE.WebGLRenderer} renderer

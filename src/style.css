@@ -313,3 +313,58 @@ body {
   color: #6b7fa0;
   font-weight: 400;
 }
+
+@media (max-width: 720px) {
+  .top-bar {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    max-width: calc(100vw - 16px);
+    padding: 8px;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .planet-selector::-webkit-scrollbar {
+    display: none;
+  }
+
+  .top-bar h1 {
+    font-size: 14px;
+    flex: 0 0 100%;
+    text-align: center;
+  }
+
+  .time-controls {
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .time-controls input[type="range"] {
+    width: 96px;
+  }
+
+  .time-value {
+    min-width: 44px;
+  }
+
+  .planet-selector {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .planet-btn {
+    flex: 0 0 auto;
+  }
+
+  #attribution {
+    right: 8px !important;
+    bottom: 4px !important;
+    font-size: 9px !important;
+  }
+}

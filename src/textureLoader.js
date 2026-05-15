@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const loadingManager = new THREE.LoadingManager();
 const textureLoader = new THREE.TextureLoader(loadingManager);
+const textureCache = new Map();
 
 // Bắt sự kiện tải để cập nhật UI
 loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
@@ -10,7 +11,9 @@ loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
   const loadingPercent = document.getElementById('loading-percent');
   
   if (loadingBar) loadingBar.style.width = `${percent}%`;
-  if (loadingPercent) loadingPercent.textContent = `Đang tải tài nguyên... ${percent}%`;
+  if (loadingPercent) {
+    loadingPercent.textContent = `Đang tải texture... ${itemsLoaded}/${itemsTotal} (${percent}%)`;
+  }
 };
 
 loadingManager.onLoad = () => {
@@ -29,6 +32,24 @@ loadingManager.onError = (url) => {
   console.error(`Lỗi tải texture: ${url}`);
 };
 
+function resolveTextureUrl(url) {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  if (url.startsWith('/') && !url.startsWith(baseUrl)) {
+    return baseUrl + url.substring(1);
+  }
+  return url;
+}
+
+function configureTexture(texture, isColorMap) {
+  if (isColorMap) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+  }
+
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+}
+
 /**
  * Tải texture và tự động thiết lập colorSpace nếu cần
  * @param {string} url - Đường dẫn texture
@@ -38,17 +59,18 @@ loadingManager.onError = (url) => {
 export function loadTexture(url, isColorMap = false) {
   if (!url) return null;
   
-  // Xử lý đường dẫn tương đối cho Vite / GitHub Pages
-  const baseUrl = import.meta.env.BASE_URL || '/';
-  let finalUrl = url;
-  if (url.startsWith('/') && !url.startsWith(baseUrl)) {
-    finalUrl = baseUrl + url.substring(1);
+  const finalUrl = resolveTextureUrl(url);
+  const cachedTexture = textureCache.get(finalUrl);
+  if (cachedTexture) {
+    configureTexture(cachedTexture, isColorMap);
+    return cachedTexture;
   }
 
   const texture = textureLoader.load(finalUrl);
-  if (isColorMap) {
-    texture.colorSpace = THREE.SRGBColorSpace;
-  }
+  configureTexture(texture, isColorMap);
+  texture.userData.sourceUrl = finalUrl;
+  textureCache.set(finalUrl, texture);
+
   return texture;
 }
 

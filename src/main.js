@@ -20,25 +20,9 @@ window.addEventListener('resize', () => {
   composer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// 2. Tạo tất cả thiên thể từ dữ liệu
+// 2. Containers cho scene objects
 const bodies = [];
 const orbits = [];
-
-for (const data of planetData) {
-  const body = createPlanet(data);
-  scene.add(body.pivot);
-  bodies.push(body);
-
-  // Tạo orbit line
-  const orbitLine = createOrbitLine(data);
-  if (orbitLine) {
-    scene.add(orbitLine);
-    orbits.push(orbitLine);
-  }
-
-  // Tạo label (bao gồm cả Mặt Trời nếu muốn, hoặc bỏ qua Mặt Trời)
-  createLabel(data, body.pivot);
-}
 
 // 3. Thiết lập thời gian mô phỏng
 const clock = new THREE.Clock();
@@ -86,7 +70,22 @@ initUI({
   },
 });
 
-// 4. Animation Loop
+// 5. Tạo tất cả thiên thể sau khi loading UI đã sẵn sàng nhận progress events.
+for (const data of planetData) {
+  const body = createPlanet(data);
+  scene.add(body.pivot);
+  bodies.push(body);
+
+  const orbitLine = createOrbitLine(data);
+  if (orbitLine) {
+    scene.add(orbitLine);
+    orbits.push(orbitLine);
+  }
+
+  createLabel(data, body.pivot);
+}
+
+// 6. Animation Loop
 function animate() {
   requestAnimationFrame(animate);
 
@@ -114,12 +113,24 @@ function animate() {
       if (body.cloudMesh) {
         body.cloudMesh.rotation.y += direction * rotSpeed * 1.2 * deltaTime * timeScale;
       }
-      
-      // D. Cập nhật ShaderMaterial cho Mặt Trời (hiệu ứng bề mặt)
-      if (body.mesh.material.userData && body.mesh.material.userData.isSunShader) {
-        // Cộng thêm deltaTime để tạo animation mượt mà (không phụ thuộc vào timeScale)
-        body.mesh.material.userData.uniforms.uTime.value += deltaTime * 5.0;
+
+      if (body.atmosphereTextureMesh) {
+        const venusCloudDrift = body.data.id === 'venus'
+          ? -0.015
+          : direction * rotSpeed * 1.1 * timeScale;
+        body.atmosphereTextureMesh.rotation.y += venusCloudDrift * deltaTime;
       }
+      
+    }
+
+    // D. Cập nhật shader Mặt Trời độc lập với tốc độ mô phỏng.
+    if (body.mesh.material.userData?.isSunSurfaceShader) {
+      body.mesh.material.uniforms.uTime.value += deltaTime;
+    }
+
+    if (body.coronaMesh?.material.userData?.isSunCoronaShader) {
+      body.coronaMesh.material.uniforms.uTime.value += deltaTime;
+      body.coronaMesh.rotation.y += deltaTime * 0.03;
     }
   }
 
@@ -139,4 +150,3 @@ function animate() {
 animate();
 
 console.log(`Kepler Engine: ${bodies.length} thiên thể đang quay trên quỹ đạo elip`);
-

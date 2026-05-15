@@ -4,6 +4,7 @@ import { AU } from './constants.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
+import { createSunCorona, createSunSurfaceMaterial } from './sun.js';
 
 // Màu fallback khi chưa có texture
 const FALLBACK_COLORS = {
@@ -18,6 +19,26 @@ const FALLBACK_COLORS = {
   neptune: 0x3355AA,
   pluto:   0xC2B5A0,
 };
+
+function createVenusAtmosphereShell(radius, oblateness, atmosphereTexture, segments) {
+  const geometry = new THREE.SphereGeometry(1.012, segments, segments);
+  const material = new THREE.MeshStandardMaterial({
+    map: atmosphereTexture,
+    color: 0xfff0c8,
+    transparent: true,
+    opacity: 0.94,
+    depthWrite: false,
+    roughness: 1.0,
+    metalness: 0.0,
+    emissive: new THREE.Color(0x221000),
+    emissiveIntensity: 0.08,
+  });
+
+  const shell = new THREE.Mesh(geometry, material);
+  shell.name = 'venus_atmosphere_texture';
+  shell.scale.set(radius, radius * (1 - oblateness), radius);
+  return shell;
+}
 
 /**
  * Tạo một thiên thể hoàn chỉnh với hệ phân cấp:
@@ -39,42 +60,7 @@ export function createPlanet(data) {
   let material;
   
   if (data.type === 'star') {
-    if (textures.albedo) {
-      // Mặt Trời: Custom Shader để tạo hiệu ứng plasma chuyển động
-      material = new THREE.ShaderMaterial({
-        uniforms: {
-          uAlbedo: { value: textures.albedo },
-          uTime: { value: 0 }
-        },
-        vertexShader: `
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          uniform sampler2D uAlbedo;
-          uniform float uTime;
-          varying vec2 vUv;
-          
-          void main() {
-            vec2 uv = vUv;
-            // Bóp méo UV theo thời gian để tạo cảm giác bề mặt đang sôi
-            uv.x += sin(uv.y * 20.0 + uTime * 0.2) * 0.003;
-            uv.y += cos(uv.x * 20.0 + uTime * 0.15) * 0.003;
-            
-            vec4 texColor = texture2D(uAlbedo, uv);
-            // Kích sáng thêm 50% để tạo glow mạnh hơn, phù hợp với Bloom
-            gl_FragColor = vec4(texColor.rgb * 1.5, 1.0);
-          }
-        `
-      });
-      // Lưu reference để main.js có thể cập nhật uTime
-      material.userData = { isSunShader: true, uniforms: material.uniforms };
-    } else {
-      material = new THREE.MeshBasicMaterial({ color: FALLBACK_COLORS[data.id] || 0xffffff });
-    }
+    material = createSunSurfaceMaterial(textures.albedo, FALLBACK_COLORS[data.id]);
   } else {
     // Hành tinh: MeshStandardMaterial hỗ trợ PBR
     let pbrRoughness = 0.8;
@@ -124,7 +110,21 @@ export function createPlanet(data) {
   tiltGroup.rotation.z = THREE.MathUtils.degToRad(data.axialTilt || 0);
   tiltGroup.add(mesh);
 
-  // 4b. Khí quyển Fresnel (nếu hành tinh có atmosphere config)
+  // 4b. Corona riêng cho Mặt Trời
+  let coronaMesh = null;
+  if (data.type === 'star') {
+    coronaMesh = createSunCorona(r, ob);
+    tiltGroup.add(coronaMesh);
+  }
+
+  // 4c. Lớp mây dày của Sao Kim che gần toàn bộ surface texture.
+  let atmosphereTextureMesh = null;
+  if (data.id === 'venus' && textures.atmosphere) {
+    atmosphereTextureMesh = createVenusAtmosphereShell(r, ob, textures.atmosphere, segments);
+    tiltGroup.add(atmosphereTextureMesh);
+  }
+
+  // 4d. Khí quyển Fresnel (nếu hành tinh có atmosphere config)
   let atmosphereMesh = null;
   if (data.atmosphere) {
     atmosphereMesh = createAtmosphere(data.radius, data.atmosphere);
@@ -132,7 +132,7 @@ export function createPlanet(data) {
     tiltGroup.add(atmosphereMesh);
   }
 
-  // 4c. Lớp mây (Cloud Shell) cho Trái Đất
+  // 4e. Lớp mây (Cloud Shell) cho Trái Đất
   let cloudMesh = null;
   if (textures.clouds) {
     // Sphere geometry lớn hơn bề mặt 0.6%
@@ -153,10 +153,10 @@ export function createPlanet(data) {
     tiltGroup.add(cloudMesh);
   }
 
-  // 4d. Vành đai (Saturn, Uranus)
+  // 4f. Vành đai (Saturn, Uranus)
   let ringMesh = null;
   if (data.rings && data.rings.hasRings) {
-    ringMesh = createRings(data);
+    ringMesh = createRings(data, textures.ring);
     tiltGroup.add(ringMesh);
   }
 
@@ -170,5 +170,15 @@ export function createPlanet(data) {
     pivot.position.x = data.semiMajorAxis * AU;
   }
 
-  return { pivot, tiltGroup, mesh, atmosphereMesh, ringMesh, cloudMesh, data };
+  return {
+    pivot,
+    tiltGroup,
+    mesh,
+    atmosphereMesh,
+    atmosphereTextureMesh,
+    ringMesh,
+    cloudMesh,
+    coronaMesh,
+    data
+  };
 }
