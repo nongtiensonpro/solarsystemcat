@@ -70,6 +70,9 @@ export function initUI(callbacks) {
     </div>
     <button class="btn-icon" id="btn-orbits" title="Đường quỹ đạo">◎</button>
     <button class="btn-icon" id="btn-labels" title="Nhãn tên">Aa</button>
+    <button class="btn-icon active" id="btn-slice-toggle" title="Tự động Cắt lớp">🔬</button>
+    <button class="btn-icon active" id="btn-minimap-toggle" title="Bản đồ Radar">📡</button>
+    <button class="btn-icon active" id="btn-zoom-toggle" title="Chỉ báo Zoom">📏</button>
     <div class="quality-preset-group" title="Chất lượng đồ họa">
       ${presetButtonsHTML}
     </div>
@@ -153,10 +156,39 @@ export function initUI(callbacks) {
     <div class="info-actions">
       <button class="btn-action" id="btn-overview">🌐 Toàn cảnh</button>
       <button class="btn-action active" id="btn-follow">🎯 Bám sát</button>
-      <button class="btn-action" id="btn-cross-section" title="Mặt Cắt">🔬 Cắt</button>
+      <button class="btn-action" id="btn-screenshot" title="Chụp ảnh màn hình">📸</button>
     </div>
   `;
   container.appendChild(infoPanel);
+
+  // ═══ Layer Tooltip ═══
+  const layerTooltip = document.createElement('div');
+  layerTooltip.id = 'layer-tooltip';
+  layerTooltip.innerHTML = `
+    <div class="layer-name"></div>
+    <div class="layer-desc"></div>
+  `;
+  document.body.appendChild(layerTooltip);
+
+  // ═══ Minimap ═══
+  const minimapContainer = document.createElement('div');
+  minimapContainer.id = 'minimap-container';
+  minimapContainer.innerHTML = `
+    <canvas id="minimap-canvas" width="150" height="150"></canvas>
+    <div id="minimap-label">Hệ Mặt Trời</div>
+  `;
+  container.appendChild(minimapContainer);
+
+  // ═══ Zoom Indicator ═══
+  const zoomIndicator = document.createElement('div');
+  zoomIndicator.id = 'zoom-indicator';
+  zoomIndicator.innerHTML = `
+    <div class="zoom-level" data-level="overview">Toàn hệ</div>
+    <div class="zoom-level" data-level="approach">Tiếp cận</div>
+    <div class="zoom-level" data-level="slice">Cắt lớp</div>
+    <div id="zoom-pointer"></div>
+  `;
+  container.appendChild(zoomIndicator);
 
   // ═══════ Event Handlers ═══════
 
@@ -313,6 +345,25 @@ export function initUI(callbacks) {
     if (callbacks.onToggleLabels) callbacks.onToggleLabels(btnLabels.classList.contains('active'));
   });
 
+  // Auto Slice Toggle
+  const btnSliceToggle = document.getElementById('btn-slice-toggle');
+  btnSliceToggle.addEventListener('click', () => {
+    const isActive = btnSliceToggle.classList.toggle('active');
+    if (callbacks.onToggleSlice) callbacks.onToggleSlice(isActive);
+  });
+
+  const btnMinimapToggle = document.getElementById('btn-minimap-toggle');
+  btnMinimapToggle.addEventListener('click', () => {
+    const isActive = btnMinimapToggle.classList.toggle('active');
+    if (callbacks.onToggleMinimap) callbacks.onToggleMinimap(isActive);
+  });
+
+  const btnZoomToggle = document.getElementById('btn-zoom-toggle');
+  btnZoomToggle.addEventListener('click', () => {
+    const isActive = btnZoomToggle.classList.toggle('active');
+    if (callbacks.onToggleZoomIndicator) callbacks.onToggleZoomIndicator(isActive);
+  });
+
   // Planet + Moon Selector Buttons
   const allBtns = selector.querySelectorAll('.planet-btn');
   allBtns.forEach(btn => {
@@ -336,13 +387,6 @@ export function initUI(callbacks) {
       // Auto switch to Follow mode when selecting a body
       btnFollow.classList.add('active');
       btnOverview.classList.remove('active');
-
-      // Tắt cross section nếu chọn hành tinh mới
-      if (isCrossSectionActive) {
-        isCrossSectionActive = false;
-        btnCrossSection.classList.remove('active');
-        // Không gọi callback ở đây vì onPlanetSelect đã reset ở main
-      }
     }
   }
 
@@ -350,13 +394,6 @@ export function initUI(callbacks) {
   function closeInfoPanel() {
     infoPanel.classList.remove('visible');
     infoPanel.style.transform = ''; // Reset inline transform từ swipe
-    
-    // Tắt mặt cắt nếu đang mở
-    if (isCrossSectionActive) {
-      isCrossSectionActive = false;
-      btnCrossSection.classList.remove('active');
-      if (callbacks.onToggleCrossSection) callbacks.onToggleCrossSection(false);
-    }
   }
   document.getElementById('btn-close-info').addEventListener('click', closeInfoPanel);
 
@@ -399,8 +436,6 @@ export function initUI(callbacks) {
   // Camera Mode Buttons
   const btnOverview = document.getElementById('btn-overview');
   const btnFollow = document.getElementById('btn-follow');
-  const btnCrossSection = document.getElementById('btn-cross-section');
-  let isCrossSectionActive = false;
   
   btnOverview.addEventListener('click', () => {
     btnOverview.classList.add('active');
@@ -417,12 +452,9 @@ export function initUI(callbacks) {
     }
   });
 
-  btnCrossSection.addEventListener('click', () => {
-    isCrossSectionActive = !isCrossSectionActive;
-    btnCrossSection.classList.toggle('active', isCrossSectionActive);
-    if (callbacks.onToggleCrossSection) {
-      callbacks.onToggleCrossSection(isCrossSectionActive);
-    }
+  const btnScreenshot = document.getElementById('btn-screenshot');
+  btnScreenshot.addEventListener('click', () => {
+    if (callbacks.onScreenshot) callbacks.onScreenshot();
   });
 
   // ═══ Info Panel Content ═══
@@ -576,5 +608,26 @@ export function initUI(callbacks) {
     ).join('') + interiorHtml + summaryHtml;
 
     infoPanel.classList.add('visible');
+  }
+}
+
+let layerTooltipInstance = null;
+
+export function updateLayerTooltip(visible, x, y, name, desc) {
+  if (!layerTooltipInstance) {
+    layerTooltipInstance = document.getElementById('layer-tooltip');
+  }
+  if (!layerTooltipInstance) return;
+
+  if (visible) {
+    layerTooltipInstance.classList.add('visible');
+    layerTooltipInstance.style.left = `${x}px`;
+    layerTooltipInstance.style.top = `${y}px`;
+    const nameEl = layerTooltipInstance.querySelector('.layer-name');
+    const descEl = layerTooltipInstance.querySelector('.layer-desc');
+    if (nameEl) nameEl.textContent = name || '';
+    if (descEl) descEl.innerHTML = desc || '';
+  } else {
+    layerTooltipInstance.classList.remove('visible');
   }
 }

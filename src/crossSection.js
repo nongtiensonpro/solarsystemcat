@@ -5,7 +5,7 @@ import { GAS_GIANT_INTERIORS } from './gasGiantInterior.js';
 import { ICE_GIANT_INTERIORS } from './iceGiantInterior.js';
 
 // Plane cố định cắt dọc theo trục Z (hoặc X)
-const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+export const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const planes = [clipPlane];
 
 /**
@@ -22,7 +22,8 @@ function createInteriorLayers(data, radius) {
       name: l.name,
       min: l.radiusMin,
       max: l.radiusMax,
-      color: new THREE.Color(l.colorHex)
+      color: new THREE.Color(l.colorHex),
+      desc: l.description || l.compositionVi || ''
     }));
   } else if (data.type === 'terrestrial' && TERRESTRIAL_INTERIORS[data.id]) {
     layers = TERRESTRIAL_INTERIORS[data.id].layers.map(l => ({
@@ -44,40 +45,76 @@ function createInteriorLayers(data, radius) {
     // Scale layer so với bán kính gốc
     const layerRadius = radius * layer.max;
     
-    // Nếu là lõi Mộc/Thổ tinh (mờ), ta có thể làm nó hơi trong suốt, nhưng để đơn giản ta dùng MeshBasicMaterial
+    // Xử lý Lõi mờ (Fuzzy Core) của Khí Khổng Lồ
+    const isFuzzy = layer.name.includes('mờ');
+    
     const geo = new THREE.SphereGeometry(layerRadius, 64, 64);
     const mat = new THREE.MeshStandardMaterial({
       color: layer.color,
-      roughness: 0.9,
+      roughness: isFuzzy ? 1.0 : 0.9,
       metalness: 0.1,
       side: THREE.DoubleSide, // Quan trọng: Thấy được mặt trong (tạo hình cái bát)
       clippingPlanes: planes,
-      clipIntersection: false
+      clipIntersection: false,
+      transparent: isFuzzy,
+      opacity: isFuzzy ? 0.7 : 1.0,
+      blending: isFuzzy ? THREE.AdditiveBlending : THREE.NormalBlending
     });
 
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.layerData = {
+      name: layer.name,
+      desc: layer.desc || ''
+    };
     group.add(mesh);
   }
 
   return group;
 }
 
-/**
- * Cập nhật clipping plane để luôn cắt qua tâm của thiên thể đang bám sát
- * Đồng thời hướng mặt cắt về phía camera (hoặc giữ cố định)
- * @param {THREE.Object3D} targetPivot - Pivot của thiên thể đang bám sát
- */
-export function updateCrossSectionPlane(targetPivot) {
-  if (!targetPivot) return;
-  
-  // Lấy vị trí thế giới của thiên thể
-  const targetWorldPos = new THREE.Vector3();
-  targetPivot.getWorldPosition(targetWorldPos);
+let currentCutState = 0;
 
-  // Đặt hằng số plane dựa trên vị trí (để cắt qua tâm)
-  // Plane: Z = target.z
-  clipPlane.normal.set(0, 0, 1);
-  clipPlane.constant = -targetWorldPos.z;
+/**
+ * Cập nhật tự động mặt cắt dưa hấu dựa trên khoảng cách camera
+ * @param {Object} body - Hành tinh đang bám sát
+ * @param {number} cameraDistance - Khoảng cách từ camera đến tâm hành tinh
+ * @param {THREE.Vector3} targetWorldPos - Tọa độ thế giới của tâm hành tinh
+ */
+export function updateAutoCrossSection(body, cameraDistance, targetWorldPos) {
+  if (!body) return;
+  
+  const radius = body.mesh.scale.x; 
+  
+  // Ngưỡng kích hoạt (Đã điều chỉnh để rộng đường cho view "Tiếp cận")
+  const startZoom = radius * 3.5; 
+  const endZoom = radius * 1.4;
+  
+  let targetCutState = 0;
+  if (cameraDistance < startZoom) {
+    targetCutState = 1.0 - Math.max(0, (cameraDistance - endZoom) / (startZoom - endZoom));
+  }
+  
+  // Làm mượt hiệu ứng trượt
+  currentCutState += (targetCutState - currentCutState) * 0.1;
+  
+  if (currentCutState > 0.01) {
+    if (!body.isCrossSectionActive) {
+      toggleCrossSection(body, true);
+      body.isCrossSectionActive = true;
+    }
+    
+    // Plane: Z = target.z
+    // Mặt phẳng sẽ trượt từ ngoài (cách 1.1 radius) vào tâm (offset = 0)
+    clipPlane.normal.set(0, 0, 1);
+    const cutOffset = radius * 1.1 * (1.0 - currentCutState);
+    clipPlane.constant = -targetWorldPos.z + cutOffset;
+    
+  } else {
+    if (body.isCrossSectionActive) {
+      toggleCrossSection(body, false);
+      body.isCrossSectionActive = false;
+    }
+  }
 }
 
 /**

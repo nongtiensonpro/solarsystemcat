@@ -9,6 +9,7 @@ import { createCometTail, createCometComa } from './comets.js';
 import { createMagneticField } from './magneticField.js';
 import { createHeliumRain } from './heliumRain.js';
 import { createDiamondRain } from './diamondRain.js';
+import { createIronSnow } from './ironSnow.js';
 
 // Lấy fallback color từ data (đã normalize bởi dataLoader.js)
 function getFallbackColor(data) {
@@ -56,11 +57,19 @@ export function createPlanet(data) {
   } else if (data.isMoon) {
     segments = Math.round(24 * segmentScale); // Vệ tinh vừa và nhỏ
   } else if (data.radius <= 2.0) {
-    segments = Math.round(48 * segmentScale); // Hành tinh đá (Earth, Mars, Venus)
+    segments = Math.round(48 * segmentScale);  // 1. Tạo Geometries theo cấp độ (LOD)
   }
-  const geometry = new THREE.SphereGeometry(1, segments, segments);
 
-  // 2. Material — phân biệt Mặt Trời vs hành tinh
+  // High: 64 segments (Dành cho góc nhìn gần)
+  // Medium: 32 segments
+  // Low: 16 segments (Dành cho góc nhìn xa/Overview)
+  const geometries = {
+    high: new THREE.SphereGeometry(1, 64, 64),
+    med: new THREE.SphereGeometry(1, 32, 32),
+    low: new THREE.SphereGeometry(1, 16, 16)
+  };
+
+  // 2. Vật liệu (Material) - Dùng chung cho các cấp độ LOD
   const textures = loadPlanetTextures(data);
   let material;
   
@@ -126,20 +135,37 @@ export function createPlanet(data) {
     });
   }
 
-  // 3. Mesh
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = data.id;
+  // 3. Mesh & LOD
+  const lod = new THREE.LOD();
+  lod.name = data.id;
+
+  // Cấp độ Cao (Rất gần)
+  const meshHigh = new THREE.Mesh(geometries.high, material);
+  lod.addLevel(meshHigh, 0);
+
+  // Cấp độ Trung bình (Gần)
+  const meshMed = new THREE.Mesh(geometries.med, data.radius * 30);
+  lod.addLevel(meshMed, data.radius * 30);
+
+  // Cấp độ Thấp (Xa)
+  const meshLow = new THREE.Mesh(geometries.low, data.radius * 100);
+  lod.addLevel(meshLow, data.radius * 100);
 
   // Áp dụng kích thước (radius) và độ dẹt (oblateness)
   const r = data.radius;
   const ob = data.oblateness || 0;
-  mesh.scale.set(r, r * (1 - ob), r);
+  lod.scale.set(r, r * (1 - ob), r);
 
   // 4. TiltGroup — xoay theo độ nghiêng trục (axialTilt)
   const tiltGroup = new THREE.Group();
   tiltGroup.name = `${data.id}_tilt`;
   tiltGroup.rotation.z = THREE.MathUtils.degToRad(data.axialTilt || 0);
-  tiltGroup.add(mesh);
+  tiltGroup.add(lod);
+
+  // Lưu tham chiếu mesh chính (thường là bản High để shader logic hoạt động)
+  const mesh = meshHigh; 
+  // Gán id cho lod để search
+  lod.userData.planetId = data.id;
 
   // 4b. Corona và Chromosphere riêng cho Mặt Trời
   let coronaMesh = null;
@@ -237,6 +263,13 @@ export function createPlanet(data) {
     tiltGroup.add(diamondRainMesh);
   }
 
+  // 4j. Tuyết Sắt (Mercury)
+  let ironSnowMesh = null;
+  if (data.id === 'mercury') {
+    ironSnowMesh = createIronSnow(r, 0.75, 1500);
+    tiltGroup.add(ironSnowMesh);
+  }
+
   // 5. Pivot — vị trí trên quỹ đạo (sẽ được cập nhật bởi Kepler engine)
   const pivot = new THREE.Object3D();
   pivot.name = `${data.id}_pivot`;
@@ -262,6 +295,7 @@ export function createPlanet(data) {
   return {
     pivot,
     tiltGroup,
+    lod,
     mesh,
     atmosphereMesh,
     atmosphereTextureMesh,
@@ -274,6 +308,7 @@ export function createPlanet(data) {
     magneticFieldMesh,
     heliumRainMesh,
     diamondRainMesh,
+    ironSnowMesh,
     data
   };
 }

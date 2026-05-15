@@ -5,11 +5,11 @@ import { setPlanetData, planetData } from './planetData.js';
 import { createPlanet } from './createPlanet.js';
 import { computeOrbitalPosition } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
-import { initUI } from './ui.js';
+import { initUI, updateLayerTooltip } from './ui.js';
 import { createOrbitLine } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
-import { updateCrossSectionPlane, toggleCrossSection } from './crossSection.js';
+import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
@@ -42,13 +42,26 @@ async function bootstrap() {
   let simulationTime = 0;
   let timeScale = 1000; // Giá trị mặc định, sẽ được UI slider ghi đè
   let isPaused = false;
-  let isCrossSectionOn = false;
+  let isAutoSliceEnabled = true;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
   let trackedBody = null;
   let isFlying = false;
   let flyProgress = 0;
+  
+  // 3d. Raycaster cho Tooltip
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2(-100, -100);
+  let mouseClientX = 0;
+  let mouseClientY = 0;
+
+  window.addEventListener('mousemove', (event) => {
+    mouseClientX = event.clientX;
+    mouseClientY = event.clientY;
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  });
   let flyStartPos = new THREE.Vector3();
   let flyStartTarget = new THREE.Vector3();
   let flyEndPos = new THREE.Vector3();
@@ -66,9 +79,10 @@ async function bootstrap() {
   // 4. Khởi tạo UI với callbacks (planetData đã được populate)
   // Hàm dùng chung để chọn hành tinh từ cả UI lẫn double-tap mobile
   function selectPlanet(planetId) {
-    if (isCrossSectionOn && trackedBody) {
+    // Reset manual cross section if there's any pending
+    if (trackedBody && trackedBody.isCrossSectionActive) {
       toggleCrossSection(trackedBody, false);
-      isCrossSectionOn = false;
+      trackedBody.isCrossSectionActive = false;
     }
     cameraMode = 'follow';
     trackedBody = bodyById.get(planetId);
@@ -86,9 +100,9 @@ async function bootstrap() {
     onPauseToggle: (paused) => { isPaused = paused; },
     onPlanetSelect: (planetId) => { selectPlanet(planetId); },
     onOverview: () => {
-      if (isCrossSectionOn && trackedBody) {
+      if (trackedBody && trackedBody.isCrossSectionActive) {
         toggleCrossSection(trackedBody, false);
-        isCrossSectionOn = false;
+        trackedBody.isCrossSectionActive = false;
       }
       cameraMode = 'overview';
       trackedBody = null;
@@ -107,11 +121,24 @@ async function bootstrap() {
     onToggleLabels: (show) => {
       toggleLabels(show);
     },
-    onToggleCrossSection: (on) => {
-      isCrossSectionOn = on;
-      if (trackedBody) {
-        toggleCrossSection(trackedBody, on);
+    onScreenshot: () => {
+      takeScreenshot();
+    },
+    onToggleSlice: (enabled) => {
+      isAutoSliceEnabled = enabled;
+      // Nếu tắt khi đang cắt, hãy đóng mặt cắt ngay lập tức
+      if (!enabled && trackedBody && trackedBody.isCrossSectionActive) {
+        toggleCrossSection(trackedBody, false);
+        trackedBody.isCrossSectionActive = false;
       }
+    },
+    onToggleMinimap: (enabled) => {
+      const minimap = document.getElementById('minimap-container');
+      if (minimap) minimap.style.display = enabled ? 'block' : 'none';
+    },
+    onToggleZoomIndicator: (enabled) => {
+      const zoom = document.getElementById('zoom-indicator');
+      if (zoom) zoom.style.display = enabled ? 'flex' : 'none';
     }
   });
 
@@ -342,14 +369,39 @@ async function bootstrap() {
         body.magneticFieldMesh.material.uniforms.uTime.value += deltaTime;
       }
 
+      // --- TỐI ƯU HÓA (PHASE 5) ---
+      const bodyWorldPos = new THREE.Vector3();
+      body.pivot.getWorldPosition(bodyWorldPos);
+      const distToCamera = camera.position.distanceTo(bodyWorldPos);
+      const isClose = distToCamera < body.data.radius * 30;
+
+      // Cập nhật LOD
+      if (body.lod) {
+        body.lod.update(camera);
+      }
+
       // D4. Cập nhật mưa Heli
-      if (body.heliumRainMesh?.material.userData?.isHeliumRainShader) {
-        body.heliumRainMesh.material.uniforms.uTime.value += deltaTime;
+      if (body.heliumRainMesh) {
+        body.heliumRainMesh.visible = isClose;
+        if (isClose && body.heliumRainMesh.material.userData?.isHeliumRainShader) {
+          body.heliumRainMesh.material.uniforms.uTime.value += deltaTime;
+        }
       }
 
       // D5. Cập nhật mưa Kim Cương
-      if (body.diamondRainMesh?.material.userData?.isDiamondRainShader) {
-        body.diamondRainMesh.material.uniforms.uTime.value += deltaTime;
+      if (body.diamondRainMesh) {
+        body.diamondRainMesh.visible = isClose;
+        if (isClose && body.diamondRainMesh.material.userData?.isDiamondRainShader) {
+          body.diamondRainMesh.material.uniforms.uTime.value += deltaTime;
+        }
+      }
+
+      // D6. Cập nhật Tuyết Sắt (Iron Snow)
+      if (body.ironSnowMesh) {
+        body.ironSnowMesh.visible = isClose;
+        if (isClose && body.ironSnowMesh.material.userData?.isIronSnowShader) {
+          body.ironSnowMesh.material.uniforms.uTime.value += deltaTime;
+        }
       }
     }
 
@@ -375,13 +427,35 @@ async function bootstrap() {
         controls.target.copy(targetPos);
         camera.position.copy(targetPos).add(offset);
         
-        // Cập nhật vị trí mặt cắt (luôn đi qua tâm)
-        if (isCrossSectionOn) {
-          updateCrossSectionPlane(trackedBody.pivot);
+        // Tự động Cắt dưa hấu dựa trên khoảng cách camera (nếu bật)
+        if (isAutoSliceEnabled) {
+          const distance = camera.position.distanceTo(targetPos);
+          updateAutoCrossSection(trackedBody, distance, targetPos);
         }
       }
     }
     controls.update();
+
+    // -- Raycasting cho Tooltip --
+    let tooltipVisible = false;
+    if (trackedBody && trackedBody.isCrossSectionActive) {
+      const interiorGroup = trackedBody.tiltGroup.getObjectByName('cross_section_layers');
+      if (interiorGroup) {
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(interiorGroup.children, false);
+        
+        // Tìm điểm giao cắt không bị clipping
+        const validHit = intersects.find(hit => clipPlane.distanceToPoint(hit.point) >= 0);
+        
+        if (validHit && validHit.object.userData.layerData) {
+          tooltipVisible = true;
+          updateLayerTooltip(true, mouseClientX, mouseClientY, validHit.object.userData.layerData.name, validHit.object.userData.layerData.desc);
+        }
+      }
+    }
+    if (!tooltipVisible) {
+      updateLayerTooltip(false);
+    }
 
     // Cập nhật nhãn (nếu đang hiển thị) - Throttled để tối ưu hiệu năng
     const labelThrottle = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 6 : 3;
@@ -393,8 +467,99 @@ async function bootstrap() {
     // Cập nhật vành đai tiểu hành tinh
     asteroidBelt.update(simulationTime, deltaTime);
 
+    // Cập nhật Minimap & Zoom Indicator
+    updateMinimap();
+    updateZoomIndicator();
+
     // Kết xuất qua post-processing pipeline (bloom)
     composer.render();
+  }
+
+  function updateMinimap() {
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    const minimapCtx = minimapCanvas.getContext('2d');
+    if (!minimapCtx) return;
+
+    const w = minimapCanvas.width;
+    const h = minimapCanvas.height;
+    const center = w / 2;
+    
+    minimapCtx.clearRect(0, 0, w, h);
+    
+    // Scale factor: AU is very large
+    const scale = center / (40 * AU); 
+
+    // Draw Sun
+    minimapCtx.fillStyle = '#ffcc00';
+    minimapCtx.beginPath();
+    minimapCtx.arc(center, center, 3, 0, Math.PI * 2);
+    minimapCtx.fill();
+
+    bodies.forEach(body => {
+      if (body.data.isMoon || body.data.id === 'sun') return;
+      
+      const pos = new THREE.Vector3();
+      body.pivot.getWorldPosition(pos);
+      
+      const mx = center + pos.x * scale;
+      const my = center + pos.z * scale;
+      
+      minimapCtx.fillStyle = body === trackedBody ? '#ffffff' : 'rgba(110, 198, 255, 0.5)';
+      minimapCtx.beginPath();
+      minimapCtx.arc(mx, my, 1.5, 0, Math.PI * 2);
+      minimapCtx.fill();
+    });
+
+    // Draw Camera
+    const cx = center + camera.position.x * scale;
+    const cz = center + camera.position.z * scale;
+    minimapCtx.fillStyle = '#ff3333';
+    minimapCtx.beginPath();
+    minimapCtx.arc(cx, cz, 2, 0, Math.PI * 2);
+    minimapCtx.fill();
+  }
+
+  function updateZoomIndicator() {
+    const zoomLevels = document.querySelectorAll('.zoom-level');
+    const zoomPointer = document.getElementById('zoom-pointer');
+    if (!zoomPointer) return;
+
+    if (!trackedBody) {
+      zoomLevels.forEach(el => el.classList.remove('active'));
+      zoomLevels[0].classList.add('active');
+      zoomPointer.style.top = '20px';
+      return;
+    }
+
+    const targetPos = new THREE.Vector3();
+    trackedBody.pivot.getWorldPosition(targetPos);
+    const dist = camera.position.distanceTo(targetPos);
+    const radius = trackedBody.mesh.scale.x;
+
+    let activeLevel = 'overview';
+    let pointerTop = '20px';
+
+    if (dist < radius * 3.5) {
+      activeLevel = 'slice';
+      pointerTop = '120px';
+    } else if (dist < radius * 18) {
+      activeLevel = 'approach';
+      pointerTop = '70px';
+    }
+
+    zoomLevels.forEach(el => {
+      el.classList.toggle('active', el.dataset.level === activeLevel);
+    });
+    zoomPointer.style.top = pointerTop;
+  }
+
+  function takeScreenshot() {
+    renderer.render(scene, camera);
+    const dataURL = renderer.domElement.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `SolarSystem_${trackedBody?.data.name || 'System'}_${Date.now()}.png`;
+    link.href = dataURL;
+    link.click();
   }
 
   // Bắt đầu vòng lặp
