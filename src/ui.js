@@ -29,10 +29,7 @@ export function initUI(callbacks) {
   `;
   document.body.appendChild(loadingScreen);
 
-  // Auto-hide loading sau 1.5s (vì chưa có textures nặng)
-  setTimeout(() => {
-    loadingScreen.classList.add('hidden');
-  }, 1500);
+  // Loading screen sẽ được ẩn bởi textureLoader.js khi tải xong tài nguyên
 
   // ═══ Top Bar ═══
   const topBar = document.createElement('div');

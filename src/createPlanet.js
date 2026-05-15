@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { AU } from './constants.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createRings } from './rings.js';
+import { loadPlanetTextures } from './textureLoader.js';
 
 // Màu fallback khi chưa có texture
 const FALLBACK_COLORS = {
@@ -34,18 +35,77 @@ export function createPlanet(data) {
   const geometry = new THREE.SphereGeometry(1, segments, segments);
 
   // 2. Material — phân biệt Mặt Trời vs hành tinh
+  const textures = loadPlanetTextures(data);
   let material;
+  
   if (data.type === 'star') {
-    // Mặt Trời: MeshBasicMaterial tự phát sáng, không phản ứng lighting
-    material = new THREE.MeshBasicMaterial({
-      color: FALLBACK_COLORS[data.id] || 0xffffff,
-    });
+    if (textures.albedo) {
+      // Mặt Trời: Custom Shader để tạo hiệu ứng plasma chuyển động
+      material = new THREE.ShaderMaterial({
+        uniforms: {
+          uAlbedo: { value: textures.albedo },
+          uTime: { value: 0 }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D uAlbedo;
+          uniform float uTime;
+          varying vec2 vUv;
+          
+          void main() {
+            vec2 uv = vUv;
+            // Bóp méo UV theo thời gian để tạo cảm giác bề mặt đang sôi
+            uv.x += sin(uv.y * 20.0 + uTime * 0.2) * 0.003;
+            uv.y += cos(uv.x * 20.0 + uTime * 0.15) * 0.003;
+            
+            vec4 texColor = texture2D(uAlbedo, uv);
+            // Kích sáng thêm 50% để tạo glow mạnh hơn, phù hợp với Bloom
+            gl_FragColor = vec4(texColor.rgb * 1.5, 1.0);
+          }
+        `
+      });
+      // Lưu reference để main.js có thể cập nhật uTime
+      material.userData = { isSunShader: true, uniforms: material.uniforms };
+    } else {
+      material = new THREE.MeshBasicMaterial({ color: FALLBACK_COLORS[data.id] || 0xffffff });
+    }
   } else {
     // Hành tinh: MeshStandardMaterial hỗ trợ PBR
+    let pbrRoughness = 0.8;
+    let pbrMetalness = 0.0;
+    
+    // Tùy chỉnh thông số bề mặt theo hành tinh
+    if (['mercury', 'mars', 'pluto'].includes(data.id)) {
+      pbrRoughness = 0.95; // Bề mặt đá khô, nhám
+    } else if (data.id === 'earth') {
+      pbrRoughness = 0.6;
+      pbrMetalness = 0.1;
+    } else if (data.id === 'venus') {
+      pbrRoughness = 0.7;
+    } else if (['uranus', 'neptune'].includes(data.id)) {
+      pbrRoughness = 0.5; // Bề mặt băng/khí láng hơn
+    }
+
     material = new THREE.MeshStandardMaterial({
-      color: FALLBACK_COLORS[data.id] || 0xaaaaaa,
-      roughness: 0.8,
-      metalness: 0.1,
+      color: textures.albedo ? 0xffffff : (FALLBACK_COLORS[data.id] || 0xaaaaaa),
+      map: textures.albedo || null,
+      normalMap: textures.normal || null,
+      bumpMap: textures.bump || null,
+      bumpScale: 0.05,
+      // Roughness map cho các vùng phản chiếu khác nhau
+      roughnessMap: textures.specular || null,
+      roughness: pbrRoughness,
+      metalness: pbrMetalness,
+      // Night map cho đèn thành phố (sẽ sáng ở phần tối)
+      emissiveMap: textures.night || null,
+      emissive: textures.night ? new THREE.Color(0xffffee) : new THREE.Color(0x000000),
+      emissiveIntensity: 0.6,
     });
   }
 
@@ -72,7 +132,28 @@ export function createPlanet(data) {
     tiltGroup.add(atmosphereMesh);
   }
 
-  // 4c. Vành đai (Saturn, Uranus)
+  // 4c. Lớp mây (Cloud Shell) cho Trái Đất
+  let cloudMesh = null;
+  if (textures.clouds) {
+    // Sphere geometry lớn hơn bề mặt 0.6%
+    const cloudGeo = new THREE.SphereGeometry(1.006, segments, segments);
+    const cloudMat = new THREE.MeshStandardMaterial({
+      map: textures.clouds,
+      alphaMap: textures.clouds, // Dùng ảnh cloud map (trắng đen) làm kênh alpha
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending, // Màu đen sẽ trở thành trong suốt
+      color: 0xffffff,
+      roughness: 1.0,
+      metalness: 0.0,
+    });
+    cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+    cloudMesh.name = `${data.id}_clouds`;
+    cloudMesh.scale.set(r, r * (1 - ob), r);
+    tiltGroup.add(cloudMesh);
+  }
+
+  // 4d. Vành đai (Saturn, Uranus)
   let ringMesh = null;
   if (data.rings && data.rings.hasRings) {
     ringMesh = createRings(data);
@@ -89,5 +170,5 @@ export function createPlanet(data) {
     pivot.position.x = data.semiMajorAxis * AU;
   }
 
-  return { pivot, tiltGroup, mesh, atmosphereMesh, ringMesh, data };
+  return { pivot, tiltGroup, mesh, atmosphereMesh, ringMesh, cloudMesh, data };
 }

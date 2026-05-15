@@ -57,13 +57,16 @@ export function initScene(canvas) {
   controls.maxDistance = 50000;
 
   // 5. Lighting
-  // Ánh sáng môi trường cường độ rất thấp để phần khuất không bị đen đặc
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.05);
+  // Ánh sáng môi trường để phần khuất không bị đen hoàn toàn
+  // Tăng lên 0.4 để các hành tinh xa (Saturn, Uranus) vẫn có thể nhìn thấy rõ kết cấu
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
   scene.add(ambientLight);
 
   // Ánh sáng điểm từ Mặt Trời tại tâm
-  // PointLight(color, intensity, distance, decay)
-  const sunLight = new THREE.PointLight(0xffffee, 5.0, 0, 0);
+  // Ở Three.js r170, PointLight mặc định dùng physical inverse-square decay.
+  // Cường độ 20000 giúp Trái Đất (100 AU) nhận cường độ 2.0 (20000 / 100^2),
+  // mức độ vừa phải không bị cháy sáng khi dùng chung với ACESFilmicToneMapping.
+  const sunLight = new THREE.PointLight(0xffffee, 20000, 0); 
   sunLight.position.set(0, 0, 0);
   scene.add(sunLight);
 

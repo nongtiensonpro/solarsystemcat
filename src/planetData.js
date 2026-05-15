@@ -30,8 +30,7 @@ export const planetData = [
     rotationPeriod: 1407.6,
     oblateness: 0,
     textures: {
-      albedo: '/textures/planets/mercury/albedo.jpg',
-      bump: '/textures/planets/mercury/bump.jpg'
+      albedo: '/textures/planets/mercury/albedo.jpg'
     },
     atmosphere: null
   },
@@ -95,8 +94,7 @@ export const planetData = [
     rotationPeriod: 24.62,
     oblateness: 0.00648,
     textures: {
-      albedo: '/textures/planets/mars/albedo.jpg',
-      bump: '/textures/planets/mars/bump.jpg'
+      albedo: '/textures/planets/mars/albedo.jpg'
     },
     atmosphere: {
       color: 0xC06030,

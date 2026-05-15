@@ -96,20 +96,30 @@ function animate() {
   }
 
   for (const body of bodies) {
-    // Bỏ qua Mặt Trời (tâm hệ)
-    if (body.data.type === 'star') continue;
-
-    // A. Cập nhật vị trí quỹ đạo (Kepler)
-    if (body.data.semiMajorAxis > 0 && !isPaused) {
-      const pos = computeOrbitalPosition(body.data, simulationTime);
-      body.pivot.position.set(pos.x, pos.y, pos.z);
+    // A. Cập nhật vị trí quỹ đạo (Kepler) - Bỏ qua Mặt Trời
+    if (body.data.type !== 'star') {
+      if (body.data.semiMajorAxis > 0 && !isPaused) {
+        const pos = computeOrbitalPosition(body.data, simulationTime);
+        body.pivot.position.set(pos.x, pos.y, pos.z);
+      }
     }
 
-    // B. Tự quay quanh trục
+    // B. Tự quay quanh trục (cả Mặt Trời và Hành tinh)
     if (body.data.rotationPeriod !== 0 && !isPaused) {
       const rotSpeed = (2 * Math.PI) / (Math.abs(body.data.rotationPeriod) * 3600);
       const direction = body.data.rotationPeriod > 0 ? 1 : -1;
       body.mesh.rotation.y += direction * rotSpeed * deltaTime * timeScale;
+
+      // C. Lớp mây quay độc lập (nhanh hơn bề mặt 20% để tạo hiệu ứng gió)
+      if (body.cloudMesh) {
+        body.cloudMesh.rotation.y += direction * rotSpeed * 1.2 * deltaTime * timeScale;
+      }
+      
+      // D. Cập nhật ShaderMaterial cho Mặt Trời (hiệu ứng bề mặt)
+      if (body.mesh.material.userData && body.mesh.material.userData.isSunShader) {
+        // Cộng thêm deltaTime để tạo animation mượt mà (không phụ thuộc vào timeScale)
+        body.mesh.material.userData.uniforms.uTime.value += deltaTime * 5.0;
+      }
     }
   }
 
