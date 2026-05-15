@@ -101,7 +101,7 @@ export function createPlanet(data) {
 
     // Xác định emissive (phát sáng)
     let emissiveColor = new THREE.Color(0x000000);
-    let emissiveInt = 0.6;
+    let emissiveInt = 1.0;
     if (textures.night) {
       emissiveColor = new THREE.Color(0xffffee); // Đèn thành phố (Trái Đất)
     } else if (data.id === 'io') {

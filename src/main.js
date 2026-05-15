@@ -374,6 +374,7 @@ async function bootstrap() {
       body.pivot.getWorldPosition(bodyWorldPos);
       const distToCamera = camera.position.distanceTo(bodyWorldPos);
       const isClose = distToCamera < body.data.radius * 30;
+      const isSlicing = body.isCrossSectionActive;
 
       // Cập nhật LOD
       if (body.lod) {
@@ -382,24 +383,24 @@ async function bootstrap() {
 
       // D4. Cập nhật mưa Heli
       if (body.heliumRainMesh) {
-        body.heliumRainMesh.visible = isClose;
-        if (isClose && body.heliumRainMesh.material.userData?.isHeliumRainShader) {
+        body.heliumRainMesh.visible = isClose && isSlicing;
+        if (body.heliumRainMesh.visible && body.heliumRainMesh.material.userData?.isHeliumRainShader) {
           body.heliumRainMesh.material.uniforms.uTime.value += deltaTime;
         }
       }
 
       // D5. Cập nhật mưa Kim Cương
       if (body.diamondRainMesh) {
-        body.diamondRainMesh.visible = isClose;
-        if (isClose && body.diamondRainMesh.material.userData?.isDiamondRainShader) {
+        body.diamondRainMesh.visible = isClose && isSlicing;
+        if (body.diamondRainMesh.visible && body.diamondRainMesh.material.userData?.isDiamondRainShader) {
           body.diamondRainMesh.material.uniforms.uTime.value += deltaTime;
         }
       }
 
       // D6. Cập nhật Tuyết Sắt (Iron Snow)
       if (body.ironSnowMesh) {
-        body.ironSnowMesh.visible = isClose;
-        if (isClose && body.ironSnowMesh.material.userData?.isIronSnowShader) {
+        body.ironSnowMesh.visible = isClose && isSlicing;
+        if (body.ironSnowMesh.visible && body.ironSnowMesh.material.userData?.isIronSnowShader) {
           body.ironSnowMesh.material.uniforms.uTime.value += deltaTime;
         }
       }
