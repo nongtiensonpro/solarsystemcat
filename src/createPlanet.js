@@ -5,20 +5,12 @@ import { createAtmosphere } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
 import { createSunCorona, createSunSurfaceMaterial } from './sun.js';
+import { createCometTail, createCometComa } from './comets.js';
 
-// Màu fallback khi chưa có texture
-const FALLBACK_COLORS = {
-  sun:     0xFFDD33,
-  mercury: 0x8C7E6D,
-  venus:   0xE8CDA0,
-  earth:   0x2266AA,
-  mars:    0xC1440E,
-  jupiter: 0xC8A77A,
-  saturn:  0xD4BE8D,
-  uranus:  0x7EC8C8,
-  neptune: 0x3355AA,
-  pluto:   0xC2B5A0,
-};
+// Lấy fallback color từ data (đã normalize bởi dataLoader.js)
+function getFallbackColor(data) {
+  return data.fallbackColor ?? 0xaaaaaa;
+}
 
 function createVenusAtmosphereShell(radius, oblateness, atmosphereTexture, segments) {
   const geometry = new THREE.SphereGeometry(1.012, segments, segments);
@@ -51,8 +43,15 @@ function createVenusAtmosphereShell(radius, oblateness, atmosphereTexture, segme
  * @returns {{ pivot, tiltGroup, mesh, data }}
  */
 export function createPlanet(data) {
-  // 1. Geometry — quả cầu chuẩn hóa
-  const segments = data.radius > 5 ? 64 : 32;
+  // 1. Geometry — Quả cầu chuẩn hóa (Áp dụng LOD để tối ưu hiệu năng)
+  let segments = 64; // Mặc định cao cho Mặt Trời và Khí Khổng Lồ
+  if (data.type === 'comet' || data.radius < 0.1) {
+    segments = 16; // Nhỏ nhất (Sao chổi, tiểu hành tinh)
+  } else if (data.isMoon) {
+    segments = 24; // Vệ tinh vừa và nhỏ
+  } else if (data.radius <= 2.0) {
+    segments = 48; // Hành tinh đá (Earth, Mars, Venus)
+  }
   const geometry = new THREE.SphereGeometry(1, segments, segments);
 
   // 2. Material — phân biệt Mặt Trời vs hành tinh
@@ -60,26 +59,46 @@ export function createPlanet(data) {
   let material;
   
   if (data.type === 'star') {
-    material = createSunSurfaceMaterial(textures.albedo, FALLBACK_COLORS[data.id]);
+    material = createSunSurfaceMaterial(textures.albedo, getFallbackColor(data));
   } else {
     // Hành tinh: MeshStandardMaterial hỗ trợ PBR
     let pbrRoughness = 0.8;
     let pbrMetalness = 0.0;
     
-    // Tùy chỉnh thông số bề mặt theo hành tinh
-    if (['mercury', 'mars', 'pluto'].includes(data.id)) {
+    // Tùy chỉnh thông số bề mặt theo thiên thể
+    if (['mercury', 'mars', 'pluto', 'moon', 'callisto'].includes(data.id)) {
       pbrRoughness = 0.95; // Bề mặt đá khô, nhám
     } else if (data.id === 'earth') {
       pbrRoughness = 0.6;
       pbrMetalness = 0.1;
-    } else if (data.id === 'venus') {
-      pbrRoughness = 0.7;
-    } else if (['uranus', 'neptune'].includes(data.id)) {
-      pbrRoughness = 0.5; // Bề mặt băng/khí láng hơn
+    } else if (data.id === 'venus' || data.id === 'io') {
+      pbrRoughness = 0.7; // Bề mặt mây hoặc lưu huỳnh
+    } else if (data.id === 'europa') {
+      pbrRoughness = 0.25; // Bề mặt băng phản quang tốt
+      pbrMetalness = 0.05;
+    } else if (data.id === 'ganymede') {
+      pbrRoughness = 0.6; // Pha trộn giữa băng và đá
+    } else if (['uranus', 'neptune', 'titan'].includes(data.id)) {
+      pbrRoughness = 0.5; // Bề mặt băng/khí/khí quyển láng hơn
+    } else if (data.type === 'comet') {
+      pbrRoughness = 0.95; // Lõi sao chổi carbon tối màu
+    }
+
+    // Xác định emissive (phát sáng)
+    let emissiveColor = new THREE.Color(0x000000);
+    let emissiveInt = 0.6;
+    if (textures.night) {
+      emissiveColor = new THREE.Color(0xffffee); // Đèn thành phố (Trái Đất)
+    } else if (data.id === 'io') {
+      emissiveColor = new THREE.Color(0x331100); // Núi lửa phát sáng mờ đỏ/cam
+      emissiveInt = 0.15;
+    } else if (data.type === 'comet') {
+      emissiveColor = new THREE.Color(0x88ccff); // Phát sáng mờ màu xanh
+      emissiveInt = 0.2;
     }
 
     material = new THREE.MeshStandardMaterial({
-      color: textures.albedo ? 0xffffff : (FALLBACK_COLORS[data.id] || 0xaaaaaa),
+      color: textures.albedo ? 0xffffff : getFallbackColor(data),
       map: textures.albedo || null,
       normalMap: textures.normal || null,
       bumpMap: textures.bump || null,
@@ -88,10 +107,10 @@ export function createPlanet(data) {
       roughnessMap: textures.specular || null,
       roughness: pbrRoughness,
       metalness: pbrMetalness,
-      // Night map cho đèn thành phố (sẽ sáng ở phần tối)
+      // Night map cho đèn thành phố hoặc emissive mặc định
       emissiveMap: textures.night || null,
-      emissive: textures.night ? new THREE.Color(0xffffee) : new THREE.Color(0x000000),
-      emissiveIntensity: 0.6,
+      emissive: emissiveColor,
+      emissiveIntensity: emissiveInt,
     });
   }
 
@@ -132,6 +151,25 @@ export function createPlanet(data) {
     tiltGroup.add(atmosphereMesh);
   }
 
+  // Khí quyển đục đặc biệt của Titan (Haze layer)
+  if (data.id === 'titan') {
+    const titanHazeGeo = new THREE.SphereGeometry(1.015, segments, segments);
+    const titanHazeMat = new THREE.MeshStandardMaterial({
+      color: 0xCC8833,
+      transparent: true,
+      opacity: 0.7,           // Che ~70% bề mặt
+      depthWrite: false,
+      roughness: 1.0,
+      metalness: 0.0,
+      emissive: new THREE.Color(0x221100),
+      emissiveIntensity: 0.08,
+    });
+    const titanHaze = new THREE.Mesh(titanHazeGeo, titanHazeMat);
+    titanHaze.scale.set(r, r * (1 - ob), r);
+    titanHaze.name = 'titan_haze';
+    tiltGroup.add(titanHaze);
+  }
+
   // 4e. Lớp mây (Cloud Shell) cho Trái Đất
   let cloudMesh = null;
   if (textures.clouds) {
@@ -170,6 +208,18 @@ export function createPlanet(data) {
     pivot.position.x = data.semiMajorAxis * AU;
   }
 
+  // 4g. Đuôi sao chổi
+  let tailMesh = null;
+  let comaMesh = null;
+  if (data.type === 'comet') {
+    tailMesh = createCometTail();
+    // Gắn vào pivot thay vì tiltGroup để dễ dàng lookAt ra xa Mặt Trời
+    pivot.add(tailMesh);
+    
+    comaMesh = createCometComa(data.physical.radius);
+    tiltGroup.add(comaMesh);
+  }
+
   return {
     pivot,
     tiltGroup,
@@ -179,6 +229,8 @@ export function createPlanet(data) {
     ringMesh,
     cloudMesh,
     coronaMesh,
+    tailMesh,
+    comaMesh,
     data
   };
 }

@@ -1,13 +1,27 @@
 // UI Module — Tạo và quản lý giao diện người dùng
 import { planetData } from './planetData.js';
+import { QUALITY_PRESETS, getCurrentPresetKey, applyPreset } from './renderConfig.js';
 
-// Màu dot cho từng hành tinh
-const PLANET_COLORS = {
-  sun: '#FFDD33', mercury: '#8C7E6D', venus: '#E8CDA0',
-  earth: '#2266AA', mars: '#C1440E', jupiter: '#C8A77A',
-  saturn: '#D4BE8D', uranus: '#7EC8C8', neptune: '#3355AA',
-  pluto: '#C2B5A0',
-};
+/**
+ * Chuyển hex number 0xRRGGBB sang CSS hex string "#RRGGBB"
+ * @param {number} color
+ * @returns {string}
+ */
+function colorToHex(color) {
+  if (typeof color === 'string') return color;
+  return '#' + (color & 0xFFFFFF).toString(16).padStart(6, '0');
+}
+
+/**
+ * Tìm tên parent body
+ * @param {string} parentId
+ * @returns {string}
+ */
+function getParentName(parentId) {
+  if (!parentId) return '';
+  const parent = planetData.find(p => p.id === parentId);
+  return parent ? parent.name : parentId;
+}
 
 /**
  * Khởi tạo toàn bộ UI
@@ -29,13 +43,20 @@ export function initUI(callbacks) {
   `;
   document.body.appendChild(loadingScreen);
 
-  // Loading screen sẽ được ẩn bởi textureLoader.js khi tải xong tài nguyên
-
   // ═══ Top Bar ═══
   const topBar = document.createElement('div');
   topBar.className = 'glass-panel top-bar';
+
+  const currentPresetKey = getCurrentPresetKey();
+  const presetKeys = Object.keys(QUALITY_PRESETS);
+  const presetButtonsHTML = presetKeys.map(key => {
+    const preset = QUALITY_PRESETS[key];
+    const activeClass = key === currentPresetKey ? 'active' : '';
+    return `<button class="preset-btn ${activeClass}" data-preset="${key}">${preset.label}</button>`;
+  }).join('');
+
   topBar.innerHTML = `
-    <h1>☀️ Hệ Mặt Trời</h1>
+    <button class="btn-icon" id="btn-search" title="Tìm kiếm">🔍</button>
     <div class="time-controls">
       <button class="btn-icon" id="btn-pause" title="Tạm dừng">⏸</button>
       <label>Tốc độ</label>
@@ -44,22 +65,75 @@ export function initUI(callbacks) {
     </div>
     <button class="btn-icon" id="btn-orbits" title="Đường quỹ đạo">◎</button>
     <button class="btn-icon" id="btn-labels" title="Nhãn tên">Aa</button>
+    <div class="quality-preset-group" title="Chất lượng đồ họa">
+      ${presetButtonsHTML}
+    </div>
   `;
   container.appendChild(topBar);
 
-  // ═══ Planet Selector ═══
+  // ═══ Search Panel ═══
+  const searchPanel = document.createElement('div');
+  searchPanel.className = 'glass-panel search-panel';
+  searchPanel.id = 'search-panel';
+  searchPanel.style.display = 'none'; // Ẩn mặc định
+  searchPanel.innerHTML = `
+    <div class="search-header">
+      <input type="text" id="search-input" placeholder="Tìm kiếm hành tinh, vệ tinh..." autocomplete="off">
+      <button class="btn-close-search" id="btn-close-search">✕</button>
+    </div>
+    <div class="search-filters">
+      <button class="filter-btn active" data-type="all">Tất cả</button>
+      <button class="filter-btn" data-type="planet">Hành tinh & Sao</button>
+      <button class="filter-btn" data-type="moon">Vệ tinh</button>
+      <button class="filter-btn" data-type="other">Khác</button>
+    </div>
+    <div class="search-results" id="search-results"></div>
+  `;
+  container.appendChild(searchPanel);
+
+  // ═══ Planet Selector — Vẫn giữ nhưng sẽ mờ đi khi search ═══
   const selector = document.createElement('div');
   selector.className = 'glass-panel planet-selector';
   
-  for (const planet of planetData) {
+  // Tách planets (non-moon) và moons
+  const planets = planetData.filter(p => !p.isMoon);
+  const moonsByParent = new Map();
+  for (const body of planetData) {
+    if (body.isMoon && body.parentId) {
+      if (!moonsByParent.has(body.parentId)) {
+        moonsByParent.set(body.parentId, []);
+      }
+      moonsByParent.get(body.parentId).push(body);
+    }
+  }
+  
+  for (const planet of planets) {
+    // Planet button
     const btn = document.createElement('button');
     btn.className = 'planet-btn';
     btn.dataset.id = planet.id;
+    const dotColor = colorToHex(planet.fallbackColor || 0xaaaaaa);
     btn.innerHTML = `
-      <span class="planet-dot" style="background: ${PLANET_COLORS[planet.id]}"></span>
+      <span class="planet-dot" style="background: ${dotColor}"></span>
       ${planet.name}
     `;
     selector.appendChild(btn);
+
+    // Moon buttons (grouped under parent)
+    const moons = moonsByParent.get(planet.id);
+    if (moons && moons.length > 0) {
+      for (const moon of moons) {
+        const moonBtn = document.createElement('button');
+        moonBtn.className = 'planet-btn moon-btn';
+        moonBtn.dataset.id = moon.id;
+        const moonDotColor = colorToHex(moon.fallbackColor || 0x888888);
+        moonBtn.innerHTML = `
+          <span class="planet-dot moon-dot" style="background: ${moonDotColor}"></span>
+          ${moon.name}
+        `;
+        selector.appendChild(moonBtn);
+      }
+    }
   }
   container.appendChild(selector);
 
@@ -71,17 +145,112 @@ export function initUI(callbacks) {
     <button class="btn-close-info" id="btn-close-info">✕</button>
     <h2 id="info-name">—</h2>
     <div id="info-content"></div>
+    <div class="info-actions">
+      <button class="btn-action" id="btn-overview">🌐 Toàn cảnh</button>
+      <button class="btn-action active" id="btn-follow">🎯 Bám sát</button>
+    </div>
   `;
   container.appendChild(infoPanel);
 
   // ═══════ Event Handlers ═══════
 
+  // Search Panel Toggle & Logic
+  const btnSearch = document.getElementById('btn-search');
+  const btnCloseSearch = document.getElementById('btn-close-search');
+  const searchInput = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  const filterBtns = searchPanel.querySelectorAll('.filter-btn');
+  let currentSearchFilter = 'all';
+
+  function toggleSearch() {
+    const isVisible = searchPanel.style.display === 'flex';
+    searchPanel.style.display = isVisible ? 'none' : 'flex';
+    if (!isVisible) {
+      searchInput.focus();
+      renderSearchResults();
+    }
+  }
+
+  btnSearch.addEventListener('click', toggleSearch);
+  btnCloseSearch.addEventListener('click', toggleSearch);
+
+  function getBodyCategory(type) {
+    if (type === 'star' || type === 'terrestrial' || type === 'gas-giant' || type === 'ice-giant') return 'planet';
+    if (type === 'moon') return 'moon';
+    return 'other'; // dwarf, comet
+  }
+
+  function renderSearchResults() {
+    const query = searchInput.value.toLowerCase().trim();
+    
+    const filtered = planetData.filter(body => {
+      // Check category
+      const cat = getBodyCategory(body.type);
+      if (currentSearchFilter !== 'all' && cat !== currentSearchFilter) return false;
+      
+      // Check query
+      if (!query) return true;
+      return body.name.toLowerCase().includes(query) || body.id.toLowerCase().includes(query);
+    });
+
+    searchResults.innerHTML = '';
+    
+    if (filtered.length === 0) {
+      searchResults.innerHTML = '<div class="no-results">Không tìm thấy thiên thể nào.</div>';
+      return;
+    }
+
+    filtered.forEach(body => {
+      const el = document.createElement('div');
+      el.className = 'search-item';
+      
+      let typeText = body.type === 'star' ? 'Ngôi sao' : body.isMoon ? 'Vệ tinh' : body.type === 'comet' ? 'Sao chổi' : 'Hành tinh';
+      
+      el.innerHTML = `
+        <div class="search-item-dot" style="background: ${colorToHex(body.fallbackColor)}"></div>
+        <div class="search-item-info">
+          <div class="search-item-name">${body.name}</div>
+          <div class="search-item-type">${typeText}${body.parentId ? ` của ${getParentName(body.parentId)}` : ''}</div>
+        </div>
+      `;
+      
+      el.addEventListener('click', () => {
+        selectBody(body.id);
+        if (window.innerWidth < 768) {
+          toggleSearch(); // Ẩn search trên mobile sau khi chọn
+        }
+      });
+      
+      searchResults.appendChild(el);
+    });
+  }
+
+  searchInput.addEventListener('input', renderSearchResults);
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentSearchFilter = btn.dataset.type;
+      renderSearchResults();
+    });
+  });
+
+  // Quality Preset Buttons
+  const presetBtns = topBar.querySelectorAll('.preset-btn');
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.preset;
+      presetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyPreset(key);
+    });
+  });
+
   // Time Slider
   const timeSlider = document.getElementById('time-slider');
   const timeValueEl = document.getElementById('time-value');
 
-  // Slider giá trị 0-6 → timeScale theo hàm mũ:
-  //   0 = 1x, 1 = 10x, 2 = 100x, 3 = 1000x... 6 = 1,000,000x
   function sliderToTimeScale(val) {
     return Math.pow(10, val);
   }
@@ -100,7 +269,7 @@ export function initUI(callbacks) {
   }
 
   timeSlider.addEventListener('input', updateTimeDisplay);
-  updateTimeDisplay(); // Khởi tạo giá trị ban đầu
+  updateTimeDisplay();
 
   // Pause Button
   const btnPause = document.getElementById('btn-pause');
@@ -126,28 +295,56 @@ export function initUI(callbacks) {
     if (callbacks.onToggleLabels) callbacks.onToggleLabels(btnLabels.classList.contains('active'));
   });
 
-  // Planet Selector Buttons
-  const planetBtns = selector.querySelectorAll('.planet-btn');
-  planetBtns.forEach(btn => {
+  // Planet + Moon Selector Buttons
+  const allBtns = selector.querySelectorAll('.planet-btn');
+  allBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-      // Toggle active
-      planetBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const planetId = btn.dataset.id;
-      const data = planetData.find(p => p.id === planetId);
-
-      // Hiển thị Info Panel
-      showInfoPanel(data);
-
-      if (callbacks.onPlanetSelect) callbacks.onPlanetSelect(planetId);
+      selectBody(btn.dataset.id);
     });
   });
+
+  // Share logic for selecting a body
+  function selectBody(bodyId) {
+    // Update active state in bottom selector
+    allBtns.forEach(b => {
+      b.classList.toggle('active', b.dataset.id === bodyId);
+    });
+
+    const data = planetData.find(p => p.id === bodyId);
+    if (data) {
+      showInfoPanel(data);
+      if (callbacks.onPlanetSelect) callbacks.onPlanetSelect(bodyId);
+      
+      // Auto switch to Follow mode when selecting a body
+      btnFollow.classList.add('active');
+      btnOverview.classList.remove('active');
+    }
+  }
 
   // Close Info Panel
   document.getElementById('btn-close-info').addEventListener('click', () => {
     infoPanel.classList.remove('visible');
-    planetBtns.forEach(b => b.classList.remove('active'));
+    allBtns.forEach(b => b.classList.remove('active'));
+    if (callbacks.onOverview) callbacks.onOverview();
+  });
+
+  // Camera Mode Buttons
+  const btnOverview = document.getElementById('btn-overview');
+  const btnFollow = document.getElementById('btn-follow');
+  
+  btnOverview.addEventListener('click', () => {
+    btnOverview.classList.add('active');
+    btnFollow.classList.remove('active');
+    if (callbacks.onOverview) callbacks.onOverview();
+  });
+
+  btnFollow.addEventListener('click', () => {
+    btnFollow.classList.add('active');
+    btnOverview.classList.remove('active');
+    const activeBtn = Array.from(allBtns).find(b => b.classList.contains('active'));
+    if (activeBtn && callbacks.onFollow) {
+      callbacks.onFollow(activeBtn.dataset.id);
+    }
   });
 
   // ═══ Info Panel Content ═══
@@ -155,20 +352,68 @@ export function initUI(callbacks) {
     document.getElementById('info-name').textContent = data.name;
     
     const content = document.getElementById('info-content');
+
+    // Loại thiên thể — bao gồm "Vệ tinh" cho moons và "Sao chổi"
+    const typeLabel = data.type === 'star' ? 'Ngôi sao'
+      : data.type === 'terrestrial' ? 'Hành tinh đá'
+      : data.type === 'gas-giant' ? 'Khí khổng lồ'
+      : data.type === 'ice-giant' ? 'Băng khổng lồ'
+      : data.type === 'moon' ? 'Vệ tinh'
+      : data.type === 'comet' ? 'Sao chổi'
+      : 'Hành tinh lùn';
+
     const rows = [
-      ['Loại', data.type === 'star' ? 'Ngôi sao' : data.type === 'terrestrial' ? 'Hành tinh đá' : data.type === 'gas-giant' ? 'Khí khổng lồ' : data.type === 'ice-giant' ? 'Băng khổng lồ' : 'Hành tinh lùn'],
+      ['Loại', typeLabel],
+    ];
+
+    // Hiển thị parent cho moons
+    if (data.isMoon && data.parentId) {
+      rows.push(['Hành tinh mẹ', getParentName(data.parentId)]);
+    }
+    
+    // Đếm số vệ tinh
+    const moonCount = planetData.filter(p => p.parentId === data.id && p.isMoon).length;
+    if (moonCount > 0) {
+      rows.push(['Số vệ tinh', moonCount]);
+    }
+
+    rows.push(
       ['Bán kính', data.type === 'star' ? '696,340 km' : `${(data.radius * 6371).toFixed(0)} km`],
-      ['Khoảng cách', data.semiMajorAxis > 0 ? `${data.semiMajorAxis} AU` : 'Tâm hệ'],
+      ['Khoảng cách', data.semiMajorAxis > 0 ? (data.isMoon ? `${(data.semiMajorAxis * 149597870.7).toFixed(0)} km` : `${data.semiMajorAxis} AU`) : 'Tâm hệ'],
       ['Chu kỳ QĐ', data.semiMajorAxis > 0 ? `${data.orbitalPeriod.toFixed(1)} ngày` : '—'],
       ['Độ lệch tâm', data.eccentricity > 0 ? data.eccentricity.toFixed(4) : '—'],
       ['Tự quay', `${Math.abs(data.rotationPeriod).toFixed(1)} giờ`],
       ['Hướng quay', data.rotationPeriod < 0 ? 'Ngược chiều ↺' : 'Thuận chiều ↻'],
       ['Nghiêng trục', `${data.axialTilt}°`],
-    ];
+    );
+
+    // Thêm thông tin vật lý từ JSON nếu có
+    if (data.physical) {
+      if (data.physical.massKg) {
+        rows.push(['Khối lượng', `${data.physical.massKg.toExponential(2)} kg`]);
+      }
+      if (data.physical.density) {
+        rows.push(['Mật độ', `${data.physical.density} g/cm³`]);
+      }
+      if (data.physical.meanTemperatureC !== undefined) {
+        rows.push(['Nhiệt độ TB', `${data.physical.meanTemperatureC}°C`]);
+      }
+    }
+
+    // Thêm thành phần từ info
+    if (data.info?.compositionVi) {
+      rows.push(['Thành phần', data.info.compositionVi]);
+    }
+
+    // Thêm mô tả ngắn từ info
+    let summaryHtml = '';
+    if (data.info?.summaryVi) {
+      summaryHtml = `<div class="info-summary">${data.info.summaryVi}</div>`;
+    }
 
     content.innerHTML = rows.map(([label, value]) =>
       `<div class="info-row"><span class="label">${label}</span><span class="value">${value}</span></div>`
-    ).join('');
+    ).join('') + summaryHtml;
 
     infoPanel.classList.add('visible');
   }

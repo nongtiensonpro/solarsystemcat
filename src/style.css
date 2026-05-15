@@ -104,8 +104,186 @@ body {
   height: 14px;
   border-radius: 50%;
   background: #6ec6ff;
-  box-shadow: 0 0 8px rgba(110, 198, 255, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ═══ Info Panel Actions ═══ */
+.info-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-action {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 8px 0;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-action.active {
+  background: rgba(74, 144, 226, 0.4);
+  border-color: #4a90e2;
+  font-weight: 500;
+}
+
+/* ═══ Search Panel ═══ */
+.search-panel {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 100;
+  padding: 15px;
+}
+
+.search-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-header input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+}
+
+.search-header input:focus {
+  border-color: #4a90e2;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.btn-close-search {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 5px;
+}
+
+.btn-close-search:hover {
+  color: white;
+}
+
+.search-filters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filter-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  padding: 5px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filter-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.filter-btn.active {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+.search-results {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.search-results::-webkit-scrollbar {
+  width: 6px;
+}
+.search-results::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.search-item-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+.search-item-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}
+
+.search-item-type {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.no-results {
+  text-align: center;
+  color: #aaa;
+  padding: 20px 0;
+  font-size: 14px;
+}
+
+/* Responsive cho mobile */
+@media (max-width: 768px) {
+  .planet-selector {
+    display: none; /* Ẩn selector cũ trên mobile để dùng search */
+  }
 }
 
 .time-value {
@@ -140,6 +318,44 @@ body {
   background: rgba(110, 198, 255, 0.15);
   color: #6ec6ff;
   border-color: #6ec6ff;
+}
+
+/* ═══════════════════════════════════════════
+   Quality Preset — Segmented Control
+   ═══════════════════════════════════════════ */
+.quality-preset-group {
+  display: flex;
+  gap: 2px;
+  background: rgba(10, 15, 30, 0.5);
+  border: 1px solid rgba(100, 140, 255, 0.15);
+  border-radius: 8px;
+  padding: 2px;
+  margin-left: 8px;
+}
+
+.preset-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7fa0;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+
+.preset-btn:hover {
+  color: #c0d0f0;
+  background: rgba(100, 140, 255, 0.1);
+}
+
+.preset-btn.active {
+  color: #6ec6ff;
+  background: rgba(110, 198, 255, 0.18);
+  box-shadow: 0 0 8px rgba(110, 198, 255, 0.15);
 }
 
 /* ═══════════════════════════════════════════
@@ -191,6 +407,25 @@ body {
   height: 12px;
   border-radius: 50%;
   display: block;
+}
+
+/* ═══════════════════════════════════════════
+   Moon Buttons — Smaller variant
+   ═══════════════════════════════════════════ */
+.moon-btn {
+  min-width: 40px;
+  padding: 4px 6px;
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+.moon-btn:hover {
+  opacity: 1;
+}
+
+.moon-dot {
+  width: 8px;
+  height: 8px;
 }
 
 /* ═══════════════════════════════════════════
@@ -253,6 +488,16 @@ body {
 
 .btn-close-info:hover {
   color: #e0e8ff;
+}
+
+.info-summary {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(100, 140, 255, 0.12);
+  font-size: 11px;
+  color: #8899bb;
+  line-height: 1.5;
+  font-style: italic;
 }
 
 /* ═══════════════════════════════════════════
@@ -364,5 +609,15 @@ body {
     right: 8px !important;
     bottom: 4px !important;
     font-size: 9px !important;
+  }
+
+  .quality-preset-group {
+    margin-left: 0;
+    order: 10; /* Đẩy xuống cuối top-bar trên mobile */
+  }
+
+  .preset-btn {
+    padding: 4px 10px;
+    font-size: 10px;
   }
 }

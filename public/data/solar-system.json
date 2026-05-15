@@ -1,0 +1,651 @@
+{
+  "bodies": [
+    {
+      "id": "sun",
+      "parentId": null,
+      "name": { "vi": "Mặt Trời", "en": "Sun" },
+      "type": "star",
+      "physical": {
+        "radius": 25,
+        "massKg": 1.989e30,
+        "density": 1.41,
+        "meanTemperatureC": 5505
+      },
+      "orbit": {
+        "semiMajorAxis": 0,
+        "orbitalPeriod": 1,
+        "eccentricity": 0,
+        "inclination": 0
+      },
+      "rotation": {
+        "axialTilt": 7.25,
+        "rotationPeriod": 609.12,
+        "oblateness": 0.00005
+      },
+      "render": {
+        "fallbackColor": "#FFDD33"
+      },
+      "textures": {
+        "albedo": "/textures/planets/sun/albedo.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Ngôi sao trung tâm của hệ mặt trời, chiếm 99.86% tổng khối lượng.",
+        "compositionVi": "Hydro (73%), Heli (25%), các nguyên tố nặng hơn (2%)"
+      }
+    },
+    {
+      "id": "mercury",
+      "parentId": "sun",
+      "name": { "vi": "Sao Thủy", "en": "Mercury" },
+      "type": "terrestrial",
+      "physical": {
+        "radius": 0.383,
+        "massKg": 3.301e23,
+        "density": 5.43,
+        "meanTemperatureC": 167
+      },
+      "orbit": {
+        "semiMajorAxis": 0.387,
+        "orbitalPeriod": 87.97,
+        "eccentricity": 0.2056,
+        "inclination": 7.0
+      },
+      "rotation": {
+        "axialTilt": 0.034,
+        "rotationPeriod": 1407.6,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#8C7E6D"
+      },
+      "textures": {
+        "albedo": "/textures/planets/mercury/albedo.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh nhỏ nhất và gần Mặt Trời nhất trong hệ mặt trời.",
+        "compositionVi": "Sắt, silicat, bề mặt đầy hố thiên thạch"
+      }
+    },
+    {
+      "id": "venus",
+      "parentId": "sun",
+      "name": { "vi": "Sao Kim", "en": "Venus" },
+      "type": "terrestrial",
+      "physical": {
+        "radius": 0.949,
+        "massKg": 4.867e24,
+        "density": 5.24,
+        "meanTemperatureC": 464
+      },
+      "orbit": {
+        "semiMajorAxis": 0.723,
+        "orbitalPeriod": 224.7,
+        "eccentricity": 0.0068,
+        "inclination": 3.39
+      },
+      "rotation": {
+        "axialTilt": 177.4,
+        "rotationPeriod": -5832.5,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#E8CDA0"
+      },
+      "textures": {
+        "albedo": "/textures/planets/venus/surface.jpg",
+        "atmosphere": "/textures/planets/venus/atmosphere.jpg"
+      },
+      "atmosphere": {
+        "color": "#FFA500",
+        "opacity": 0.9,
+        "power": 2.0
+      },
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh nóng nhất hệ mặt trời do hiệu ứng nhà kính cực mạnh.",
+        "compositionVi": "CO₂ (96.5%), N₂ (3.5%), bầu khí quyển dày đặc axit sunfuric"
+      }
+    },
+    {
+      "id": "earth",
+      "parentId": "sun",
+      "name": { "vi": "Trái Đất", "en": "Earth" },
+      "type": "terrestrial",
+      "physical": {
+        "radius": 1.0,
+        "massKg": 5.972e24,
+        "density": 5.51,
+        "meanTemperatureC": 15
+      },
+      "orbit": {
+        "semiMajorAxis": 1.0,
+        "orbitalPeriod": 365.2,
+        "eccentricity": 0.0167,
+        "inclination": 0.0
+      },
+      "rotation": {
+        "axialTilt": 23.4,
+        "rotationPeriod": 23.93,
+        "oblateness": 0.00335
+      },
+      "render": {
+        "fallbackColor": "#2266AA"
+      },
+      "textures": {
+        "albedo": "/textures/planets/earth/albedo.jpg",
+        "normal": "/textures/planets/earth/normal.jpg",
+        "specular": "/textures/planets/earth/specular.jpg",
+        "night": "/textures/planets/earth/night.jpg",
+        "clouds": "/textures/planets/earth/clouds.jpg"
+      },
+      "atmosphere": {
+        "color": "#3B5B89",
+        "opacity": 0.6,
+        "power": 4.0
+      },
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh có sự sống duy nhất được biết đến trong vũ trụ.",
+        "compositionVi": "Nitơ (78%), Oxy (21%), Argon (0.9%), CO₂ và hơi nước"
+      }
+    },
+    {
+      "id": "mars",
+      "parentId": "sun",
+      "name": { "vi": "Sao Hỏa", "en": "Mars" },
+      "type": "terrestrial",
+      "physical": {
+        "radius": 0.532,
+        "massKg": 6.39e23,
+        "density": 3.93,
+        "meanTemperatureC": -65
+      },
+      "orbit": {
+        "semiMajorAxis": 1.524,
+        "orbitalPeriod": 687.0,
+        "eccentricity": 0.0934,
+        "inclination": 1.85
+      },
+      "rotation": {
+        "axialTilt": 25.2,
+        "rotationPeriod": 24.62,
+        "oblateness": 0.00648
+      },
+      "render": {
+        "fallbackColor": "#C1440E"
+      },
+      "textures": {
+        "albedo": "/textures/planets/mars/albedo.jpg"
+      },
+      "atmosphere": {
+        "color": "#C06030",
+        "opacity": 0.2,
+        "power": 5.0
+      },
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh đỏ, mục tiêu chính cho khám phá và khai phá không gian.",
+        "compositionVi": "CO₂ (95%), N₂ (2.7%), Argon (1.6%), bề mặt oxit sắt"
+      }
+    },
+    {
+      "id": "jupiter",
+      "parentId": "sun",
+      "name": { "vi": "Sao Mộc", "en": "Jupiter" },
+      "type": "gas-giant",
+      "physical": {
+        "radius": 11.21,
+        "massKg": 1.898e27,
+        "density": 1.33,
+        "meanTemperatureC": -110
+      },
+      "orbit": {
+        "semiMajorAxis": 5.203,
+        "orbitalPeriod": 4331,
+        "eccentricity": 0.0484,
+        "inclination": 1.31
+      },
+      "rotation": {
+        "axialTilt": 3.1,
+        "rotationPeriod": 9.93,
+        "oblateness": 0.06487
+      },
+      "render": {
+        "fallbackColor": "#C8A77A"
+      },
+      "textures": {
+        "albedo": "/textures/planets/jupiter/albedo.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh lớn nhất hệ mặt trời, khối lượng gấp 318 lần Trái Đất.",
+        "compositionVi": "Hydro (89%), Heli (10%), Vết amonia, metan, hơi nước"
+      }
+    },
+    {
+      "id": "saturn",
+      "parentId": "sun",
+      "name": { "vi": "Sao Thổ", "en": "Saturn" },
+      "type": "gas-giant",
+      "physical": {
+        "radius": 9.45,
+        "massKg": 5.683e26,
+        "density": 0.687,
+        "meanTemperatureC": -140
+      },
+      "orbit": {
+        "semiMajorAxis": 9.537,
+        "orbitalPeriod": 10747,
+        "eccentricity": 0.0542,
+        "inclination": 2.49
+      },
+      "rotation": {
+        "axialTilt": 26.7,
+        "rotationPeriod": 10.66,
+        "oblateness": 0.09796
+      },
+      "render": {
+        "fallbackColor": "#D4BE8D"
+      },
+      "textures": {
+        "albedo": "/textures/planets/saturn/albedo.jpg",
+        "ring": "/textures/planets/saturn/ring.png"
+      },
+      "atmosphere": {
+        "color": "#C8A832",
+        "opacity": 0.15,
+        "power": 4.0
+      },
+      "rings": {
+        "innerRadius": 1.2,
+        "outerRadius": 2.34,
+        "hasRings": true
+      },
+      "info": {
+        "summaryVi": "Hành tinh có hệ thống vành đai ngoạn mục nhất hệ mặt trời.",
+        "compositionVi": "Hydro (96%), Heli (3%), Vết metan, amonia"
+      }
+    },
+    {
+      "id": "uranus",
+      "parentId": "sun",
+      "name": { "vi": "Sao Thiên Vương", "en": "Uranus" },
+      "type": "ice-giant",
+      "physical": {
+        "radius": 4.01,
+        "massKg": 8.681e25,
+        "density": 1.27,
+        "meanTemperatureC": -195
+      },
+      "orbit": {
+        "semiMajorAxis": 19.19,
+        "orbitalPeriod": 30589,
+        "eccentricity": 0.0472,
+        "inclination": 0.77
+      },
+      "rotation": {
+        "axialTilt": 97.8,
+        "rotationPeriod": -17.24,
+        "oblateness": 0.02293
+      },
+      "render": {
+        "fallbackColor": "#7EC8C8"
+      },
+      "textures": {
+        "albedo": "/textures/planets/uranus/albedo.jpg",
+        "ring": "/textures/planets/uranus/ring.png"
+      },
+      "atmosphere": {
+        "color": "#64B5C8",
+        "opacity": 0.4,
+        "power": 3.5
+      },
+      "rings": {
+        "innerRadius": 1.5,
+        "outerRadius": 2.01,
+        "hasRings": true
+      },
+      "info": {
+        "summaryVi": "Hành tinh băng khổng lồ quay nằm ngang trên mặt phẳng quỹ đạo.",
+        "compositionVi": "Hydro (83%), Heli (15%), Metan (2%), băng nước, amonia, metan"
+      }
+    },
+    {
+      "id": "neptune",
+      "parentId": "sun",
+      "name": { "vi": "Sao Hải Vương", "en": "Neptune" },
+      "type": "ice-giant",
+      "physical": {
+        "radius": 3.88,
+        "massKg": 1.024e26,
+        "density": 1.64,
+        "meanTemperatureC": -200
+      },
+      "orbit": {
+        "semiMajorAxis": 30.07,
+        "orbitalPeriod": 59800,
+        "eccentricity": 0.0086,
+        "inclination": 1.77
+      },
+      "rotation": {
+        "axialTilt": 28.3,
+        "rotationPeriod": 16.11,
+        "oblateness": 0.01708
+      },
+      "render": {
+        "fallbackColor": "#3355AA"
+      },
+      "textures": {
+        "albedo": "/textures/planets/neptune/albedo.jpg"
+      },
+      "atmosphere": {
+        "color": "#3264C8",
+        "opacity": 0.5,
+        "power": 3.5
+      },
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh xa nhất trong hệ mặt trời, có gió mạnh nhất (2100 km/h).",
+        "compositionVi": "Hydro (80%), Heli (19%), Metan (1.5%), băng nước, amonia"
+      }
+    },
+    {
+      "id": "pluto",
+      "parentId": "sun",
+      "name": { "vi": "Sao Diêm Vương", "en": "Pluto" },
+      "type": "dwarf",
+      "physical": {
+        "radius": 0.186,
+        "massKg": 1.303e22,
+        "density": 1.86,
+        "meanTemperatureC": -229
+      },
+      "orbit": {
+        "semiMajorAxis": 39.48,
+        "orbitalPeriod": 90560,
+        "eccentricity": 0.2444,
+        "inclination": 17.2
+      },
+      "rotation": {
+        "axialTilt": 122.5,
+        "rotationPeriod": -153.3,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#C2B5A0"
+      },
+      "textures": {
+        "albedo": "/textures/planets/pluto/albedo.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Hành tinh lùn nổi tiếng nhất, từng là hành tinh thứ 9 đến năm 2006.",
+        "compositionVi": "Đá, băng nitơ, metan, carbon monoxide"
+      }
+    },
+    {
+      "id": "moon",
+      "parentId": "earth",
+      "name": { "vi": "Mặt Trăng", "en": "Moon" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.273,
+        "massKg": 7.342e22,
+        "density": 3.34,
+        "meanTemperatureC": -23
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00257,
+        "orbitalPeriod": 27.32,
+        "eccentricity": 0.0549,
+        "inclination": 5.14
+      },
+      "rotation": {
+        "axialTilt": 6.68,
+        "rotationPeriod": 655.7,
+        "oblateness": 0.0012
+      },
+      "render": {
+        "fallbackColor": "#AAAAAA",
+        "orbitScale": 8
+      },
+      "textures": {
+        "albedo": "/textures/planets/moon/albedo.jpg",
+        "bump": "/textures/planets/moon/bump.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh tự nhiên duy nhất của Trái Đất, thiên thể gần nhất.",
+        "compositionVi": "Đá bazan, anorthosit, regolith, không có khí quyển đáng kể"
+      }
+    },
+    {
+      "id": "io",
+      "parentId": "jupiter",
+      "name": { "vi": "Io", "en": "Io" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.286,
+        "massKg": 8.932e22,
+        "density": 3.53,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00282,
+        "orbitalPeriod": 1.769,
+        "eccentricity": 0.0041,
+        "inclination": 0.04
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 42.46,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#E8C84A",
+        "orbitScale": 4
+      },
+      "textures": {
+        "albedo": "/textures/planets/io/albedo.jpg",
+        "normal": "/textures/planets/io/normal.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh có hoạt động núi lửa mạnh nhất trong hệ mặt trời.",
+        "compositionVi": "Silicat, lưu huỳnh, hơn 400 núi lửa hoạt động"
+      }
+    },
+    {
+      "id": "europa",
+      "parentId": "jupiter",
+      "name": { "vi": "Europa", "en": "Europa" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.245,
+        "massKg": 4.8e22,
+        "density": 3.01,
+        "meanTemperatureC": -160
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00449,
+        "orbitalPeriod": 3.551,
+        "eccentricity": 0.009,
+        "inclination": 0.47
+      },
+      "rotation": {
+        "axialTilt": 0.1,
+        "rotationPeriod": 85.23,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#C8B896",
+        "orbitScale": 4
+      },
+      "textures": {
+        "albedo": "/textures/planets/europa/albedo.jpg",
+        "bump": "/textures/planets/europa/bump.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Ứng viên hàng đầu cho sự sống ngoài Trái Đất nhờ đại dương ngầm.",
+        "compositionVi": "Lớp băng bề mặt, đại dương nước mặn bên dưới, lõi sắt-silicat"
+      }
+    },
+    {
+      "id": "ganymede",
+      "parentId": "jupiter",
+      "name": { "vi": "Ganymede", "en": "Ganymede" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.413,
+        "massKg": 1.482e23,
+        "density": 1.94,
+        "meanTemperatureC": -163
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00716,
+        "orbitalPeriod": 7.155,
+        "eccentricity": 0.0013,
+        "inclination": 0.18
+      },
+      "rotation": {
+        "axialTilt": 0.33,
+        "rotationPeriod": 171.7,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#8C8478",
+        "orbitScale": 4
+      },
+      "textures": {
+        "albedo": "/textures/planets/ganymede/albedo.jpg",
+        "normal": "/textures/planets/ganymede/normal.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh lớn nhất trong hệ mặt trời, lớn hơn cả Sao Thủy.",
+        "compositionVi": "Băng nước, silicat, từ trường riêng, có thể có đại dương ngầm"
+      }
+    },
+    {
+      "id": "callisto",
+      "parentId": "jupiter",
+      "name": { "vi": "Callisto", "en": "Callisto" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.378,
+        "massKg": 1.076e23,
+        "density": 1.83,
+        "meanTemperatureC": -139
+      },
+      "orbit": {
+        "semiMajorAxis": 0.01259,
+        "orbitalPeriod": 16.69,
+        "eccentricity": 0.0074,
+        "inclination": 0.19
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 400.54,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#6B6050",
+        "orbitScale": 4
+      },
+      "textures": {
+        "albedo": "/textures/planets/callisto/albedo.jpg",
+        "bump": "/textures/planets/callisto/bump.jpg"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh lớn thứ hai của Sao Mộc, bề mặt cổ nhất trong hệ mặt trời.",
+        "compositionVi": "Băng và đá, bề mặt đầy hố thiên thạch, có thể có đại dương ngầm"
+      }
+    },
+    {
+      "id": "titan",
+      "parentId": "saturn",
+      "name": { "vi": "Titan", "en": "Titan" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.404,
+        "massKg": 1.345e23,
+        "density": 1.88,
+        "meanTemperatureC": -179
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00817,
+        "orbitalPeriod": 15.95,
+        "eccentricity": 0.0288,
+        "inclination": 0.33
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 382.7,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#D4A840",
+        "orbitScale": 4
+      },
+      "textures": {
+        "albedo": "/textures/planets/titan/albedo.jpg"
+      },
+      "atmosphere": {
+        "color": "#D4964A",
+        "opacity": 0.7,
+        "power": 2.0
+      },
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh duy nhất có bầu khí quyển dày đặc, với hồ metan lỏng.",
+        "compositionVi": "Nitơ (98.4%), Metan (1.4%), băng nước, bề mặt hydrocarbon"
+      }
+    },
+    {
+      "id": "halley",
+      "parentId": "sun",
+      "name": { "vi": "Sao chổi Halley", "en": "Halley's Comet" },
+      "type": "comet",
+      "physical": {
+        "radius": 0.05,
+        "massKg": 2.2e14,
+        "density": 0.6,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 17.834,
+        "orbitalPeriod": 27503,
+        "eccentricity": 0.96714,
+        "inclination": 162.26
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 52.8,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#AACCFF"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Sao chổi chu kỳ ngắn nổi tiếng nhất, có thể nhìn thấy bằng mắt thường mỗi 75-76 năm.",
+        "compositionVi": "Băng nước, carbon monoxide, metan, amonia và bụi"
+      }
+    }
+  ]
+}

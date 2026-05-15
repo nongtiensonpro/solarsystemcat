@@ -16,11 +16,17 @@ const labels = [];
 export function createLabel(data, pivot) {
   const el = document.createElement('div');
   el.textContent = data.name;
+
+  // Vệ tinh dùng font nhỏ hơn và mờ hơn
+  const isMoon = data.isMoon || data.type === 'moon';
+  const fontSize = isMoon ? '9px' : '11px';
+  const color = isMoon ? 'rgba(160, 180, 220, 0.55)' : 'rgba(180, 200, 240, 0.7)';
+
   el.style.cssText = `
     position: absolute;
-    color: rgba(180, 200, 240, 0.7);
+    color: ${color};
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 11px;
+    font-size: ${fontSize};
     font-weight: 500;
     letter-spacing: 0.5px;
     text-shadow: 0 0 6px rgba(0,0,0,0.8);
@@ -47,6 +53,28 @@ export function updateLabels(camera, renderer) {
     const worldPos = new THREE.Vector3();
     label.pivot.getWorldPosition(worldPos);
 
+    // Tính khoảng cách tới camera
+    const distToCam = camera.position.distanceTo(worldPos);
+    
+    // Auto-hide logic theo distance
+    let opacity = 1.0;
+    if (label.data.isMoon || label.data.type === 'comet') {
+      // Ẩn vệ tinh và sao chổi khi ở xa (ví dụ: xa hơn 80 units)
+      if (distToCam > 120) {
+        label.el.style.display = 'none';
+        continue;
+      } else if (distToCam > 80) {
+        // Fade out
+        opacity = 1.0 - ((distToCam - 80) / 40);
+      }
+    } else {
+      // Ẩn các hành tinh nhỏ nếu cực xa (VD: > 400)
+      if (distToCam > 500 && label.data.radius < 0.5) {
+        label.el.style.display = 'none';
+        continue;
+      }
+    }
+
     // Project 3D → 2D screen coordinates
     const projected = worldPos.clone().project(camera);
 
@@ -59,9 +87,10 @@ export function updateLabels(camera, renderer) {
     const x = (projected.x * halfW) + halfW;
     const y = -(projected.y * halfH) + halfH;
 
-    // Offset xuống dưới hành tinh
+    // Cập nhật vị trí và opacity
     label.el.style.left = `${x}px`;
     label.el.style.top = `${y + label.data.radius * 2 + 14}px`;
+    label.el.style.opacity = opacity.toFixed(2);
     label.el.style.display = 'block';
   }
 }

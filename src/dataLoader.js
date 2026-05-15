@@ -1,0 +1,203 @@
+// Data Loader — Tải và xác thực dữ liệu thiên thể từ JSON
+// Thay thế dữ liệu hardcode trong planetData.js
+
+/**
+ * Chuyển đổi hex color string "#RRGGBB" sang số 0xRRGGBB.
+ * Giữ nguyên nếu đã là number.
+ * @param {string|number|null} color
+ * @returns {number|null}
+ */
+function normalizeColor(color) {
+  if (color === null || color === undefined) return null;
+  if (typeof color === 'number') return color;
+  if (typeof color === 'string' && color.startsWith('#')) {
+    return parseInt(color.slice(1), 16);
+  }
+  return null;
+}
+
+/**
+ * Xác thực một body object theo schema tối thiểu.
+ * Log cảnh báo rõ ràng trong console nếu có lỗi.
+ * @param {Object} body
+ * @param {number} index
+ * @returns {string[]} Mảng lỗi (rỗng = hợp lệ)
+ */
+function validateBody(body, index) {
+  const errors = [];
+  const prefix = `[DataLoader] Body #${index}`;
+
+  if (!body.id || typeof body.id !== 'string') {
+    errors.push(`${prefix}: thiếu hoặc sai "id" (phải là string)`);
+  }
+
+  if (!body.type || typeof body.type !== 'string') {
+    errors.push(`${prefix} (${body.id || '?'}): thiếu "type"`);
+  }
+
+  // Phải có physical.radius hoặc render.radiusScale
+  const hasRadius = body.physical && typeof body.physical.radius === 'number';
+  const hasRadiusScale = body.render && typeof body.render.radiusScale === 'number';
+  if (!hasRadius && !hasRadiusScale) {
+    errors.push(`${prefix} (${body.id || '?'}): thiếu "physical.radius" hoặc "render.radiusScale"`);
+  }
+
+  // Kiểm tra texture paths
+  if (body.textures) {
+    for (const [key, path] of Object.entries(body.textures)) {
+      if (path && typeof path === 'string' && !path.startsWith('/textures/')) {
+        errors.push(`${prefix} (${body.id}): texture "${key}" path phải bắt đầu bằng "/textures/", nhận: "${path}"`);
+      }
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Xác thực tham chiếu parentId — mỗi body có parentId phải trỏ tới id tồn tại.
+ * @param {Object[]} bodies
+ * @returns {string[]}
+ */
+function validateParentRefs(bodies) {
+  const errors = [];
+  const idSet = new Set(bodies.map(b => b.id));
+
+  for (const body of bodies) {
+    if (body.parentId && !idSet.has(body.parentId)) {
+      errors.push(`[DataLoader] Body "${body.id}": parentId "${body.parentId}" không tồn tại trong danh sách bodies`);
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * Chuẩn hóa body từ schema JSON sang format flat tương thích với code hiện tại.
+ * Giữ nguyên tất cả thông tin gốc nhưng flatten các trường thường dùng.
+ *
+ * @param {Object} raw - Body data từ JSON
+ * @returns {Object} - Normalized body data
+ */
+function normalizeBody(raw) {
+  const body = {
+    // ─── Identity ───
+    id: raw.id,
+    parentId: raw.parentId || null,
+    name: raw.name?.vi || raw.id, // Fallback tên tiếng Việt
+    nameEn: raw.name?.en || raw.id,
+    type: raw.type,
+
+    // ─── Physical (flatten) ───
+    radius: raw.physical?.radius ?? raw.render?.radiusScale ?? 1,
+
+    // ─── Orbit (flatten) ───
+    semiMajorAxis: raw.orbit?.semiMajorAxis ?? 0,
+    orbitalPeriod: raw.orbit?.orbitalPeriod ?? 1,
+    eccentricity: raw.orbit?.eccentricity ?? 0,
+    inclination: raw.orbit?.inclination ?? 0,
+
+    // ─── Rotation (flatten) ───
+    axialTilt: raw.rotation?.axialTilt ?? 0,
+    rotationPeriod: raw.rotation?.rotationPeriod ?? 0,
+    oblateness: raw.rotation?.oblateness ?? 0,
+
+    // ─── Textures (giữ nguyên) ───
+    textures: raw.textures || null,
+
+    // ─── Atmosphere (normalize color) ───
+    atmosphere: raw.atmosphere ? {
+      color: normalizeColor(raw.atmosphere.color),
+      opacity: raw.atmosphere.opacity,
+      power: raw.atmosphere.power,
+    } : null,
+
+    // ─── Rings (giữ nguyên) ───
+    rings: raw.rings || null,
+
+    // ─── Render (fallback color + orbit scale for moons) ───
+    fallbackColor: normalizeColor(raw.render?.fallbackColor) ?? 0xaaaaaa,
+    orbitScale: raw.render?.orbitScale ?? 1,
+
+    // ─── Derived flags ───
+    isMoon: raw.type === 'moon',
+
+    // ─── Info (giữ nguyên cho info panel) ───
+    info: raw.info || null,
+
+    // ─── Physical raw (cho info panel nâng cao) ───
+    physical: raw.physical || null,
+
+    // ─── Giữ reference tới raw data gốc ───
+    _raw: raw,
+  };
+
+  return body;
+}
+
+/**
+ * Tải dữ liệu hệ mặt trời từ JSON.
+ * @returns {Promise<Object[]>} Mảng bodies đã chuẩn hóa
+ */
+export async function loadSolarSystemData() {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const url = `${baseUrl}data/solar-system.json`;
+
+  console.log(`[DataLoader] Đang tải dữ liệu từ ${url}...`);
+
+  let response;
+  try {
+    response = await fetch(url);
+  } catch (err) {
+    console.error(`[DataLoader] Lỗi mạng khi tải ${url}:`, err);
+    throw new Error(`Không thể tải dữ liệu hệ mặt trời: ${err.message}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`[DataLoader] HTTP ${response.status} khi tải ${url}`);
+  }
+
+  let json;
+  try {
+    json = await response.json();
+  } catch (err) {
+    throw new Error(`[DataLoader] JSON parse error: ${err.message}`);
+  }
+
+  if (!json.bodies || !Array.isArray(json.bodies)) {
+    throw new Error('[DataLoader] Schema error: thiếu trường "bodies" (phải là mảng)');
+  }
+
+  // Xác thực từng body
+  const allErrors = [];
+  for (let i = 0; i < json.bodies.length; i++) {
+    const errors = validateBody(json.bodies[i], i);
+    allErrors.push(...errors);
+  }
+
+  // Xác thực parent references
+  const parentErrors = validateParentRefs(json.bodies);
+  allErrors.push(...parentErrors);
+
+  // Log tất cả lỗi
+  if (allErrors.length > 0) {
+    console.warn(`[DataLoader] Phát hiện ${allErrors.length} lỗi trong dữ liệu:`);
+    for (const err of allErrors) {
+      console.warn(`  ⚠ ${err}`);
+    }
+  }
+
+  // Chuẩn hóa tất cả bodies
+  const bodies = json.bodies.map(normalizeBody);
+
+  // Kiểm tra duplicate ids
+  const ids = bodies.map(b => b.id);
+  const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+  if (duplicates.length > 0) {
+    console.warn(`[DataLoader] ID trùng lặp: ${[...new Set(duplicates)].join(', ')}`);
+  }
+
+  console.log(`[DataLoader] Đã tải ${bodies.length} thiên thể thành công.`);
+
+  return bodies;
+}

@@ -50,8 +50,9 @@ export function solveKepler(M, e, tolerance = 1e-10, maxIter = 100) {
  * @returns {{ x: number, y: number, z: number }}
  */
 export function computeOrbitalPosition(data, timeElapsed) {
-  // Bán trục lớn (AU → units)
-  const a = data.semiMajorAxis * AU;
+  // Bán trục lớn (AU → units), nhân orbitScale cho vệ tinh
+  const orbitScale = data.orbitScale || 1;
+  const a = data.semiMajorAxis * AU * orbitScale;
   const e = data.eccentricity;
   const inclinationRad = (data.inclination || 0) * Math.PI / 180;
 

@@ -1,22 +1,26 @@
-// Tạo đường quỹ đạo elip cho các hành tinh
+// Tạo đường quỹ đạo elip cho các thiên thể (hành tinh + vệ tinh)
 import * as THREE from 'three';
 import { AU } from './constants.js';
 
 /**
  * Tạo đường cong quỹ đạo elip 3D
- * @param {Object} data - Dữ liệu hành tinh
- * @returns {THREE.Line}
+ * Hỗ trợ cả hành tinh (quanh Sun) và vệ tinh (quanh parent planet).
+ * Vệ tinh dùng orbitScale để phóng to quỹ đạo cho dễ nhìn.
+ *
+ * @param {Object} data - Dữ liệu thiên thể (đã normalize)
+ * @returns {THREE.Line|null}
  */
 export function createOrbitLine(data) {
   if (data.semiMajorAxis <= 0) return null;
 
-  const a = data.semiMajorAxis * AU; // Bán trục lớn
+  const orbitScale = data.orbitScale || 1;
+  const a = data.semiMajorAxis * AU * orbitScale; // Bán trục lớn (có scale cho moons)
   const e = data.eccentricity;
   const b = a * Math.sqrt(1 - e * e);  // Bán trục nhỏ
   const incRad = (data.inclination || 0) * Math.PI / 180;
 
   // Tạo các điểm trên elip
-  const segments = 256;
+  const segments = data.isMoon ? 128 : 256; // Ít segment hơn cho moons
   const points = [];
 
   for (let i = 0; i <= segments; i++) {
@@ -33,10 +37,15 @@ export function createOrbitLine(data) {
   }
 
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+  // Vệ tinh dùng màu khác, mờ hơn
+  const color = data.isMoon ? 0x445566 : 0x334466;
+  const opacity = data.isMoon ? 0.25 : 0.3;
+
   const material = new THREE.LineBasicMaterial({
-    color: 0x334466,
+    color,
     transparent: true,
-    opacity: 0.3,
+    opacity,
     depthWrite: false,
   });
 

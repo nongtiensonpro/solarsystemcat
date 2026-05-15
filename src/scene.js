@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { getCurrentPreset, onPresetChange } from './renderConfig.js';
 
 export function initScene(canvas) {
+  const preset = getCurrentPreset();
+
   // 1. Scene
   const scene = new THREE.Scene();
   
@@ -9,26 +12,8 @@ export function initScene(canvas) {
   scene.background = new THREE.Color(0x000000);
 
   // Simple Starfield Skybox (Particles)
-  const starsGeometry = new THREE.BufferGeometry();
-  const starsCount = 5000;
-  const posArray = new Float32Array(starsCount * 3);
-  
-  for(let i = 0; i < starsCount * 3; i++) {
-    // Phân bổ ngẫu nhiên trong bán kính từ 1000 đến 50000
-    posArray[i] = (Math.random() - 0.5) * 100000;
-  }
-  
-  starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-  const starsMaterial = new THREE.PointsMaterial({
-    size: 5,
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.8,
-    sizeAttenuation: true
-  });
-  
-  const starMesh = new THREE.Points(starsGeometry, starsMaterial);
-  scene.add(starMesh);
+  // Star count phụ thuộc vào quality preset
+  let starMesh = createStarfield(scene, preset.starCount);
 
   // 2. Camera
   const camera = new THREE.PerspectiveCamera(
@@ -42,11 +27,11 @@ export function initScene(canvas) {
   // 3. Renderer
   const renderer = new THREE.WebGLRenderer({ 
     canvas,
-    antialias: true, 
+    antialias: preset.antialias, 
     logarithmicDepthBuffer: true // CRITICAL: Chống Z-fighting
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, preset.maxPixelRatio));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
 
@@ -75,7 +60,49 @@ export function initScene(canvas) {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, getCurrentPreset().maxPixelRatio));
+  });
+
+  // 7. Lắng nghe thay đổi preset để cập nhật starfield và pixel ratio
+  onPresetChange((newPreset) => {
+    // Cập nhật pixel ratio
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, newPreset.maxPixelRatio));
+
+    // Tạo lại starfield với số sao mới
+    scene.remove(starMesh);
+    starMesh.geometry.dispose();
+    starMesh.material.dispose();
+    starMesh = createStarfield(scene, newPreset.starCount);
   });
 
   return { scene, camera, renderer, controls };
+}
+
+/**
+ * Tạo starfield particles
+ * @param {THREE.Scene} scene
+ * @param {number} count - Số lượng sao
+ * @returns {THREE.Points}
+ */
+function createStarfield(scene, count) {
+  const starsGeometry = new THREE.BufferGeometry();
+  const posArray = new Float32Array(count * 3);
+
+  for (let i = 0; i < count * 3; i++) {
+    // Phân bổ ngẫu nhiên trong bán kính từ 1000 đến 50000
+    posArray[i] = (Math.random() - 0.5) * 100000;
+  }
+
+  starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+  const starsMaterial = new THREE.PointsMaterial({
+    size: 5,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.8,
+    sizeAttenuation: true
+  });
+
+  const starMesh = new THREE.Points(starsGeometry, starsMaterial);
+  scene.add(starMesh);
+  return starMesh;
 }
