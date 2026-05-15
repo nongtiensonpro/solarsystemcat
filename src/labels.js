@@ -19,7 +19,7 @@ export function createLabel(data, pivot) {
   el.style.cssText = `
     position: absolute;
     color: rgba(180, 200, 240, 0.7);
-    font-family: 'Inter', sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 11px;
     font-weight: 500;
     letter-spacing: 0.5px;
