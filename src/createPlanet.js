@@ -44,13 +44,16 @@ function createVenusAtmosphereShell(radius, oblateness, atmosphereTexture, segme
  */
 export function createPlanet(data) {
   // 1. Geometry — Quả cầu chuẩn hóa (Áp dụng LOD để tối ưu hiệu năng)
-  let segments = 64; // Mặc định cao cho Mặt Trời và Khí Khổng Lồ
+  const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+  const segmentScale = isMobile ? 0.6 : 1.0; // Giảm segments trên mobile
+
+  let segments = Math.round(64 * segmentScale); // Mặc định cao cho Mặt Trời và Khí Khổng Lồ
   if (data.type === 'comet' || data.radius < 0.1) {
-    segments = 16; // Nhỏ nhất (Sao chổi, tiểu hành tinh)
+    segments = Math.round(16 * segmentScale); // Nhỏ nhất (Sao chổi, tiểu hành tinh)
   } else if (data.isMoon) {
-    segments = 24; // Vệ tinh vừa và nhỏ
+    segments = Math.round(24 * segmentScale); // Vệ tinh vừa và nhỏ
   } else if (data.radius <= 2.0) {
-    segments = 48; // Hành tinh đá (Earth, Mars, Venus)
+    segments = Math.round(48 * segmentScale); // Hành tinh đá (Earth, Mars, Venus)
   }
   const geometry = new THREE.SphereGeometry(1, segments, segments);
 

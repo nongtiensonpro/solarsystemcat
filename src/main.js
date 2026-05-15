@@ -61,23 +61,23 @@ async function bootstrap() {
   }
 
   // 4. Khởi tạo UI với callbacks (planetData đã được populate)
+  // Hàm dùng chung để chọn hành tinh từ cả UI lẫn double-tap mobile
+  function selectPlanet(planetId) {
+    cameraMode = 'follow';
+    trackedBody = bodyById.get(planetId);
+    if (trackedBody) {
+      const target = new THREE.Vector3();
+      trackedBody.pivot.getWorldPosition(target);
+      const zoomDist = Math.max(trackedBody.data.radius * 5, 10);
+      const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
+      startFlyTo(camTarget, target);
+    }
+  }
+
   initUI({
     onTimeScaleChange: (scale) => { timeScale = scale; },
     onPauseToggle: (paused) => { isPaused = paused; },
-    onPlanetSelect: (planetId) => {
-      cameraMode = 'follow';
-      trackedBody = bodyById.get(planetId);
-      if (trackedBody) {
-        const target = new THREE.Vector3();
-        trackedBody.pivot.getWorldPosition(target);
-        // Khoảng cách zoom phụ thuộc kích thước thiên thể
-        const zoomDist = Math.max(trackedBody.data.radius * 5, 10);
-        // Thêm offset tương đối cho endPos
-        const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
-        
-        startFlyTo(camTarget, target);
-      }
-    },
+    onPlanetSelect: (planetId) => { selectPlanet(planetId); },
     onOverview: () => {
       cameraMode = 'overview';
       trackedBody = null;
@@ -199,7 +199,49 @@ async function bootstrap() {
     applyPresetToEffects(newPreset);
   });
 
-  // 6. Animation Loop
+  // 5c. Mobile: Double-tap để chọn hành tinh 3D
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    const tapRaycaster = new THREE.Raycaster();
+    const tapPointer = new THREE.Vector2();
+    let lastTapTime = 0;
+    let lastTapX = 0;
+    let lastTapY = 0;
+
+    renderer.domElement.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - lastTapX;
+      const dy = touch.clientY - lastTapY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Double-tap: 2 lần chạm trong 300ms, cách nhau < 30px
+      if (now - lastTapTime < 300 && dist < 30) {
+        tapPointer.x = (touch.clientX / window.innerWidth) * 2 - 1;
+        tapPointer.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        tapRaycaster.setFromCamera(tapPointer, camera);
+
+        // Lấy tất cả mesh của các thiên thể (bỏ qua Mặt Trời — quá to, dễ tap nhầm)
+        const meshes = bodies
+          .filter(b => b.data.type !== 'star')
+          .map(b => b.mesh);
+        const intersects = tapRaycaster.intersectObjects(meshes);
+
+        if (intersects.length > 0) {
+          const hitBody = bodies.find(b => b.mesh === intersects[0].object);
+          if (hitBody) {
+            selectPlanet(hitBody.data.id);
+          }
+        }
+        lastTapTime = 0; // Reset để tránh triple-tap trigger
+      } else {
+        lastTapTime = now;
+        lastTapX = touch.clientX;
+        lastTapY = touch.clientY;
+      }
+    }, { passive: true });
+  }
+
+
   function animate() {
     requestAnimationFrame(animate);
 
@@ -296,7 +338,8 @@ async function bootstrap() {
     controls.update();
 
     // Cập nhật nhãn (nếu đang hiển thị) - Throttled để tối ưu hiệu năng
-    if (areLabelsVisible() && frameCount % 3 === 0) {
+    const labelThrottle = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 6 : 3;
+    if (areLabelsVisible() && frameCount % labelThrottle === 0) {
       updateLabels(camera, renderer);
     }
     frameCount++;

@@ -57,6 +57,7 @@ export function initUI(callbacks) {
 
   topBar.innerHTML = `
     <button class="btn-icon" id="btn-search" title="Tìm kiếm">🔍</button>
+    <button class="btn-icon" id="btn-home" title="Về Toàn cảnh">🏠</button>
     <div class="time-controls">
       <button class="btn-icon" id="btn-pause" title="Tạm dừng">⏸</button>
       <label>Tốc độ</label>
@@ -156,6 +157,7 @@ export function initUI(callbacks) {
 
   // Search Panel Toggle & Logic
   const btnSearch = document.getElementById('btn-search');
+  const btnHome = document.getElementById('btn-home');
   const btnCloseSearch = document.getElementById('btn-close-search');
   const searchInput = document.getElementById('search-input');
   const searchResults = document.getElementById('search-results');
@@ -168,10 +170,21 @@ export function initUI(callbacks) {
     if (!isVisible) {
       searchInput.focus();
       renderSearchResults();
+      // Đóng info panel khi mở search trên mobile để tránh chồng chéo
+      // CHỈ ẩn UI, không thay đổi camera mode
+      if (window.innerWidth < 720) {
+        infoPanel.classList.remove('visible');
+      }
     }
   }
 
   btnSearch.addEventListener('click', toggleSearch);
+  btnHome.addEventListener('click', () => {
+    if (callbacks.onOverview) callbacks.onOverview();
+    // Khi về home thì ẩn luôn info panel và các active planet btn
+    infoPanel.classList.remove('visible');
+    allBtns.forEach(b => b.classList.remove('active'));
+  });
   btnCloseSearch.addEventListener('click', toggleSearch);
 
   function getBodyCategory(type) {
@@ -322,11 +335,52 @@ export function initUI(callbacks) {
   }
 
   // Close Info Panel
-  document.getElementById('btn-close-info').addEventListener('click', () => {
+  function closeInfoPanel() {
     infoPanel.classList.remove('visible');
-    allBtns.forEach(b => b.classList.remove('active'));
-    if (callbacks.onOverview) callbacks.onOverview();
-  });
+    infoPanel.style.transform = ''; // Reset inline transform từ swipe
+    // Vẫn giữ active planet button để user biết đang follow cái gì
+    // allBtns.forEach(b => b.classList.remove('active')); 
+    
+    // KHÔNG gọi onOverview ở đây để tránh fly-back khó chịu
+    // if (callbacks.onOverview) callbacks.onOverview();
+  }
+  document.getElementById('btn-close-info').addEventListener('click', closeInfoPanel);
+
+  // ═══ Mobile: Swipe-to-dismiss Info Panel (Bottom Sheet) ═══
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    let touchStartY = 0;
+    let currentTranslateY = 0;
+    let isSwiping = false;
+
+    infoPanel.addEventListener('touchstart', (e) => {
+      // Chỉ bắt đầu swipe nếu panel đang ở đầu scroll (scrollTop ≈ 0)
+      if (infoPanel.scrollTop > 5) return;
+      touchStartY = e.touches[0].clientY;
+      isSwiping = true;
+      infoPanel.style.transition = 'none';
+    }, { passive: true });
+
+    infoPanel.addEventListener('touchmove', (e) => {
+      if (!isSwiping) return;
+      const deltaY = e.touches[0].clientY - touchStartY;
+      if (deltaY > 0) { // Chỉ cho kéo xuống
+        currentTranslateY = deltaY;
+        infoPanel.style.transform = `translateY(${deltaY}px)`;
+      }
+    }, { passive: true });
+
+    infoPanel.addEventListener('touchend', () => {
+      if (!isSwiping) return;
+      isSwiping = false;
+      infoPanel.style.transition = 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+      if (currentTranslateY > 100) {
+        closeInfoPanel();
+      } else {
+        infoPanel.style.transform = 'translateY(0)';
+      }
+      currentTranslateY = 0;
+    }, { passive: true });
+  }
 
   // Camera Mode Buttons
   const btnOverview = document.getElementById('btn-overview');

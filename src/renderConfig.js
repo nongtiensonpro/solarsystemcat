@@ -43,14 +43,14 @@ export const QUALITY_PRESETS = {
   low: {
     label: 'Thấp',
     maxPixelRatio: 1,
-    starCount: 1500,
-    asteroidCount: 500,
+    starCount: 800,
+    asteroidCount: 300,
     bloomStrength: 1.2,
     bloomRadius: 0.4,
     bloomThreshold: 0.3,
-    atmosphereEnabled: true,
+    atmosphereEnabled: false,   // Tắt atmosphere trên mobile
     atmosphereOpacityScale: 0.5,
-    cloudsEnabled: true,
+    cloudsEnabled: false,       // Tắt clouds trên mobile
     cloudOpacityScale: 0.6,
     ringsEnabled: true,
     coronaEnabled: false, // Tắt corona để tiết kiệm draw call
