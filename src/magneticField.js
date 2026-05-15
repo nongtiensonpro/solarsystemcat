@@ -43,10 +43,10 @@ const magneticFieldFragmentShader = /* glsl */`
     if (uIsCrustal > 0.5) {
       // Crustal Magnetism (Mars): Localized patches
       float n = noise(normalize(vPosition) * 8.0 + uTime * 0.2);
-      float patch = smoothstep(0.6, 0.8, n);
-      alpha = patch * uStrength * 0.4;
+      float magPatch = smoothstep(0.6, 0.8, n);
+      alpha = magPatch * uStrength * 0.4;
       // Fade out at poles for Mars specifically to look better
-      alpha *= smoothstep(0.8, 0.4, abs(vPosition.y));
+      alpha *= (1.0 - smoothstep(0.4, 0.8, abs(vPosition.y)));
     } else {
       // Dipole Magnetism (Earth, Mercury): Field lines
       // Create lines flowing from pole to pole

@@ -116,12 +116,12 @@ const sunSurfaceFragmentShader = /* glsl */`
     float d3 = length(uv - center3);
 
     // Umbra (tâm tối) + Penumbra (vòng ngoài ít tối hơn)
-    spot += smoothstep(0.025, 0.008, d1) * 0.55;  // Umbra
-    spot += smoothstep(0.045, 0.025, d1) * 0.25;   // Penumbra
-    spot += smoothstep(0.020, 0.006, d2) * 0.50;
-    spot += smoothstep(0.035, 0.020, d2) * 0.20;
-    spot += smoothstep(0.015, 0.004, d3) * 0.45;
-    spot += smoothstep(0.028, 0.015, d3) * 0.18;
+    spot += (1.0 - smoothstep(0.008, 0.025, d1)) * 0.55;  // Umbra
+    spot += (1.0 - smoothstep(0.025, 0.045, d1)) * 0.25;   // Penumbra
+    spot += (1.0 - smoothstep(0.006, 0.020, d2)) * 0.50;
+    spot += (1.0 - smoothstep(0.020, 0.035, d2)) * 0.20;
+    spot += (1.0 - smoothstep(0.004, 0.015, d3)) * 0.45;
+    spot += (1.0 - smoothstep(0.015, 0.028, d3)) * 0.18;
 
     return clamp(spot, 0.0, 0.7);
   }
@@ -155,7 +155,7 @@ const sunSurfaceFragmentShader = /* glsl */`
     pulse *= 1.0 + sin(uTime * 1.7 + uv.y * 12.0) * 0.04;
 
     // ──── Tổng hợp màu ────
-    vec3 hotTint = vec3(1.7, 1.35, 0.95);
+    vec3 hotTint = vec3(4.0, 3.2, 2.2); // Đủ vượt bloomThreshold (2.0-3.0) nhưng không bị chói
     vec3 baseColor = texColor.rgb * hotTint * pulse;
 
     // Áp dụng granulation
@@ -247,7 +247,7 @@ const sunCoronaFragmentShader = /* glsl */`
     float alpha = corona * (0.46 + filamentCombined * 0.18) * flicker;
     alpha += prominenceStrength * 0.3;
 
-    vec3 finalColor = color * (1.4 + corona * 1.8) + chromoColor + promColor;
+    vec3 finalColor = (color * (1.4 + corona * 1.8) + chromoColor + promColor) * 3.0; // Giảm bớt chói
 
     gl_FragColor = vec4(finalColor, alpha);
   }
@@ -286,7 +286,7 @@ const chromosphereFragmentShader = /* glsl */`
     float flicker = 0.9 + 0.1 * sin(uTime * 3.0 + vUv.y * 20.0);
     intensity *= flicker * 3.0;
 
-    gl_FragColor = vec4(uColor * intensity * 2.0, intensity * 0.7);
+    gl_FragColor = vec4(uColor * intensity * 5.0, intensity * 0.7); // Điều chỉnh sáng vừa phải
   }
 `;
 

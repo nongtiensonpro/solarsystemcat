@@ -42,7 +42,7 @@ async function bootstrap() {
   let simulationTime = 0;
   let timeScale = 1000; // Giá trị mặc định, sẽ được UI slider ghi đè
   let isPaused = false;
-  let isAutoSliceEnabled = true;
+  let isAutoSliceEnabled = false;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
@@ -141,6 +141,10 @@ async function bootstrap() {
       if (zoom) zoom.style.display = enabled ? 'flex' : 'none';
     }
   });
+
+  // Khởi tạo trạng thái ẩn mặc định cho các công cụ mới (Phase 5 Optimization)
+  document.getElementById('minimap-container').style.display = 'none';
+  document.getElementById('zoom-indicator').style.display = 'none';
 
   // 5. Tạo tất cả thiên thể theo hierarchy
   // ─── Bước 1: Tạo tất cả body objects trước ───

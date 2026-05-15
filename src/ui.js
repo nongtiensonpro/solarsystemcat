@@ -64,15 +64,19 @@ export function initUI(callbacks) {
     <button class="btn-icon" id="btn-home" title="Về Toàn cảnh">🏠</button>
     <div class="time-controls">
       <button class="btn-icon" id="btn-pause" title="Tạm dừng">⏸</button>
-      <label>Tốc độ</label>
-      <input type="range" id="time-slider" min="0" max="6" step="0.1" value="3">
-      <span class="time-value" id="time-value">1.2 ngày/s</span>
+      <select id="time-select" class="time-select" title="Tốc độ thời gian">
+        <option value="1">1x (Thực)</option>
+        <option value="60">1 Phút/s</option>
+        <option value="3600">1 Giờ/s</option>
+        <option value="86400" selected>1 Ngày/s</option>
+        <option value="604800">1 Tuần/s</option>
+        <option value="2592000">1 Tháng/s</option>
+        <option value="31536000">1 Năm/s</option>
+      </select>
     </div>
-    <button class="btn-icon" id="btn-orbits" title="Đường quỹ đạo">◎</button>
-    <button class="btn-icon" id="btn-labels" title="Nhãn tên">Aa</button>
-    <button class="btn-icon active" id="btn-slice-toggle" title="Tự động Cắt lớp">🔬</button>
-    <button class="btn-icon active" id="btn-minimap-toggle" title="Bản đồ Radar">📡</button>
-    <button class="btn-icon active" id="btn-zoom-toggle" title="Chỉ báo Zoom">📏</button>
+    <button class="btn-icon" id="btn-visuals-toggle" title="Quỹ đạo & Nhãn tên">◎</button>
+    <button class="btn-icon" id="btn-slice-toggle" title="Tự động Cắt lớp">🔬</button>
+    <button class="btn-hud-icon btn-icon" id="btn-hud-toggle" title="Radar & Zoom HUD">📡</button>
     <div class="quality-preset-group" title="Chất lượng đồ họa">
       ${presetButtonsHTML}
     </div>
@@ -297,28 +301,15 @@ export function initUI(callbacks) {
     });
   });
 
-  // Time Slider
-  const timeSlider = document.getElementById('time-slider');
-  const timeValueEl = document.getElementById('time-value');
-
-  function sliderToTimeScale(val) {
-    return Math.pow(10, val);
-  }
-
-  function formatTimeScale(scale) {
-    const daysPerSec = scale / 86400;
-    if (daysPerSec < 1) return `${(daysPerSec * 24).toFixed(1)} giờ/s`;
-    if (daysPerSec < 365) return `${daysPerSec.toFixed(1)} ngày/s`;
-    return `${(daysPerSec / 365.25).toFixed(1)} năm/s`;
-  }
+  // Time Select
+  const timeSelect = document.getElementById('time-select');
 
   function updateTimeDisplay() {
-    const scale = sliderToTimeScale(parseFloat(timeSlider.value));
-    timeValueEl.textContent = formatTimeScale(scale);
+    const scale = parseFloat(timeSelect.value);
     if (callbacks.onTimeScaleChange) callbacks.onTimeScaleChange(scale);
   }
 
-  timeSlider.addEventListener('input', updateTimeDisplay);
+  timeSelect.addEventListener('change', updateTimeDisplay);
   updateTimeDisplay();
 
   // Pause Button
@@ -331,18 +322,12 @@ export function initUI(callbacks) {
     if (callbacks.onPauseToggle) callbacks.onPauseToggle(isPaused);
   });
 
-  // Orbit Lines Toggle
-  const btnOrbits = document.getElementById('btn-orbits');
-  btnOrbits.addEventListener('click', () => {
-    btnOrbits.classList.toggle('active');
-    if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(btnOrbits.classList.contains('active'));
-  });
-
-  // Labels Toggle
-  const btnLabels = document.getElementById('btn-labels');
-  btnLabels.addEventListener('click', () => {
-    btnLabels.classList.toggle('active');
-    if (callbacks.onToggleLabels) callbacks.onToggleLabels(btnLabels.classList.contains('active'));
+  // Visuals (Orbits & Labels) Toggle
+  const btnVisualsToggle = document.getElementById('btn-visuals-toggle');
+  btnVisualsToggle.addEventListener('click', () => {
+    const isActive = btnVisualsToggle.classList.toggle('active');
+    if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(isActive);
+    if (callbacks.onToggleLabels) callbacks.onToggleLabels(isActive);
   });
 
   // Auto Slice Toggle
@@ -352,15 +337,10 @@ export function initUI(callbacks) {
     if (callbacks.onToggleSlice) callbacks.onToggleSlice(isActive);
   });
 
-  const btnMinimapToggle = document.getElementById('btn-minimap-toggle');
-  btnMinimapToggle.addEventListener('click', () => {
-    const isActive = btnMinimapToggle.classList.toggle('active');
+  const btnHudToggle = document.getElementById('btn-hud-toggle');
+  btnHudToggle.addEventListener('click', () => {
+    const isActive = btnHudToggle.classList.toggle('active');
     if (callbacks.onToggleMinimap) callbacks.onToggleMinimap(isActive);
-  });
-
-  const btnZoomToggle = document.getElementById('btn-zoom-toggle');
-  btnZoomToggle.addEventListener('click', () => {
-    const isActive = btnZoomToggle.classList.toggle('active');
     if (callbacks.onToggleZoomIndicator) callbacks.onToggleZoomIndicator(isActive);
   });
 

@@ -104,18 +104,19 @@ export function createPlanet(data) {
     let emissiveInt = 1.0;
     if (textures.night) {
       emissiveColor = new THREE.Color(0xffffee); // Đèn thành phố (Trái Đất)
+      emissiveInt = 5.0; // Tăng x5 để vượt bloom threshold
     } else if (data.id === 'io') {
       emissiveColor = new THREE.Color(0x331100); // Núi lửa phát sáng mờ đỏ/cam
-      emissiveInt = 0.15;
+      emissiveInt = 1.5; // Tăng x10
     } else if (data.id === 'saturn') {
       emissiveColor = new THREE.Color(0x332211); // Nhiệt thặng dư do mưa Heli
-      emissiveInt = 0.2;
+      emissiveInt = 2.0; // Tăng x10
     } else if (data.id === 'neptune') {
       emissiveColor = new THREE.Color(0x112244); // Nhiệt thặng dư x2.6 (Đối lưu dữ dội)
-      emissiveInt = 0.25;
+      emissiveInt = 2.5; // Tăng x10
     } else if (data.type === 'comet') {
       emissiveColor = new THREE.Color(0x88ccff); // Phát sáng mờ màu xanh
-      emissiveInt = 0.2;
+      emissiveInt = 2.0; // Tăng x10
     }
 
     material = new THREE.MeshStandardMaterial({

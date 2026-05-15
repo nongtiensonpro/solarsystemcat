@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const heliumRainVertexShader = /* glsl */`
   uniform float uTime;
+  uniform float uRadius;
   attribute float aSpeed;
   attribute float aOffset;
   
@@ -24,7 +25,7 @@ const heliumRainVertexShader = /* glsl */`
     vAlpha = 1.0 - (drop / 0.2);
     
     vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
-    gl_PointSize = 2.0 * (100.0 / -mvPosition.z); // Perspective scale
+    gl_PointSize = 2.0 * ((uRadius * 20.0) / -mvPosition.z); // Perspective scale
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -83,6 +84,7 @@ export function createHeliumRain(planetRadius, outerFraction = 0.8, count = 2000
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
+      uRadius: { value: planetRadius },
       uColor: { value: new THREE.Color(0xffd700) } // Vàng nhạt
     },
     vertexShader: heliumRainVertexShader,

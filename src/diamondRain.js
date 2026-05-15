@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const diamondRainVertexShader = /* glsl */`
   uniform float uTime;
+  uniform float uRadius;
   attribute float aSpeed;
   attribute float aOffset;
   attribute float aSize;
@@ -35,10 +36,10 @@ const diamondRainVertexShader = /* glsl */`
     newPos = rotationY(uTime * aSpeed * 2.0) * newPos;
     
     // Làm mờ khi bắt đầu và kết thúc chu kỳ để loop mượt
-    vAlpha = smoothstep(0.0, 0.1, cycle) * smoothstep(1.0, 0.8, cycle);
+    vAlpha = smoothstep(0.0, 0.1, cycle) * (1.0 - smoothstep(0.8, 1.0, cycle));
     
     vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
-    gl_PointSize = aSize * (100.0 / -mvPosition.z);
+    gl_PointSize = aSize * ((uRadius * 20.0) / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -112,7 +113,8 @@ export function createDiamondRain(planetRadius, outerFraction = 0.7, count = 150
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      uTime: { value: 0 }
+      uTime: { value: 0 },
+      uRadius: { value: planetRadius }
     },
     vertexShader: diamondRainVertexShader,
     fragmentShader: diamondRainFragmentShader,

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const ironSnowVertexShader = /* glsl */`
   uniform float uTime;
+  uniform float uRadius;
   attribute float aSpeed;
   attribute float aOffset;
   
@@ -28,7 +29,7 @@ const ironSnowVertexShader = /* glsl */`
     vAlpha = smoothstep(0.0, 0.1, drop) * (1.0 - smoothstep(0.9, 1.0, drop));
     
     vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
-    gl_PointSize = 3.0 * (100.0 / -mvPosition.z); // Perspective scale
+    gl_PointSize = 3.0 * ((uRadius * 40.0) / -mvPosition.z); // Perspective scale relative to planet
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -94,6 +95,7 @@ export function createIronSnow(planetRadius, outerFraction = 0.75, count = 1500)
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
+      uRadius: { value: planetRadius },
       uColorTop: { value: new THREE.Color(0xffffff) }, // Trắng xám
       uColorBottom: { value: new THREE.Color(0x886600) } // Vàng đồng
     },

@@ -15,7 +15,7 @@ export const QUALITY_PRESETS = {
     asteroidCount: 3000,
     bloomStrength: 2.5,
     bloomRadius: 0.8,
-    bloomThreshold: 0.15,
+    bloomThreshold: 2.0,
     atmosphereEnabled: true,
     atmosphereOpacityScale: 1.0,
     cloudsEnabled: true,
@@ -31,7 +31,7 @@ export const QUALITY_PRESETS = {
     asteroidCount: 1500,
     bloomStrength: 2.0,
     bloomRadius: 0.6,
-    bloomThreshold: 0.2,
+    bloomThreshold: 2.5,
     atmosphereEnabled: true,
     atmosphereOpacityScale: 0.8,
     cloudsEnabled: true,
@@ -47,7 +47,7 @@ export const QUALITY_PRESETS = {
     asteroidCount: 300,
     bloomStrength: 1.2,
     bloomRadius: 0.4,
-    bloomThreshold: 0.3,
+    bloomThreshold: 3.0,
     atmosphereEnabled: false,   // Tắt atmosphere trên mobile
     atmosphereOpacityScale: 0.5,
     cloudsEnabled: false,       // Tắt clouds trên mobile
