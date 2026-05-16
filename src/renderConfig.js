@@ -23,6 +23,12 @@ export const QUALITY_PRESETS = {
     ringsEnabled: true,
     coronaEnabled: true,
     antialias: true,
+    cinematic: {
+      dofEnabled: true,
+      vignetteEnabled: true,
+      grainEnabled: true,
+      grainAmount: 0.04
+    }
   },
   balanced: {
     label: 'Cân bằng',
@@ -39,6 +45,12 @@ export const QUALITY_PRESETS = {
     ringsEnabled: true,
     coronaEnabled: true,
     antialias: true,
+    cinematic: {
+      dofEnabled: false,
+      vignetteEnabled: true,
+      grainEnabled: true,
+      grainAmount: 0.03
+    }
   },
   low: {
     label: 'Thấp',
@@ -48,13 +60,19 @@ export const QUALITY_PRESETS = {
     bloomStrength: 1.2,
     bloomRadius: 0.4,
     bloomThreshold: 3.0,
-    atmosphereEnabled: false,   // Tắt atmosphere trên mobile
+    atmosphereEnabled: false,
     atmosphereOpacityScale: 0.5,
-    cloudsEnabled: false,       // Tắt clouds trên mobile
+    cloudsEnabled: false,
     cloudOpacityScale: 0.6,
     ringsEnabled: true,
-    coronaEnabled: false, // Tắt corona để tiết kiệm draw call
+    coronaEnabled: false,
     antialias: false,
+    cinematic: {
+      dofEnabled: false,
+      vignetteEnabled: true,
+      grainEnabled: true,
+      grainAmount: 0.02
+    }
   },
 };
 

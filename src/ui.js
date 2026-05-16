@@ -76,6 +76,7 @@ export function initUI(callbacks) {
     </div>
     <button class="btn-icon" id="btn-visuals-toggle" title="Quỹ đạo & Nhãn tên">◎</button>
     <button class="btn-icon" id="btn-slice-toggle" title="Tự động Cắt lớp">🔬</button>
+    <button class="btn-icon" id="btn-cinematic-toggle" title="Chế độ Điện ảnh (Tự do)">🎥</button>
     <button class="btn-hud-icon btn-icon" id="btn-hud-toggle" title="Radar & Zoom HUD">📡</button>
     <div class="quality-preset-group" title="Chất lượng đồ họa">
       ${presetButtonsHTML}
@@ -193,6 +194,55 @@ export function initUI(callbacks) {
     <div id="zoom-pointer"></div>
   `;
   container.appendChild(zoomIndicator);
+
+  // ═══ Cinematic Panel ═══
+  const cinematicPanel = document.createElement('div');
+  cinematicPanel.className = 'glass-panel cinematic-panel';
+  cinematicPanel.id = 'cinematic-panel';
+  cinematicPanel.style.display = 'none';
+  cinematicPanel.innerHTML = `
+    <div class="cinematic-header">
+      <h3>Đạo diễn hình ảnh</h3>
+      <button class="btn-close-cinematic" id="btn-close-cinematic">✕</button>
+    </div>
+    
+    <div class="cinematic-section">
+      <div class="cinematic-label">Cú máy (Shot)</div>
+      <div class="cinematic-controls grid-3" id="cine-shot-group">
+        <button class="cine-btn active" data-shot="free">Tự do</button>
+        <button class="cine-btn" data-shot="targetLock">Khóa mục tiêu</button>
+        <button class="cine-btn" data-shot="orbit">Bay vòng</button>
+        <button class="cine-btn" data-shot="flyBy">Lướt qua</button>
+        <button class="cine-btn" data-shot="chase">Bám đuổi</button>
+      </div>
+    </div>
+
+    <div class="cinematic-section">
+      <div class="cinematic-label">Ống kính (Lens)</div>
+      <div class="cinematic-controls grid-5" id="cine-lens-group">
+        <button class="cine-btn" data-lens="24">24mm</button>
+        <button class="cine-btn active" data-lens="35">35mm</button>
+        <button class="cine-btn" data-lens="50">50mm</button>
+        <button class="cine-btn" data-lens="85">85mm</button>
+        <button class="cine-btn" data-lens="135">135m</button>
+      </div>
+    </div>
+
+    <div class="cinematic-section">
+      <button class="cine-btn full-width" id="btn-cine-auto" style="margin-bottom: 8px; background: rgba(255, 211, 106, 0.15); border-color: rgba(255, 211, 106, 0.4); color: #ffd36a; font-weight: 600;">✨ Đạo diễn Tự động</button>
+      <button class="cine-btn full-width" id="btn-cine-clean-ui">Ẩn giao diện (Clean UI)</button>
+    </div>
+  `;
+  container.appendChild(cinematicPanel);
+
+  // ═══ Restore UI Button ═══
+  const btnRestoreUI = document.createElement('button');
+  btnRestoreUI.id = 'btn-restore-ui';
+  btnRestoreUI.innerHTML = 'Hiển thị Giao diện (Show UI)';
+  btnRestoreUI.style.cssText = 'position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 1000; padding: 10px 20px; background: rgba(20, 30, 50, 0.7); color: #fff; border: 1px solid rgba(100, 140, 255, 0.3); border-radius: 20px; cursor: pointer; font-size: 12px; display: none; backdrop-filter: blur(5px); transition: all 0.2s;';
+  btnRestoreUI.addEventListener('mouseover', () => btnRestoreUI.style.background = 'rgba(40, 60, 100, 0.9)');
+  btnRestoreUI.addEventListener('mouseout', () => btnRestoreUI.style.background = 'rgba(20, 30, 50, 0.7)');
+  document.body.appendChild(btnRestoreUI);
 
   // ═══════ Event Handlers ═══════
 
@@ -342,6 +392,90 @@ export function initUI(callbacks) {
     const isActive = btnHudToggle.classList.toggle('active');
     if (callbacks.onToggleMinimap) callbacks.onToggleMinimap(isActive);
     if (callbacks.onToggleZoomIndicator) callbacks.onToggleZoomIndicator(isActive);
+  });
+  
+  // Cinematic Toggle
+  const btnCinematicToggle = document.getElementById('btn-cinematic-toggle');
+  const cinematicPanelDOM = document.getElementById('cinematic-panel');
+  const btnCloseCinematic = document.getElementById('btn-close-cinematic');
+
+  function toggleCinematicPanel(show) {
+    cinematicPanelDOM.style.display = show ? 'flex' : 'none';
+    if (show) {
+      if (window.innerWidth < 768) {
+        infoPanel.classList.remove('visible'); // Đóng info panel trên mobile để nhường chỗ
+      }
+    }
+  }
+
+  btnCinematicToggle.addEventListener('click', () => {
+    const isActive = btnCinematicToggle.classList.toggle('active');
+    toggleCinematicPanel(isActive);
+    if (callbacks.onToggleCinematic) callbacks.onToggleCinematic(isActive);
+  });
+
+  btnCloseCinematic.addEventListener('click', () => {
+    btnCinematicToggle.classList.remove('active');
+    toggleCinematicPanel(false);
+    if (callbacks.onToggleCinematic) callbacks.onToggleCinematic(false);
+  });
+
+  window.addEventListener('cinematic-disabled', () => {
+    // Handler moved below
+  });
+
+  // Cinematic Panel Controls
+  const shotBtns = cinematicPanelDOM.querySelectorAll('#cine-shot-group .cine-btn');
+  shotBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      shotBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (callbacks.onCinematicShotChange) callbacks.onCinematicShotChange(btn.dataset.shot);
+    });
+  });
+
+  const lensBtns = cinematicPanelDOM.querySelectorAll('#cine-lens-group .cine-btn');
+  lensBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      lensBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (callbacks.onCinematicLensChange) callbacks.onCinematicLensChange(parseFloat(btn.dataset.lens));
+    });
+  });
+
+  const btnCleanUI = document.getElementById('btn-cine-clean-ui');
+  let isCleanUI = false;
+
+  function setCleanUI(clean) {
+    isCleanUI = clean;
+    btnCleanUI.classList.toggle('active', isCleanUI);
+    btnRestoreUI.style.display = isCleanUI ? 'block' : 'none';
+    cinematicPanelDOM.style.display = isCleanUI ? 'none' : 'flex';
+    if (callbacks.onCinematicCleanUIToggle) callbacks.onCinematicCleanUIToggle(isCleanUI);
+  }
+
+  btnCleanUI.addEventListener('click', () => setCleanUI(!isCleanUI));
+  btnRestoreUI.addEventListener('click', () => setCleanUI(false));
+
+  const btnAutoDirector = document.getElementById('btn-cine-auto');
+  let isAutoDirector = false;
+  btnAutoDirector.addEventListener('click', () => {
+    isAutoDirector = !isAutoDirector;
+    btnAutoDirector.classList.toggle('active', isAutoDirector);
+    if (callbacks.onCinematicAutoDirectorToggle) callbacks.onCinematicAutoDirectorToggle(isAutoDirector);
+    
+    // Tự động bật Clean UI nếu đang kích hoạt Đạo diễn
+    if (isAutoDirector && !isCleanUI) {
+      btnCleanUI.click();
+    }
+  });
+
+  window.addEventListener('cinematic-disabled', () => {
+    btnCinematicToggle.classList.remove('active');
+    toggleCinematicPanel(false);
+    
+    if (isAutoDirector) btnAutoDirector.click();
+    if (isCleanUI) setCleanUI(false);
   });
 
   // Planet + Moon Selector Buttons

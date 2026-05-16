@@ -13,6 +13,7 @@ import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSe
 import { createAsteroidBelt } from './asteroidBelt.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
+import { createCinematicCameraController } from './cinematicCamera.js';
 
 // ═══ Bootstrap — Tải dữ liệu trước khi khởi tạo ═══
 async function bootstrap() {
@@ -26,6 +27,9 @@ async function bootstrap() {
 
   // 1b. Khởi tạo post-processing (Sun Bloom)
   const { composer, bloomPass } = initPostProcessing(renderer, scene, camera);
+
+  // 1c. Khởi tạo Cinematic Camera
+  const cinematicCamera = createCinematicCameraController(camera, controls, renderer.domElement);
 
   // Cập nhật composer khi resize
   window.addEventListener('resize', () => {
@@ -49,6 +53,10 @@ async function bootstrap() {
   let trackedBody = null;
   let isFlying = false;
   let flyProgress = 0;
+  
+  // 3c. Cinematic Director Mode
+  let isAutoDirectorActive = false;
+  let autoDirectorTimer = 0;
   
   // 3d. Raycaster cho Tooltip
   const raycaster = new THREE.Raycaster();
@@ -76,6 +84,89 @@ async function bootstrap() {
     flyEndTarget.copy(targetLookAt);
   }
 
+  // 3e. Auto Director Logic
+  function triggerRandomCinematicCut() {
+    if (!cinematicCamera.isActive()) return;
+    
+    const allBodies = Array.from(bodyById.values());
+    if (allBodies.length === 0) return;
+    
+    // Pick a random body
+    let nextBody = allBodies[Math.floor(Math.random() * allBodies.length)];
+    
+    // 40% chance to pick a "hero" body
+    if (Math.random() < 0.4) {
+      const heroes = ['sun', 'earth', 'saturn', 'jupiter', 'mars', 'moon', 'europa'];
+      const heroId = heroes[Math.floor(Math.random() * heroes.length)];
+      if (bodyById.has(heroId)) nextBody = bodyById.get(heroId);
+    }
+    
+    trackedBody = nextBody;
+    cinematicCamera.setTarget(trackedBody);
+    
+    // Teleport camera close to the new body to prevent dark screen flying
+    const targetWorldPos = trackedBody.pivot.getWorldPosition(new THREE.Vector3());
+    const startDist = trackedBody.data.radius * (Math.random() * 4 + 3); // 3x to 7x radius
+    // Random angle for teleportation
+    const angle = Math.random() * Math.PI * 2;
+    const height = (Math.random() - 0.5) * startDist;
+    const offset = new THREE.Vector3(
+      Math.cos(angle) * startDist,
+      height,
+      Math.sin(angle) * startDist
+    );
+    camera.position.copy(targetWorldPos).add(offset);
+    
+    // Notify UI
+    const allBtns = document.querySelectorAll('.planet-btn');
+    allBtns.forEach(b => b.classList.toggle('active', b.dataset.id === trackedBody.id));
+    
+    // Pick a random shot (only positional shots)
+    const shots = ['orbit', 'flyBy', 'chase'];
+    const weights = [0.45, 0.35, 0.2];
+    let randomVal = Math.random();
+    let selectedShot = 'orbit';
+    for (let i = 0; i < shots.length; i++) {
+      if (randomVal < weights[i]) {
+        selectedShot = shots[i];
+        break;
+      }
+      randomVal -= weights[i];
+    }
+    
+    // Pick a random lens (favoring cinematic/telephoto for close-ups)
+    const lenses = [35, 50, 85, 135];
+    const selectedLens = lenses[Math.floor(Math.random() * lenses.length)];
+    
+    // Apply changes
+    const shotParams = {};
+    if (selectedShot === 'flyBy') shotParams.duration = 10 + Math.random() * 8;
+    if (selectedShot === 'chase') {
+      // Dynamic offset based on planet size
+      const chaseOffset = trackedBody.data.radius * (2 + Math.random() * 3);
+      shotParams.offset = new THREE.Vector3(chaseOffset * 0.3, chaseOffset * 0.2, chaseOffset);
+    }
+    if (selectedShot === 'orbit') {
+      shotParams.radius = trackedBody.data.radius * (3 + Math.random() * 5);
+      shotParams.speed = 0.05 + Math.random() * 0.1;
+      shotParams.height = (Math.random() - 0.5) * trackedBody.data.radius * 2;
+    }
+    
+    cinematicCamera.setShotPreset(selectedShot, shotParams);
+    cinematicCamera.setLens(selectedLens);
+    
+    // Update UI
+    document.querySelectorAll('#cine-shot-group .cine-btn').forEach(b => 
+      b.classList.toggle('active', b.dataset.shot === selectedShot)
+    );
+    document.querySelectorAll('#cine-lens-group .cine-btn').forEach(b => 
+      b.classList.toggle('active', parseFloat(b.dataset.lens) === selectedLens)
+    );
+    
+    // Reset timer
+    autoDirectorTimer = 8 + Math.random() * 8; // 8-16 seconds
+  }
+
   // 4. Khởi tạo UI với callbacks (planetData đã được populate)
   // Hàm dùng chung để chọn hành tinh từ cả UI lẫn double-tap mobile
   function selectPlanet(planetId) {
@@ -87,6 +178,7 @@ async function bootstrap() {
     cameraMode = 'follow';
     trackedBody = bodyById.get(planetId);
     if (trackedBody) {
+      cinematicCamera.setTarget(trackedBody);
       const target = new THREE.Vector3();
       trackedBody.pivot.getWorldPosition(target);
       const zoomDist = Math.max(trackedBody.data.radius * 5, 10);
@@ -106,12 +198,16 @@ async function bootstrap() {
       }
       cameraMode = 'overview';
       trackedBody = null;
+      cinematicCamera.setTarget(null);
+      if (cinematicCamera.isActive()) cinematicCamera.setMode('free');
       // Fly back to overview (Sun focused)
       startFlyTo(new THREE.Vector3(200, 100, 200), new THREE.Vector3(0, 0, 0));
     },
     onFollow: (planetId) => {
       cameraMode = 'follow';
       trackedBody = bodyById.get(planetId);
+      cinematicCamera.setTarget(trackedBody);
+      if (cinematicCamera.isActive() && trackedBody) cinematicCamera.setMode('targetLock');
     },
     onToggleOrbits: (show) => {
       for (const orbit of orbits) {
@@ -139,6 +235,53 @@ async function bootstrap() {
     onToggleZoomIndicator: (enabled) => {
       const zoom = document.getElementById('zoom-indicator');
       if (zoom) zoom.style.display = enabled ? 'flex' : 'none';
+    },
+    onToggleCinematic: (enabled) => {
+      if (enabled) {
+        cinematicCamera.setTarget(trackedBody);
+        cinematicCamera.enable(trackedBody ? 'targetLock' : 'free');
+      } else {
+        cinematicCamera.disable();
+      }
+    },
+    onCinematicShotChange: (shot) => {
+      if (shot === 'free' || shot === 'targetLock') {
+        cinematicCamera.setMode(shot);
+      } else {
+        cinematicCamera.setShotPreset(shot);
+      }
+    },
+    onCinematicLensChange: (lens) => {
+      cinematicCamera.setLens(lens);
+    },
+    onCinematicCleanUIToggle: (isClean) => {
+      const topBar = document.getElementById('top-bar');
+      const planetSelector = document.getElementById('planet-selector');
+      const infoPanel = document.getElementById('info-panel');
+      const minimap = document.getElementById('minimap-container');
+      const zoomInd = document.getElementById('zoom-indicator');
+      
+      const displayStyle = isClean ? 'none' : '';
+      if (topBar) topBar.style.display = displayStyle;
+      if (planetSelector) planetSelector.style.display = displayStyle;
+      if (infoPanel && infoPanel.classList.contains('visible')) infoPanel.style.display = displayStyle;
+      if (minimap && !isClean && document.getElementById('btn-hud-toggle').classList.contains('active')) minimap.style.display = 'block';
+      else if (minimap) minimap.style.display = 'none';
+      
+      if (zoomInd && !isClean && document.getElementById('btn-hud-toggle').classList.contains('active')) zoomInd.style.display = 'flex';
+      else if (zoomInd) zoomInd.style.display = 'none';
+      
+      // Also hide labels and orbits
+      toggleLabels(!isClean && document.getElementById('btn-visuals-toggle').classList.contains('active'));
+      for (const orbit of orbits) {
+        orbit.visible = !isClean && document.getElementById('btn-visuals-toggle').classList.contains('active');
+      }
+    },
+    onCinematicAutoDirectorToggle: (active) => {
+      isAutoDirectorActive = active;
+      if (active) {
+        autoDirectorTimer = 0; // Trigger immediately
+      }
     }
   });
 
@@ -439,7 +582,19 @@ async function bootstrap() {
         }
       }
     }
-    controls.update();
+
+    // Cập nhật Cinematic Camera nếu đang active
+    if (cinematicCamera.isActive()) {
+      if (isAutoDirectorActive) {
+        autoDirectorTimer -= deltaTime;
+        if (autoDirectorTimer <= 0) {
+          triggerRandomCinematicCut();
+        }
+      }
+      cinematicCamera.update(deltaTime);
+    } else {
+      controls.update();
+    }
 
     // -- Raycasting cho Tooltip --
     let tooltipVisible = false;
