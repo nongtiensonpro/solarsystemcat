@@ -221,6 +221,9 @@ export function createCinematicCameraController(camera, controls, domElement) {
       case 'chase':
         handleChase(deltaTime);
         break;
+      case 'dollyZoom':
+        handleDollyZoom(deltaTime);
+        break;
     }
 
     applyTransform(deltaTime);
@@ -308,17 +311,64 @@ export function createCinematicCameraController(camera, controls, domElement) {
     camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
   }
 
+  function handleDollyZoom(deltaTime) {
+    if (!targetBody) return;
+    const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+    const progress = THREE.MathUtils.clamp(shotTime / (shotParams.duration || 10), 0, 1);
+    
+    // Dolly Zoom: Zoom in while pulling back, keeping the subject the same size on screen
+    const currentFrameFov = THREE.MathUtils.lerp(shotParams.startFov || 135, shotParams.endFov || 24, progress);
+    targetFOV = currentFrameFov;
+    
+    // Base scale calculation for constant subject size
+    const startDist = shotParams.startDist || targetBody.data.radius * 3;
+    const ratio = startDist * Math.tan(THREE.MathUtils.degToRad((shotParams.startFov || 135) / 2));
+    const currentDist = ratio / Math.tan(THREE.MathUtils.degToRad(currentFrameFov / 2));
+    
+    const dir = new THREE.Vector3().subVectors(camera.position, targetPos).normalize();
+    // Prevent division by zero or weird angles
+    if (dir.lengthSq() < 0.1) dir.set(0, 0, 1);
+    
+    const targetCamPos = targetPos.clone().add(dir.multiplyScalar(currentDist));
+    camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
+    
+    if (progress >= 1) mode = 'targetLock';
+  }
+
   function applyTransform(deltaTime) {
-    if ((mode === 'targetLock' || mode === 'orbit' || mode === 'flyBy' || mode === 'chase') && targetBody) {
+    if ((mode === 'targetLock' || mode === 'orbit' || mode === 'flyBy' || mode === 'chase' || mode === 'dollyZoom') && targetBody) {
       // Look at target body
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+      
+      // Rule of Thirds / Framing Offset (Off-center composition)
+      if (shotParams.framingOffset) {
+         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+         const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+         targetPos.add(right.multiplyScalar(shotParams.framingOffset.x * targetBody.data.radius));
+         targetPos.add(up.multiplyScalar(shotParams.framingOffset.y * targetBody.data.radius));
+      }
       
       const m1 = new THREE.Matrix4();
       m1.lookAt(camera.position, targetPos, new THREE.Vector3(0, 1, 0));
       const targetQuat = new THREE.Quaternion().setFromRotationMatrix(m1);
       
-      if (roll !== 0) {
-        const rollQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll);
+      // Combine manual roll and Dutch Angle
+      const currentRoll = roll + (shotParams.dutchAngle || 0);
+      
+      // Handheld / Zero-G floating camera shake
+      if (shotParams.handheld) {
+         // Subtle perlin-like noise using sine waves
+         const time = shotTime;
+         const shakeX = Math.sin(time * 1.5) * 0.002 + Math.sin(time * 3.1) * 0.001;
+         const shakeY = Math.cos(time * 1.3) * 0.002 + Math.sin(time * 2.7) * 0.001;
+         const shakeZ = Math.sin(time * 0.8) * 0.005;
+         
+         const shakeQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(shakeX, shakeY, shakeZ));
+         targetQuat.multiply(shakeQuat);
+      }
+      
+      if (currentRoll !== 0) {
+        const rollQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), currentRoll);
         targetQuat.multiply(rollQuat);
       }
       

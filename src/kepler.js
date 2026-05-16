@@ -50,17 +50,19 @@ export function solveKepler(M, e, tolerance = 1e-10, maxIter = 100) {
  * @returns {{ x: number, y: number, z: number }}
  */
 export function computeOrbitalPosition(data, timeElapsed) {
-  // Bán trục lớn (AU → units), nhân orbitScale cho vệ tinh
+  // Bán trục lớn (AU → units)
+  // Ưu tiên displayOrbitRadius nếu có (layout tùy chỉnh), nếu không dùng logic orbitScale
   const orbitScale = data.orbitScale || 1;
-  const a = data.semiMajorAxis * AU * orbitScale;
+  const a = data.displayOrbitRadius ?? (data.semiMajorAxis * AU * orbitScale);
   const e = data.eccentricity;
   const inclinationRad = (data.inclination || 0) * Math.PI / 180;
 
   // Chu kỳ quỹ đạo (ngày → giây)
   const periodSeconds = data.orbitalPeriod * 86400;
 
-  // 1. Dị thường trung bình: M = (2π / T) * t
-  const M = (2 * Math.PI / periodSeconds) * timeElapsed;
+  // 1. Dị thường trung bình: M = (2π / T) * t + phase
+  const phase = (data.initialPhaseDeg || 0) * Math.PI / 180;
+  const M = (2 * Math.PI / periodSeconds) * timeElapsed + phase;
 
   // 2. Giải phương trình Kepler → E
   const E = solveKepler(M, e);

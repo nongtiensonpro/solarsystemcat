@@ -1,5 +1,36 @@
 // Data Loader — Tải và xác thực dữ liệu thiên thể từ JSON
 // Thay thế dữ liệu hardcode trong planetData.js
+import { AU } from './constants.js';
+
+/**
+ * Kiểm tra khoảng cách an toàn của vệ tinh so với hành tinh mẹ (Phòng chống lỗi Phase 6).
+ * Cảnh báo nếu vệ tinh có nguy cơ đè lên mesh của hành tinh do orbitScale quá nhỏ.
+ * @param {Object[]} bodies - Danh sách bodies đã chuẩn hóa
+ */
+function validateMoonDistances(bodies) {
+  const bodyMap = new Map(bodies.map(b => [b.id, b]));
+  const safetyMargin = 4.0; // Margin an toàn theo thiết kế
+
+  for (const body of bodies) {
+    if (body.isMoon && body.parentId) {
+      const parent = bodyMap.get(body.parentId);
+      if (!parent) continue;
+
+      // Tính bán kính hiển thị thực tế
+      const a = body.displayOrbitRadius ?? (body.semiMajorAxis * AU * body.orbitScale);
+      const pericenter = a * (1 - body.eccentricity);
+      const minSafeDistance = parent.radius + safetyMargin;
+
+      if (pericenter <= minSafeDistance) {
+        console.warn(
+          `[DataLoader] Cảnh báo layout: Vệ tinh "${body.id}" (pericenter: ${pericenter.toFixed(2)}) ` +
+          `quá gần hành tinh mẹ "${parent.id}" (radius + margin: ${minSafeDistance.toFixed(2)}). ` +
+          `Vệ tinh có nguy cơ nằm trong hoặc đè lên bề mặt hành tinh.`
+        );
+      }
+    }
+  }
+}
 
 /**
  * Chuyển đổi hex color string "#RRGGBB" sang số 0xRRGGBB.
@@ -118,6 +149,9 @@ function normalizeBody(raw) {
     // ─── Render (fallback color + orbit scale for moons) ───
     fallbackColor: normalizeColor(raw.render?.fallbackColor) ?? 0xaaaaaa,
     orbitScale: raw.render?.orbitScale ?? 1,
+    displayOrbitRadius: raw.render?.displayOrbitRadius ?? null,
+    initialPhaseDeg: raw.render?.initialPhaseDeg ?? 0,
+    orbitPlane: raw.render?.orbitPlane ?? null,
 
     // ─── Derived flags ───
     isMoon: raw.type === 'moon',
@@ -189,6 +223,9 @@ export async function loadSolarSystemData() {
 
   // Chuẩn hóa tất cả bodies
   const bodies = json.bodies.map(normalizeBody);
+
+  // Kiểm tra khoảng cách vệ tinh (Phase 6)
+  validateMoonDistances(bodies);
 
   // Kiểm tra duplicate ids
   const ids = bodies.map(b => b.id);

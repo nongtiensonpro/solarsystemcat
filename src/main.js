@@ -121,9 +121,9 @@ async function bootstrap() {
     const allBtns = document.querySelectorAll('.planet-btn');
     allBtns.forEach(b => b.classList.toggle('active', b.dataset.id === trackedBody.id));
     
-    // Pick a random shot (only positional shots)
-    const shots = ['orbit', 'flyBy', 'chase'];
-    const weights = [0.45, 0.35, 0.2];
+    // Pick a random shot (including new Dolly Zoom)
+    const shots = ['orbit', 'flyBy', 'chase', 'dollyZoom'];
+    const weights = [0.35, 0.3, 0.2, 0.15];
     let randomVal = Math.random();
     let selectedShot = 'orbit';
     for (let i = 0; i < shots.length; i++) {
@@ -134,15 +134,31 @@ async function bootstrap() {
       randomVal -= weights[i];
     }
     
-    // Pick a random lens (favoring cinematic/telephoto for close-ups)
-    const lenses = [35, 50, 85, 135];
+    // Pick a random lens
+    const lenses = [24, 35, 50, 85, 135];
     const selectedLens = lenses[Math.floor(Math.random() * lenses.length)];
     
-    // Apply changes
-    const shotParams = {};
-    if (selectedShot === 'flyBy') shotParams.duration = 10 + Math.random() * 8;
+    // Base configuration for all shots
+    const shotParams = {
+      handheld: Math.random() > 0.5, // 50% chance for subtle handheld shake
+      dutchAngle: (Math.random() - 0.5) * 0.2 // Slight roll offset (-11 to +11 degrees)
+    };
+    
+    // Rule of Thirds framing (20% chance to off-center the planet)
+    if (Math.random() < 0.2) {
+      shotParams.framingOffset = {
+        x: (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random()), 
+        y: (Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.5)
+      };
+    }
+
+    // Shot specific logic
+    if (selectedShot === 'flyBy') {
+      shotParams.duration = 10 + Math.random() * 8;
+      // Fly-bys look epic with stronger Dutch Angles
+      shotParams.dutchAngle = (Math.random() - 0.5) * 0.5; 
+    }
     if (selectedShot === 'chase') {
-      // Dynamic offset based on planet size
       const chaseOffset = trackedBody.data.radius * (2 + Math.random() * 3);
       shotParams.offset = new THREE.Vector3(chaseOffset * 0.3, chaseOffset * 0.2, chaseOffset);
     }
@@ -150,6 +166,12 @@ async function bootstrap() {
       shotParams.radius = trackedBody.data.radius * (3 + Math.random() * 5);
       shotParams.speed = 0.05 + Math.random() * 0.1;
       shotParams.height = (Math.random() - 0.5) * trackedBody.data.radius * 2;
+    }
+    if (selectedShot === 'dollyZoom') {
+      shotParams.duration = 12 + Math.random() * 6;
+      shotParams.startFov = Math.random() > 0.5 ? 135 : 24; // Either zoom in or zoom out
+      shotParams.endFov = shotParams.startFov === 135 ? 24 : 135;
+      shotParams.startDist = trackedBody.data.radius * 5;
     }
     
     cinematicCamera.setShotPreset(selectedShot, shotParams);
@@ -302,14 +324,19 @@ async function bootstrap() {
     const data = body.data;
 
     if (data.isMoon && data.parentId) {
-      // Vệ tinh: gắn pivot vào pivot của hành tinh mẹ
+      // Vệ tinh: gắn pivot vào pivot hoặc tiltGroup của hành tinh mẹ
       const parentBody = bodyById.get(data.parentId);
       if (parentBody) {
-        parentBody.pivot.add(body.pivot);
-        // Moon orbit line nằm trong coordinate space của parent
+        // Nếu yêu cầu mặt phẳng xích đạo, gắn vào tiltGroup (nơi đã có axialTilt)
+        // Nếu không, gắn vào pivot (mặt phẳng quỹ đạo của hành tinh mẹ)
+        const container = data.orbitPlane === 'parentEquator' ? parentBody.tiltGroup : parentBody.pivot;
+        
+        container.add(body.pivot);
+
+        // Moon orbit line nằm trong coordinate space của container
         const orbitLine = createOrbitLine(data);
         if (orbitLine) {
-          parentBody.pivot.add(orbitLine);
+          container.add(orbitLine);
           orbits.push(orbitLine);
         }
       } else {

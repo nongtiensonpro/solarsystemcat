@@ -11,10 +11,10 @@ import { AU } from './constants.js';
  * @returns {THREE.Line|null}
  */
 export function createOrbitLine(data) {
-  if (data.semiMajorAxis <= 0) return null;
-
   const orbitScale = data.orbitScale || 1;
-  const a = data.semiMajorAxis * AU * orbitScale; // Bán trục lớn (có scale cho moons)
+  const a = data.displayOrbitRadius ?? (data.semiMajorAxis * AU * orbitScale);
+
+  if (a <= 0) return null;
   const e = data.eccentricity;
   const b = a * Math.sqrt(1 - e * e);  // Bán trục nhỏ
   const incRad = (data.inclination || 0) * Math.PI / 180;

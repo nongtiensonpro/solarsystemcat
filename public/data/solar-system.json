@@ -450,7 +450,10 @@
       },
       "render": {
         "fallbackColor": "#E8C84A",
-        "orbitScale": 4
+        "orbitScale": 4,
+        "displayOrbitRadius": 18,
+        "initialPhaseDeg": 20,
+        "orbitPlane": "parentEquator"
       },
       "textures": {
         "albedo": "/textures/planets/io/albedo.jpg",
@@ -487,7 +490,10 @@
       },
       "render": {
         "fallbackColor": "#C8B896",
-        "orbitScale": 4
+        "orbitScale": 4,
+        "displayOrbitRadius": 24,
+        "initialPhaseDeg": 115,
+        "orbitPlane": "parentEquator"
       },
       "textures": {
         "albedo": "/textures/planets/europa/albedo.jpg",
@@ -524,7 +530,10 @@
       },
       "render": {
         "fallbackColor": "#8C8478",
-        "orbitScale": 4
+        "orbitScale": 4,
+        "displayOrbitRadius": 31,
+        "initialPhaseDeg": 225,
+        "orbitPlane": "parentEquator"
       },
       "textures": {
         "albedo": "/textures/planets/ganymede/albedo.jpg",
@@ -561,7 +570,10 @@
       },
       "render": {
         "fallbackColor": "#6B6050",
-        "orbitScale": 4
+        "orbitScale": 4,
+        "displayOrbitRadius": 41,
+        "initialPhaseDeg": 310,
+        "orbitPlane": "parentEquator"
       },
       "textures": {
         "albedo": "/textures/planets/callisto/albedo.jpg",
