@@ -116,8 +116,11 @@ export function createPlanet(data) {
       emissiveColor = new THREE.Color(0x112244); // Nhiệt thặng dư x2.6 (Đối lưu dữ dội)
       emissiveInt = 2.5; // Tăng x10
     } else if (data.type === 'comet') {
-      emissiveColor = new THREE.Color(0x88ccff); // Phát sáng mờ màu xanh
-      emissiveInt = 2.0; // Tăng x10
+      emissiveColor = new THREE.Color(0x88ccff); 
+      emissiveInt = 2.0;
+    } else if (data.saturnMoon?.lodTier === 'hero') {
+      emissiveColor = new THREE.Color(data.render?.fallbackColor || 0xffffff);
+      emissiveInt = 0.2; 
     }
 
     // Tùy chỉnh bump / normal scale (đặc biệt cho Mimas - Herschel crater)
@@ -152,10 +155,14 @@ export function createPlanet(data) {
 
   // Cấp độ Cao (Rất gần)
   const meshHigh = new THREE.Mesh(geometries.high, material);
+  meshHigh.castShadow = true;
+  meshHigh.receiveShadow = true;
   lod.addLevel(meshHigh, 0);
 
   // Cấp độ Trung bình (Gần)
-  const meshMed = new THREE.Mesh(geometries.med, data.radius * 30);
+  const meshMed = new THREE.Mesh(geometries.med, material);
+  meshMed.castShadow = true;
+  meshMed.receiveShadow = true;
   lod.addLevel(meshMed, data.radius * 30);
 
   // Cấp độ Thấp (Xa)

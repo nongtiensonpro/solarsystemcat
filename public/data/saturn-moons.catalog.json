@@ -1,12 +1,100 @@
 {
   "bodies": [
     {
+      "id": "pan", "parentId": "saturn", "name": { "vi": "Pan" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0022 },
+      "orbit": { "semiMajorAxis": 0.000893, "orbitalPeriod": 0.575, "eccentricity": 0.0, "inclination": 0.0 },
+      "render": { "displayOrbitRadius": 22.0, "initialPhaseDeg": 10, "orbitPlane": "parentEquator", "fallbackColor": "#dddddd" },
+      "info": { "summaryVi": "Vệ tinh nằm trong khoảng trống Encke của vành đai A." }
+    },
+    {
+      "id": "daphnis", "parentId": "saturn", "name": { "vi": "Daphnis" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0006 },
+      "orbit": { "semiMajorAxis": 0.000912, "orbitalPeriod": 0.594, "eccentricity": 0.0, "inclination": 0.0 },
+      "render": { "displayOrbitRadius": 24.5, "initialPhaseDeg": 85, "orbitPlane": "parentEquator", "fallbackColor": "#ffffff" },
+      "info": { "summaryVi": "Nằm trong khoảng trống Keeler, tạo ra các sóng trên vành đai." }
+    },
+    {
+      "id": "atlas", "parentId": "saturn", "name": { "vi": "Atlas" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0024 },
+      "orbit": { "semiMajorAxis": 0.000920, "orbitalPeriod": 0.602, "eccentricity": 0.0012, "inclination": 0.003 },
+      "render": { "displayOrbitRadius": 27.0, "initialPhaseDeg": 150, "orbitPlane": "parentEquator", "fallbackColor": "#cccccc" },
+      "info": { "summaryVi": "Vệ tinh chăn dắt ở mép ngoài của vành đai A." }
+    },
+    {
+      "id": "aegaeon", "parentId": "saturn", "name": { "vi": "Aegaeon" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0001 },
+      "orbit": { "semiMajorAxis": 0.001121, "orbitalPeriod": 0.808, "eccentricity": 0.0002, "inclination": 0.001 },
+      "render": { "displayOrbitRadius": 29.0, "initialPhaseDeg": 200, "orbitPlane": "parentEquator", "fallbackColor": "#aaaaaa" },
+      "info": { "summaryVi": "Vệ tinh cực nhỏ nằm trong vành đai G." }
+    },
+    {
+      "id": "prometheus", "parentId": "saturn", "name": { "vi": "Prometheus" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0068 },
+      "orbit": { "semiMajorAxis": 0.000931, "orbitalPeriod": 0.613, "eccentricity": 0.0022, "inclination": 0.008 },
+      "render": { "displayOrbitRadius": 31.0, "initialPhaseDeg": 260, "orbitPlane": "parentEquator", "fallbackColor": "#e0e0e0" },
+      "info": { "summaryVi": "Vệ tinh chăn dắt phía trong của vành đai F." }
+    },
+    {
+      "id": "pandora", "parentId": "saturn", "name": { "vi": "Pandora" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0064 },
+      "orbit": { "semiMajorAxis": 0.000947, "orbitalPeriod": 0.629, "eccentricity": 0.0042, "inclination": 0.05 },
+      "render": { "displayOrbitRadius": 35.0, "initialPhaseDeg": 310, "orbitPlane": "parentEquator", "fallbackColor": "#d0d0d0" },
+      "info": { "summaryVi": "Vệ tinh chăn dắt phía ngoài của vành đai F." }
+    },
+    {
+      "id": "epimetheus", "parentId": "saturn", "name": { "vi": "Epimetheus" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0091 },
+      "orbit": { "semiMajorAxis": 0.001012, "orbitalPeriod": 0.694, "eccentricity": 0.0098, "inclination": 0.335 },
+      "render": { "displayOrbitRadius": 39.0, "initialPhaseDeg": 45, "orbitPlane": "parentEquator", "fallbackColor": "#c0c0c0" },
+      "info": { "summaryVi": "Chia sẻ quỹ đạo gần như trùng khớp với Janus." }
+    },
+    {
+      "id": "janus", "parentId": "saturn", "name": { "vi": "Janus" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0140 },
+      "orbit": { "semiMajorAxis": 0.001012, "orbitalPeriod": 0.695, "eccentricity": 0.0068, "inclination": 0.165 },
+      "render": { "displayOrbitRadius": 41.5, "initialPhaseDeg": 55, "orbitPlane": "parentEquator", "fallbackColor": "#b0b0b0" },
+      "info": { "summaryVi": "Vệ tinh đồng quỹ đạo với Epimetheus, chúng đổi chỗ cho nhau sau mỗi 4 năm." }
+    },
+    {
       "id": "mimas", "parentId": "saturn", "name": { "vi": "Mimas" }, "type": "moon",
       "saturnMoon": { "lodTier": "hero" },
       "physical": { "radius": 0.031 },
       "orbit": { "semiMajorAxis": 0.001240, "orbitalPeriod": 0.942, "eccentricity": 0.02, "inclination": 1.57 },
       "render": { "displayOrbitRadius": 49.0, "initialPhaseDeg": 25, "orbitPlane": "parentEquator", "fallbackColor": "#8a8a8a" },
       "info": { "summaryVi": "Có hình dáng giống Death Star do hố va chạm Herschel khổng lồ." }
+    },
+    {
+      "id": "methone", "parentId": "saturn", "name": { "vi": "Methone" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0003 },
+      "orbit": { "semiMajorAxis": 0.001300, "orbitalPeriod": 1.01, "eccentricity": 0.0001, "inclination": 0.007 },
+      "render": { "displayOrbitRadius": 52.0, "initialPhaseDeg": 120, "orbitPlane": "parentEquator", "fallbackColor": "#f0f0f0" },
+      "info": { "summaryVi": "Vệ tinh hình quả trứng, cực kỳ nhẵn nhụi." }
+    },
+    {
+      "id": "anthe", "parentId": "saturn", "name": { "vi": "Anthe" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0002 },
+      "orbit": { "semiMajorAxis": 0.001321, "orbitalPeriod": 1.05, "eccentricity": 0.0011, "inclination": 0.1 },
+      "render": { "displayOrbitRadius": 54.0, "initialPhaseDeg": 160, "orbitPlane": "parentEquator", "fallbackColor": "#e8e8e8" },
+      "info": { "summaryVi": "Vệ tinh nhỏ nằm giữa Mimas và Enceladus." }
+    },
+    {
+      "id": "pallene", "parentId": "saturn", "name": { "vi": "Pallene" }, "type": "moon",
+      "saturnMoon": { "irregular": "true" },
+      "physical": { "radius": 0.0004 },
+      "orbit": { "semiMajorAxis": 0.001418, "orbitalPeriod": 1.15, "eccentricity": 0.004, "inclination": 0.18 },
+      "render": { "displayOrbitRadius": 56.5, "initialPhaseDeg": 190, "orbitPlane": "parentEquator", "fallbackColor": "#d8d8d8" },
+      "info": { "summaryVi": "Nằm trong vành đai Pallene mờ nhạt." }
     },
     {
       "id": "enceladus", "parentId": "saturn", "name": { "vi": "Enceladus" }, "type": "moon",
@@ -17,12 +105,44 @@
       "info": { "summaryVi": "Phun nước lỏng ra vũ trụ từ các vết nứt ở cực nam — bằng chứng đại dương ngầm." }
     },
     {
+      "id": "telesto", "parentId": "saturn", "name": { "vi": "Telesto" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0019 },
+      "orbit": { "semiMajorAxis": 0.001969, "orbitalPeriod": 1.887, "eccentricity": 0.000, "inclination": 1.158 },
+      "render": { "displayOrbitRadius": 65.0, "initialPhaseDeg": 250, "orbitPlane": "parentEquator", "fallbackColor": "#ffffff" },
+      "info": { "summaryVi": "Vệ tinh Trojan của Tethys, nằm ở điểm Lagrange L4." }
+    },
+    {
+      "id": "calypso", "parentId": "saturn", "name": { "vi": "Calypso" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0016 },
+      "orbit": { "semiMajorAxis": 0.001969, "orbitalPeriod": 1.887, "eccentricity": 0.000, "inclination": 1.173 },
+      "render": { "displayOrbitRadius": 66.5, "initialPhaseDeg": 270, "orbitPlane": "parentEquator", "fallbackColor": "#f8f8f8" },
+      "info": { "summaryVi": "Vệ tinh Trojan của Tethys, nằm ở điểm Lagrange L5." }
+    },
+    {
       "id": "tethys", "parentId": "saturn", "name": { "vi": "Tethys" }, "type": "moon",
       "saturnMoon": { "lodTier": "hero" },
       "physical": { "radius": 0.084 },
       "orbit": { "semiMajorAxis": 0.001969, "orbitalPeriod": 1.887, "eccentricity": 0.0001, "inclination": 1.12 },
       "render": { "displayOrbitRadius": 68.0, "initialPhaseDeg": 250, "orbitPlane": "parentEquator", "fallbackColor": "#cfcfcf" },
       "info": { "summaryVi": "Có vết nứt Ithaca Chasma dài khổng lồ và hố va chạm Odysseus." }
+    },
+    {
+      "id": "helene", "parentId": "saturn", "name": { "vi": "Helene" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0028 },
+      "orbit": { "semiMajorAxis": 0.002523, "orbitalPeriod": 2.736, "eccentricity": 0.0022, "inclination": 0.199 },
+      "render": { "displayOrbitRadius": 74.0, "initialPhaseDeg": 15, "orbitPlane": "parentEquator", "fallbackColor": "#efefef" },
+      "info": { "summaryVi": "Vệ tinh Trojan của Dione, nằm ở điểm Lagrange L4." }
+    },
+    {
+      "id": "polydeuces", "parentId": "saturn", "name": { "vi": "Polydeuces" }, "type": "moon",
+      "saturnMoon": { "lodTier": "irregular" },
+      "physical": { "radius": 0.0002 },
+      "orbit": { "semiMajorAxis": 0.002523, "orbitalPeriod": 2.736, "eccentricity": 0.0192, "inclination": 0.177 },
+      "render": { "displayOrbitRadius": 76.5, "initialPhaseDeg": 35, "orbitPlane": "parentEquator", "fallbackColor": "#e0e0e0" },
+      "info": { "summaryVi": "Vệ tinh Trojan của Dione, nằm ở điểm Lagrange L5." }
     },
     {
       "id": "dione", "parentId": "saturn", "name": { "vi": "Dione" }, "type": "moon",

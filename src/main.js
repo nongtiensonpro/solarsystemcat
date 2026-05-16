@@ -5,7 +5,7 @@ import { setPlanetData, planetData } from './planetData.js';
 import { createPlanet } from './createPlanet.js';
 import { computeOrbitalPosition } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
-import { initUI, updateLayerTooltip } from './ui.js';
+import { initUI, updateLayerTooltip, showNotification } from './ui.js';
 import { createOrbitLine } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
@@ -16,37 +16,39 @@ import { selfRegulatingFactor } from './sunInterior.js';
 import { createCinematicCameraController } from './cinematicCamera.js';
 import { GhostMoonSystem } from './ghostMoonSystem.js';
 
-// ═══ Bootstrap — Tải dữ liệu trước khi khởi tạo ═══
+// ??? Bootstrap ? T?i d? li?u tr??c khi kh?i t?o ???
 async function bootstrap() {
-  // 0. Tải dữ liệu từ JSON
+  const visitedBodies = new Set();
+  
+  // 0. T?i d? li?u t? JSON
   const solarData = await loadSolarSystemData();
   setPlanetData(solarData);
   const saturnGhostConfig = await loadSaturnGhostConfig();
 
-  // 1. Khởi tạo canvas và scene
+  // 1. Kh?i t?o canvas v? scene
   const canvas = document.querySelector('canvas.webgl');
   const { scene, camera, renderer, controls } = initScene(canvas);
 
-  // 1b. Khởi tạo post-processing (Sun Bloom)
+  // 1b. Kh?i t?o post-processing (Sun Bloom)
   const { composer, bloomPass } = initPostProcessing(renderer, scene, camera);
 
-  // 1c. Khởi tạo Cinematic Camera
+  // 1c. Kh?i t?o Cinematic Camera
   const cinematicCamera = createCinematicCameraController(camera, controls, renderer.domElement);
 
-  // Cập nhật composer khi resize
+  // C?p nh?t composer khi resize
   window.addEventListener('resize', () => {
     composer.setSize(window.innerWidth, window.innerHeight);
   });
 
   // 2. Containers cho scene objects
   const bodies = [];
-  const bodyById = new Map();  // Tra cứu body theo id
+  const bodyById = new Map();  // Tra c?u body theo id
   const orbits = [];
 
-  // 3. Thiết lập thời gian mô phỏng
+  // 3. Thi?t l?p th?i gian m? ph?ng
   const clock = new THREE.Clock();
   let simulationTime = 0;
-  let timeScale = 1000; // Giá trị mặc định, sẽ được UI slider ghi đè
+  let timeScale = 1000; // Gi? tr? m?c ??nh, s? ???c UI slider ghi ??
   let isPaused = false;
   let isAutoSliceEnabled = false;
 
@@ -193,10 +195,10 @@ async function bootstrap() {
     autoDirectorTimer = 8 + Math.random() * 8; // 8-16 seconds
   }
 
-  // 4. Khởi tạo UI với callbacks (planetData đã được populate)
+  // 4. Kh?i t?o UI v?i callbacks (planetData ?? ???c populate)
   let hasVisitedSaturn = false;
   
-  // Các preset camera cho Sao Thổ
+  // C?c preset camera cho Sao Th?
   const SATURN_PRESETS = {
     'default': { distance: 180, inclination: 28, azimuth: 30, duration: 2.2 },
     'edge': { distance: 220, inclination: 3, azimuth: 30, duration: 1.5 },
@@ -212,7 +214,7 @@ async function bootstrap() {
     const target = new THREE.Vector3();
     trackedBody.pivot.getWorldPosition(target);
     
-    // Tính toán vị trí camera theo tọa độ cầu
+    // T?nh to?n v? tr? camera theo t?a ?? c?u
     const inclRad = THREE.MathUtils.degToRad(preset.inclination);
     const azimRad = THREE.MathUtils.degToRad(preset.azimuth);
     
@@ -225,9 +227,9 @@ async function bootstrap() {
     startFlyTo(target.clone().add(offset), target, preset.duration);
   }
 
-  // Hàm dùng chung để chọn hành tinh từ cả UI lẫn double-tap mobile
+  // H?m d?ng chung ?? ch?n h?nh tinh t? c? UI l?n double-tap mobile
   function selectPlanet(planetId) {
-    // Reset manual cross section if there's any pending
+    // Reset manual cross section if pending
     if (trackedBody && trackedBody.isCrossSectionActive) {
       toggleCrossSection(trackedBody, false);
       trackedBody.isCrossSectionActive = false;
@@ -244,7 +246,7 @@ async function bootstrap() {
         const isFirstTime = !hasVisitedSaturn;
         hasVisitedSaturn = true;
         
-        // Tính toán vị trí camera default
+        // T?nh to?n v? tr? camera default
         const inclRad = THREE.MathUtils.degToRad(preset.inclination);
         const azimRad = THREE.MathUtils.degToRad(preset.azimuth);
         const offset = new THREE.Vector3(
@@ -254,12 +256,17 @@ async function bootstrap() {
         );
         const camTarget = target.clone().add(offset);
         
-        // Intro animation 2200ms cho lần đầu, sau đó mượt hơn
+        // Intro animation 2200ms cho l?n ??u, sau ?? m??t h?n
         startFlyTo(camTarget, target, isFirstTime ? 2.2 : 1.5);
       } else {
         const zoomDist = Math.max(trackedBody.data.radius * 5, 0.25);
         const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
         startFlyTo(camTarget, target, 1.1);
+      }
+      // Discovery Notification (Phase 6)
+      if (!visitedBodies.has(planetId)) {
+        visitedBodies.add(planetId);
+        showNotification(`Khám phá mới: ${trackedBody.data.name.vi || trackedBody.data.name}`);
       }
     }
   }
@@ -290,6 +297,7 @@ async function bootstrap() {
     onToggleOrbits: (show) => {
       for (const orbit of orbits) {
         orbit.visible = show;
+        // B?t shadow logic cho ring n?u orbit ???c b?t? Kh?ng, ring shadow n?n lu?n ch?y.
       }
     },
     onToggleLabels: (show) => {
@@ -300,7 +308,7 @@ async function bootstrap() {
     },
     onToggleSlice: (enabled) => {
       isAutoSliceEnabled = enabled;
-      // Nếu tắt khi đang cắt, hãy đóng mặt cắt ngay lập tức
+      // N?u t?t khi ?ang c?t, h?y ??ng m?t c?t ngay l?p t?c
       if (!enabled && trackedBody && trackedBody.isCrossSectionActive) {
         toggleCrossSection(trackedBody, false);
         trackedBody.isCrossSectionActive = false;
@@ -363,33 +371,33 @@ async function bootstrap() {
     }
   });
 
-  // Khởi tạo trạng thái ẩn mặc định cho các công cụ mới (Phase 5 Optimization)
+  // Kh?i t?o tr?ng th?i ?n m?c ??nh cho c?c c?ng c? m?i (Phase 5 Optimization)
   document.getElementById('minimap-container').style.display = 'none';
   document.getElementById('zoom-indicator').style.display = 'none';
 
-  // 5. Tạo tất cả thiên thể theo hierarchy
-  // ─── Bước 1: Tạo tất cả body objects trước ───
+  // 5. T?o t?t c? thi?n th? theo hierarchy
+  // ??? B??c 1: T?o t?t c? body objects tr??c ???
   for (const data of planetData) {
     const body = createPlanet(data);
     bodies.push(body);
     bodyById.set(data.id, body);
   }
 
-  // ─── Bước 2: Gắn vào scene hoặc parent theo parentId ───
+  // ??? B??c 2: G?n v?o scene ho?c parent theo parentId ???
   for (const body of bodies) {
     const data = body.data;
 
     if (data.isMoon && data.parentId) {
-      // Vệ tinh: gắn pivot vào pivot hoặc tiltGroup của hành tinh mẹ
+      // V? tinh: g?n pivot v?o pivot ho?c tiltGroup c?a h?nh tinh m?
       const parentBody = bodyById.get(data.parentId);
       if (parentBody) {
-        // Nếu yêu cầu mặt phẳng xích đạo, gắn vào tiltGroup (nơi đã có axialTilt)
-        // Nếu không, gắn vào pivot (mặt phẳng quỹ đạo của hành tinh mẹ)
+        // N?u y?u c?u m?t ph?ng x?ch ??o, g?n v?o tiltGroup (n?i ?? c? axialTilt)
+        // N?u kh?ng, g?n v?o pivot (m?t ph?ng qu? ??o c?a h?nh tinh m?)
         const container = data.orbitPlane === 'parentEquator' ? parentBody.tiltGroup : parentBody.pivot;
         
         container.add(body.pivot);
 
-        // Moon orbit line nằm trong coordinate space của container
+        // Moon orbit line n?m trong coordinate space c?a container
         const orbitLine = createOrbitLine(data);
         if (orbitLine) {
           container.add(orbitLine);
@@ -400,17 +408,17 @@ async function bootstrap() {
         scene.add(body.pivot);
       }
     } else if (data.parentId === 'sun' || data.parentId === null) {
-      // Hành tinh hoặc Mặt Trời: gắn trực tiếp vào scene
+      // H?nh tinh ho?c M?t Tr?i: g?n tr?c ti?p v?o scene
       scene.add(body.pivot);
-      // Orbit line cho hành tinh quanh Mặt Trời
+      // Orbit line cho h?nh tinh quanh M?t Tr?i
       const orbitLine = createOrbitLine(data);
       if (orbitLine) {
         scene.add(orbitLine);
         orbits.push(orbitLine);
       }
     } else {
-      // Trường hợp khác (parentId không phải sun, không phải moon)
-      // Fallback: gắn vào scene
+      // Tr??ng h?p kh?c (parentId kh?ng ph?i sun, kh?ng ph?i moon)
+      // Fallback: g?n v?o scene
       scene.add(body.pivot);
       const orbitLine = createOrbitLine(data);
       if (orbitLine) {
@@ -422,13 +430,13 @@ async function bootstrap() {
     createLabel(data, body.pivot);
   }
 
-  // 5a. Tạo Vành đai tiểu hành tinh (Asteroid Belt)
+  // 5a. T?o V?nh ?ai ti?u h?nh tinh (Asteroid Belt)
   const asteroidBelt = createAsteroidBelt(5000);
   scene.add(asteroidBelt.mesh);
 
-  // 5b. Áp dụng preset hiện tại cho atmosphere/cloud/corona visibility
+  // 5b. ?p d?ng preset hi?n t?i cho atmosphere/cloud/corona visibility
   function applyPresetToEffects(preset) {
-    // Cập nhật số lượng tiểu hành tinh
+    // C?p nh?t s? l??ng ti?u h?nh tinh
     if (preset.asteroidCount) {
       asteroidBelt.setCount(preset.asteroidCount);
     }
@@ -465,15 +473,15 @@ async function bootstrap() {
     }
   }
 
-  // Áp dụng preset ban đầu
+  // ?p d?ng preset ban ??u
   applyPresetToEffects(getCurrentPreset());
 
-  // Lắng nghe thay đổi preset
+  // L?ng nghe thay ??i preset
   onPresetChange((newPreset) => {
     applyPresetToEffects(newPreset);
   });
 
-  // 5c. Mobile: Double-tap để chọn hành tinh 3D
+  // 5c. Mobile: Double-tap ?? ch?n h?nh tinh 3D
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     const tapRaycaster = new THREE.Raycaster();
     const tapPointer = new THREE.Vector2();
@@ -488,13 +496,13 @@ async function bootstrap() {
       const dy = touch.clientY - lastTapY;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      // Double-tap: 2 lần chạm trong 300ms, cách nhau < 30px
+      // Double-tap: 2 l?n ch?m trong 300ms, c?ch nhau < 30px
       if (now - lastTapTime < 300 && dist < 30) {
         tapPointer.x = (touch.clientX / window.innerWidth) * 2 - 1;
         tapPointer.y = -(touch.clientY / window.innerHeight) * 2 + 1;
         tapRaycaster.setFromCamera(tapPointer, camera);
 
-        // Lấy tất cả mesh của các thiên thể (bỏ qua Mặt Trời — quá to, dễ tap nhầm)
+        // L?y t?t c? mesh c?a c?c thi?n th? (b? qua M?t Tr?i ? qu? to, d? tap nh?m)
         const meshes = bodies
           .filter(b => b.data.type !== 'star')
           .map(b => b.mesh);
@@ -506,7 +514,7 @@ async function bootstrap() {
             selectPlanet(hitBody.data.id);
           }
         }
-        lastTapTime = 0; // Reset để tránh triple-tap trigger
+        lastTapTime = 0; // Reset ?? tr?nh triple-tap trigger
       } else {
         lastTapTime = now;
         lastTapX = touch.clientX;
@@ -515,7 +523,7 @@ async function bootstrap() {
     }, { passive: true });
   }
 
-  // Khởi tạo Ghost Moon System nếu có
+  // Kh?i t?o Ghost Moon System n?u c?
   let saturnGhostSystem = null;
   if (saturnGhostConfig) {
     const saturnBody = bodyById.get('saturn');
@@ -525,40 +533,7 @@ async function bootstrap() {
     }
   }
 
-  // Lắng nghe click cho Ghost Moon System
-  renderer.domElement.addEventListener('click', (event) => {
-    if (!saturnGhostSystem || cameraMode !== 'follow' || trackedBody?.data?.id !== 'saturn') return;
-    
-    // Convert click to NDC
-    const mouseClick = new THREE.Vector2(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    raycaster.setFromCamera(mouseClick, camera);
-    const intersects = raycaster.intersectObject(saturnGhostSystem.hitMesh);
-    if (intersects.length > 0) {
-      // Hiển thị popup custom thay vì alert
-      let popup = document.getElementById('ghost-moon-popup');
-      if (!popup) {
-        popup = document.createElement('div');
-        popup.id = 'ghost-moon-popup';
-        popup.className = 'glass-panel';
-        popup.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; width: 320px; z-index: 1000; text-align: center; border: 1px solid rgba(110, 198, 255, 0.3);';
-        popup.innerHTML = `
-          <h3 style="margin-bottom: 12px; color: #6ec6ff;">🌑 Vùng vệ tinh bất quy tắc</h3>
-          <p style="font-size: 13px; color: #aab5c5; line-height: 1.5; text-align: left; margin-bottom: 16px;">
-            Sao Thổ có hơn 260 vệ tinh bất quy tắc trong vùng này — đa số là các thiên thạch bị bắt giữ từ vành đai Kuiper hàng tỷ năm trước.
-          </p>
-          <button id="btn-close-ghost-popup" class="btn-action" style="padding: 8px 16px;">Đóng</button>
-        `;
-        document.getElementById('ui-container').appendChild(popup);
-        document.getElementById('btn-close-ghost-popup').addEventListener('click', () => {
-          popup.style.display = 'none';
-        });
-      }
-      popup.style.display = 'block';
-    }
-  });
+  // Ghost Moon System interaction removed as per user request (moved to Info Panel)
 
   function animate() {
     requestAnimationFrame(animate);
@@ -569,23 +544,23 @@ async function bootstrap() {
     }
 
     for (const body of bodies) {
-      // A. Cập nhật vị trí quỹ đạo (Kepler) - Bỏ qua Mặt Trời
+      // A. C?p nh?t v? tr? qu? ??o (Kepler) - B? qua M?t Tr?i
       if (body.data.type !== 'star') {
         const hasOrbit = body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0;
         if (hasOrbit && !isPaused) {
           const pos = computeOrbitalPosition(body.data, simulationTime);
           body.pivot.position.set(pos.x, pos.y, pos.z);
           
-          // E. Cập nhật đuôi sao chổi
+          // E. C?p nh?t ?u?i sao ch?i
           if (body.tailMesh) {
-            // Mũi nhọn ở 0,0,0 của pivot. Hướng +Z của mesh hướng về target.
-            // Để đuôi (+Z) chỉ ra xa Mặt Trời, ta lookAt điểm ra xa tiếp từ vị trí hiện tại.
+            // M?i nh?n ? 0,0,0 c?a pivot. H??ng +Z c?a mesh h??ng v? target.
+            // ?? ?u?i (+Z) ch? ra xa M?t Tr?i, ta lookAt ?i?m ra xa ti?p t? v? tr? hi?n t?i.
             const awayPos = body.pivot.position.clone().multiplyScalar(2);
             body.tailMesh.lookAt(awayPos);
             
-            // Làm mờ đuôi khi ở xa Mặt Trời
+            // L?m m? ?u?i khi ? xa M?t Tr?i
             const distAU = body.pivot.position.length() / AU;
-            const maxTailDist = 10.0; // Đuôi mờ dần và biến mất khi > 10 AU
+            const maxTailDist = 10.0; // ?u?i m? d?n v? bi?n m?t khi > 10 AU
             let tailOpacity = 1.0 - (distAU / maxTailDist);
             tailOpacity = Math.max(0, Math.min(1, tailOpacity));
             
@@ -600,13 +575,13 @@ async function bootstrap() {
         }
       }
 
-      // B. Tự quay quanh trục (cả Mặt Trời và Hành tinh)
+      // B. T? quay quanh tr?c (c? M?t Tr?i v? H?nh tinh)
       if (body.data.rotationPeriod !== 0 && !isPaused) {
         const rotSpeed = (2 * Math.PI) / (Math.abs(body.data.rotationPeriod) * 3600);
         const direction = body.data.rotationPeriod > 0 ? 1 : -1;
         body.mesh.rotation.y += direction * rotSpeed * deltaTime * timeScale;
 
-        // C. Lớp mây quay độc lập (nhanh hơn bề mặt 20% để tạo hiệu ứng gió)
+        // C. L?p m?y quay ??c l?p (nhanh h?n b? m?t 20% ?? t?o hi?u ?ng gi?)
         if (body.cloudMesh) {
           body.cloudMesh.rotation.y += direction * rotSpeed * 1.2 * deltaTime * timeScale;
         }
@@ -620,10 +595,10 @@ async function bootstrap() {
         
       }
 
-      // D. Cập nhật shader Mặt Trời độc lập với tốc độ mô phỏng.
+      // D. C?p nh?t shader M?t Tr?i ??c l?p v?i t?c ?? m? ph?ng.
       if (body.mesh.material.userData?.isSunSurfaceShader) {
         body.mesh.material.uniforms.uTime.value += deltaTime;
-        // Cơ chế tự cân bằng nhiệt hạch từ sunInterior.js
+        // C? ch? t? c?n b?ng nhi?t h?ch t? sunInterior.js
         body.mesh.material.uniforms.uSelfRegFactor.value = selfRegulatingFactor(
           body.mesh.material.uniforms.uTime.value
         );
@@ -634,29 +609,29 @@ async function bootstrap() {
         body.coronaMesh.rotation.y += deltaTime * 0.03;
       }
 
-      // D2. Cập nhật sắc quyển (chromosphere)
+      // D2. C?p nh?t s?c quy?n (chromosphere)
       if (body.chromosphereMesh?.material.userData?.isSunChromosphereShader) {
         body.chromosphereMesh.material.uniforms.uTime.value += deltaTime;
       }
 
-      // D3. Cập nhật từ trường
+      // D3. C?p nh?t t? tr??ng
       if (body.magneticFieldMesh?.material.userData?.isMagneticFieldShader) {
         body.magneticFieldMesh.material.uniforms.uTime.value += deltaTime;
       }
 
-      // --- TỐI ƯU HÓA (PHASE 5) ---
+      // --- T?I ?U H?A (PHASE 5) ---
       const bodyWorldPos = new THREE.Vector3();
       body.pivot.getWorldPosition(bodyWorldPos);
       const distToCamera = camera.position.distanceTo(bodyWorldPos);
       const isClose = distToCamera < body.data.radius * 30;
       const isSlicing = body.isCrossSectionActive;
 
-      // Cập nhật LOD
+      // C?p nh?t LOD
       if (body.lod) {
         body.lod.update(camera);
       }
 
-      // D4. Cập nhật mưa Heli
+      // D4. C?p nh?t m?a Heli
       if (body.heliumRainMesh) {
         body.heliumRainMesh.visible = isClose && isSlicing;
         if (body.heliumRainMesh.visible && body.heliumRainMesh.material.userData?.isHeliumRainShader) {
@@ -664,7 +639,7 @@ async function bootstrap() {
         }
       }
 
-      // D5. Cập nhật mưa Kim Cương
+      // D5. C?p nh?t m?a Kim C??ng
       if (body.diamondRainMesh) {
         body.diamondRainMesh.visible = isClose && isSlicing;
         if (body.diamondRainMesh.visible && body.diamondRainMesh.material.userData?.isDiamondRainShader) {
@@ -672,7 +647,7 @@ async function bootstrap() {
         }
       }
 
-      // D6. Cập nhật Tuyết Sắt (Iron Snow)
+      // D6. C?p nh?t Tuy?t S?t (Iron Snow)
       if (body.ironSnowMesh) {
         body.ironSnowMesh.visible = isClose && isSlicing;
         if (body.ironSnowMesh.visible && body.ironSnowMesh.material.userData?.isIronSnowShader) {
@@ -682,6 +657,31 @@ async function bootstrap() {
       // G. Update Enceladus Plume
       if (body.enceladusPlume && !isPaused) {
         body.enceladusPlume.update(deltaTime);
+      }
+
+      // H. Update Saturn Ring Shadows (Phase 4)
+      if (body.data.id === 'saturn' && body.ringMesh && body.ringMesh.material.uniforms) {
+        const saturnPos = new THREE.Vector3();
+        body.pivot.getWorldPosition(saturnPos);
+        body.ringMesh.material.uniforms.uPlanetPosition.value.copy(saturnPos);
+        // Sun is at (0,0,0)
+        body.ringMesh.material.uniforms.uSunPosition.value.set(0, 0, 0);
+        // Camera position for scattering (Phase 8)
+        body.ringMesh.material.uniforms.uCameraPosition.value.copy(camera.position);
+      }
+      
+      // Phase 6: Pulse Hero Moons
+      if (body.data.saturnMoon?.lodTier === 'hero' && body.mesh.levels) {
+        const mat = body.mesh.levels[0].object.material;
+        if (mat) {
+          mat.emissiveIntensity = 0.1 + 0.2 * Math.sin(Date.now() * 0.003);
+        }
+      }
+    } // Kết thúc vòng lặp bodies
+
+    for (const orbit of orbits) {
+      if (orbit.visible && orbit.material.uniforms?.uTime) {
+        orbit.material.uniforms.uTime.value += deltaTime;
       }
     }
 
@@ -698,22 +698,65 @@ async function bootstrap() {
       
       camera.position.lerpVectors(flyStartPos, flyEndPos, ease);
       controls.target.lerpVectors(flyStartTarget, flyEndTarget, ease);
+
+      // Phase 6: Cinematic FOV Pulse during fly
+      const fovEffect = Math.sin(ease * Math.PI) * 10; 
+      camera.fov = 45 + fovEffect; 
+      camera.updateProjectionMatrix();
     } else {
+      camera.fov = 45;
+      camera.updateProjectionMatrix();
+
       if (cameraMode === 'follow' && trackedBody) {
         const targetPos = new THREE.Vector3();
         trackedBody.pivot.getWorldPosition(targetPos);
         
-        // Tính vector khoảng cách hiện tại từ camera đến target cũ
+        // T?nh vector kho?ng c?ch hi?n t?i t? camera ??n target c?
         const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
         
-        // Di chuyển cả target và camera theo targetPos mới
+        // Di chuy?n c? target v? camera theo targetPos m?i
         controls.target.copy(targetPos);
         camera.position.copy(targetPos).add(offset);
         
-        // Tự động Cắt dưa hấu dựa trên khoảng cách camera (nếu bật)
+        // T? ??ng C?t d?a h?u d?a tr?n kho?ng c?ch camera (n?u b?t)
         if (isAutoSliceEnabled) {
           const distance = camera.position.distanceTo(targetPos);
           updateAutoCrossSection(trackedBody, distance, targetPos);
+        }
+      }
+    }
+
+    // -- Raycasting cho Tooltip --
+    let tooltipVisible = false;
+
+    // -- Ring Tooltip Logic (Phase 7) --
+    if (trackedBody?.data?.id === 'saturn' && trackedBody.ringMesh) {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(trackedBody.ringMesh);
+      if (intersects.length > 0) {
+        const hitPoint = intersects[0].point;
+        const planetPos = new THREE.Vector3();
+        trackedBody.pivot.getWorldPosition(planetPos);
+        const distUnits = hitPoint.distanceTo(planetPos);
+        const scaleFactor = 9.45 / 58232;
+        const distKm = distUnits / scaleFactor;
+
+        let ringName = '';
+        let ringDesc = '';
+
+        if (distKm < 74500) { ringName = 'Vành D'; ringDesc = 'Vành đai mờ nhất, nằm gần sát bầu khí quyển.'; }
+        else if (distKm < 92000) { ringName = 'Vành C'; ringDesc = 'Vành đai tối, chứa nhiều bụi đá và vật chất hữu cơ.'; }
+        else if (distKm < 117580) { ringName = 'Vành B'; ringDesc = 'Vành đai lớn nhất, sáng nhất và dày đặc nhất.'; }
+        else if (distKm < 122170) { ringName = 'Phân cách Cassini'; ringDesc = 'Khoảng trống rộng 4,800km do lực hấp dẫn của Mimas.'; }
+        else if (distKm < 136775) { 
+          if (distKm > 133400 && distKm < 133800) { ringName = 'Khoảng trống Encke'; ringDesc = 'Khe hở nhỏ nơi vệ tinh Pan đang chăn dắt.'; }
+          else { ringName = 'Vành A'; ringDesc = 'Vành đai ngoài cùng trong nhóm chính.'; }
+        }
+        else if (distKm > 140000 && distKm < 140400) { ringName = 'Vành F'; ringDesc = 'Vành đai hẹp, bện xoắn kỳ lạ nằm ngoài cùng.'; }
+
+        if (ringName) {
+          tooltipVisible = true;
+          updateLayerTooltip(true, mouseClientX, mouseClientY, ringName, ringDesc);
         }
       }
     }
@@ -731,7 +774,7 @@ async function bootstrap() {
       controls.update();
     }
 
-    // Cập nhật Ghost Moon System
+    // C?p nh?t Ghost Moon System
     if (saturnGhostSystem && trackedBody?.data?.id === 'saturn') {
       const saturnWorldPos = new THREE.Vector3();
       trackedBody.pivot.getWorldPosition(saturnWorldPos);
@@ -739,15 +782,14 @@ async function bootstrap() {
       saturnGhostSystem.update(deltaTime, timeScale, distToCamera);
     }
 
-    // -- Raycasting cho Tooltip --
-    let tooltipVisible = false;
+    // -- Raycasting cho Interior Tooltip --
     if (trackedBody && trackedBody.isCrossSectionActive) {
       const interiorGroup = trackedBody.tiltGroup.getObjectByName('cross_section_layers');
       if (interiorGroup) {
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(interiorGroup.children, false);
         
-        // Tìm điểm giao cắt không bị clipping
+        // T?m ?i?m giao c?t kh?ng b? clipping
         const validHit = intersects.find(hit => clipPlane.distanceToPoint(hit.point) >= 0);
         
         if (validHit && validHit.object.userData.layerData) {
@@ -760,21 +802,21 @@ async function bootstrap() {
       updateLayerTooltip(false);
     }
 
-    // Cập nhật nhãn (nếu đang hiển thị) - Throttled để tối ưu hiệu năng
+    // C?p nh?t nh?n (n?u ?ang hi?n th?) - Throttled ?? t?i ?u hi?u n?ng
     const labelThrottle = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 6 : 3;
     if (areLabelsVisible() && frameCount % labelThrottle === 0) {
       updateLabels(camera, renderer);
     }
     frameCount++;
 
-    // Cập nhật vành đai tiểu hành tinh
+    // C?p nh?t v?nh ?ai ti?u h?nh tinh
     asteroidBelt.update(simulationTime, deltaTime);
 
-    // Cập nhật Minimap & Zoom Indicator
+    // C?p nh?t Minimap & Zoom Indicator
     updateMinimap();
     updateZoomIndicator();
 
-    // Kết xuất qua post-processing pipeline (bloom)
+    // K?t xu?t qua post-processing pipeline (bloom)
     composer.render();
   }
 
@@ -865,21 +907,20 @@ async function bootstrap() {
     link.click();
   }
 
-  // Bắt đầu vòng lặp
+  // B?t ??u v?ng l?p
   let frameCount = 0;
   animate();
 
   const moonCount = bodies.filter(b => b.data.isMoon).length;
-  console.log(`Kepler Engine: ${bodies.length} thiên thể (${moonCount} vệ tinh) đang quay trên quỹ đạo elip`);
+  console.log(`Kepler Engine: ${bodies.length} thi?n th? (${moonCount} v? tinh) ?ang quay tr?n qu? ??o elip`);
 }
 
 // Khởi động ứng dụng
 bootstrap().catch(err => {
-  console.error('[SolarSystem] Lỗi khởi tạo:', err);
-  // Hiển thị lỗi trên loading screen nếu có
+  console.error('[SolarSystem] Initialization error:', err);
   const loadingPercent = document.getElementById('loading-percent');
   if (loadingPercent) {
-    loadingPercent.textContent = `Lỗi: ${err.message}`;
+    loadingPercent.textContent = `Error: ${err.message}`;
     loadingPercent.style.color = '#ff6666';
   }
 });

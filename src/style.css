@@ -346,7 +346,6 @@ body {
 .preset-btn.active {
   color: #6ec6ff;
   background: rgba(110, 198, 255, 0.18);
-  box-shadow: 0 0 8px rgba(110, 198, 255, 0.15);
 }
 
 /* ═══════════════════════════════════════════
@@ -357,14 +356,39 @@ body {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 8px 12px;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding: 10px 16px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
   display: flex;
-  gap: 6px;
+  gap: 8px;
   z-index: 20;
+  max-width: 85vw;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 198, 255, 0.4) rgba(0, 0, 0, 0);
+}
+
+.planet-selector::-webkit-scrollbar {
+  height: 6px;
+  display: block;
+}
+
+.planet-selector::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+.planet-selector::-webkit-scrollbar-thumb {
+  background: rgba(110, 198, 255, 0.3);
+  border-radius: 10px;
+}
+
+.planet-selector::-webkit-scrollbar-thumb:hover {
+  background: rgba(110, 198, 255, 0.5);
 }
 
 .planet-btn {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -427,11 +451,24 @@ body {
   position: absolute;
   top: 80px;
   right: 16px;
-  width: 240px;
+  width: 260px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
   padding: 16px;
-  transform: translateX(300px);
+  transform: translateX(320px);
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 20;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 198, 255, 0.3) transparent;
+}
+
+.info-panel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.info-panel::-webkit-scrollbar-thumb {
+  background: rgba(110, 198, 255, 0.3);
+  border-radius: 4px;
 }
 
 .info-panel.visible {
@@ -584,6 +621,90 @@ body {
 /* ═══════════════════════════════════════════
    Loading Screen
    ═══════════════════════════════════════════ */
+.saturn-camera-panel {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 20;
+  width: auto;
+  min-width: 320px;
+  animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.saturn-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(110, 198, 255, 0.2);
+  margin-bottom: 4px;
+}
+
+.saturn-panel-header span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6ec6ff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-close-saturn-panel {
+  background: transparent;
+  border: none;
+  color: #8899bb;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+
+.btn-close-saturn-panel:hover {
+  color: #ff5555;
+}
+
+.saturn-panel-body {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.saturn-camera-panel .preset-btn {
+  font-size: 11px;
+  padding: 8px 14px;
+  background: rgba(20, 30, 50, 0.6);
+  border: 1px solid rgba(100, 140, 255, 0.15);
+  border-radius: 8px;
+  color: #aab5c5;
+  transition: all 0.2s;
+}
+
+.saturn-camera-panel .preset-btn.active {
+  background: rgba(110, 198, 255, 0.18);
+  color: #6ec6ff;
+  border-color: #6ec6ff;
+  box-shadow: 0 0 10px rgba(110, 198, 255, 0.15);
+}
+
+@keyframes slideInUp {
+  from { transform: translate(-50%, 20px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+  .saturn-camera-panel {
+    bottom: 160px;
+    min-width: 90vw;
+  }
+  .saturn-panel-body {
+    flex-wrap: wrap;
+  }
+}
+
 .loading-screen {
   position: fixed;
   top: 0;
@@ -595,6 +716,47 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  z-index: 100;
+  transition: opacity 0.8s ease;
+}
+
+.loading-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #6ec6ff, #a78bfa, #f0abfc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 30px;
+}
+
+.loading-bar-container {
+  width: 280px;
+  height: 3px;
+  background: rgba(100, 140, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6ec6ff, #a78bfa);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.loading-percent {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6b7fa0;
+  font-weight: 400;
 }
 
 /* ═══════════════════════════════════════════
@@ -1123,94 +1285,3 @@ body {
 }
 
 #zoom-indicator::before {
-  content: '';
-  position: absolute;
-  top: 20px;
-  bottom: 20px;
-  right: 10px;
-  width: 2px;
-  background: rgba(110, 198, 255, 0.2);
-}
-
-.zoom-level {
-  position: relative;
-  font-size: 10px;
-  color: rgba(110, 198, 255, 0.4);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  text-align: right;
-  padding-right: 25px;
-  transition: color 0.3s ease;
-}
-
-.zoom-level.active {
-  color: #6ec6ff;
-  font-weight: 700;
-}
-
-#zoom-pointer {
-  position: absolute;
-  right: 6px;
-  top: 20px;
-  width: 10px;
-  height: 10px;
-  background: #6ec6ff;
-  border-radius: 50%;
-  transform: translateY(-50%);
-  box-shadow: 0 0 10px #6ec6ff;
-  transition: top 0.3s ease;
-}
-
-@media (max-width: 720px) {
-  #minimap-container {
-    bottom: 160px;
-    width: 100px;
-    height: 100px;
-  }
-  
-  #zoom-indicator {
-    display: none;
-  }
-}
-
-/* ═══════════════════════════════════════════
-   Saturn Camera Presets
-   ═══════════════════════════════════════════ */
-.saturn-camera-panel {
-  position: absolute;
-  bottom: 80px;
-  right: 20px;
-  padding: 8px;
-  display: flex;
-  gap: 8px;
-  z-index: 20;
-  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.saturn-camera-panel .preset-btn {
-  font-size: 11px;
-  padding: 6px 12px;
-  background: rgba(20, 30, 50, 0.6);
-  border: 1px solid rgba(100, 140, 255, 0.15);
-  border-radius: 6px;
-  color: #aab5c5;
-}
-
-.saturn-camera-panel .preset-btn.active {
-  background: rgba(110, 198, 255, 0.18);
-  color: #6ec6ff;
-  border-color: #6ec6ff;
-}
-
-.saturn-camera-panel .preset-btn:hover {
-  background: rgba(30, 50, 90, 0.8);
-  color: #fff;
-}
-
-@media (max-width: 768px) {
-  .saturn-camera-panel {
-    bottom: 140px;
-    right: 50%;
-    transform: translateX(50%) !important;
-  }
-}

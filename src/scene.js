@@ -35,6 +35,10 @@ export function initScene(canvas) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.localClippingEnabled = true; // Kích hoạt mặt cắt
+  
+  // Shadows (Phase 4)
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   // 4. Controls
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -51,10 +55,17 @@ export function initScene(canvas) {
 
   // Ánh sáng điểm từ Mặt Trời tại tâm
   // Ở Three.js r170, PointLight mặc định dùng physical inverse-square decay.
-  // Cường độ 20000 giúp Trái Đất (100 AU) nhận cường độ 2.0 (20000 / 100^2),
-  // mức độ vừa phải không bị cháy sáng khi dùng chung với ACESFilmicToneMapping.
   const sunLight = new THREE.PointLight(0xffffee, 20000, 0); 
   sunLight.position.set(0, 0, 0);
+  
+  // Shadow config cho Sun
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 100000;
+  sunLight.shadow.bias = -0.0001; // Giảm shadow acne
+
   scene.add(sunLight);
 
   // 6. Xử lý Resize

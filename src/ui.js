@@ -250,12 +250,22 @@ export function initUI(callbacks) {
   saturnCameraPanel.id = 'saturn-camera-panel';
   saturnCameraPanel.style.display = 'none'; // Chỉ hiển thị khi chọn Sao Thổ
   saturnCameraPanel.innerHTML = `
-    <button class="preset-btn active" data-preset="default" title="Phím 1">🪐 Mặc định</button>
-    <button class="preset-btn" data-preset="edge" title="Phím 2">↔ Ngang vành</button>
-    <button class="preset-btn" data-preset="pole" title="Phím 3">⬆ Cực</button>
-    <button class="preset-btn" data-preset="close" title="Phím 4">🔍 Gần</button>
+    <div class="saturn-panel-header">
+      <span>🎯 Góc nhìn tối ưu</span>
+      <button class="btn-close-saturn-panel" id="btn-close-saturn-panel">✕</button>
+    </div>
+    <div class="saturn-panel-body">
+      <button class="preset-btn active" data-preset="default" title="Phím 1">🪐 Mặc định</button>
+      <button class="preset-btn" data-preset="edge" title="Phím 2">↔ Ngang vành</button>
+      <button class="preset-btn" data-preset="pole" title="Phím 3">⬆ Cực</button>
+      <button class="preset-btn" data-preset="close" title="Phím 4">🔍 Gần</button>
+    </div>
   `;
   container.appendChild(saturnCameraPanel);
+
+  document.getElementById('btn-close-saturn-panel').addEventListener('click', () => {
+    saturnCameraPanel.style.display = 'none';
+  });
 
   // ═══════ Event Handlers ═══════
 
@@ -644,11 +654,51 @@ export function initUI(callbacks) {
     if (data.isMoon && data.parentId) {
       rows.push(['Hành tinh mẹ', getParentName(data.parentId)]);
     }
-    
     // Đếm số vệ tinh
     const moonCount = planetData.filter(p => p.parentId === data.id && p.isMoon).length;
     if (moonCount > 0) {
       rows.push(['Số vệ tinh', moonCount]);
+    }
+
+    // Phase 5: Hiển thị danh sách vệ tinh nhanh (nếu có)
+    let moonListHtml = '';
+    if (moonCount > 0) {
+      const moons = planetData.filter(p => p.parentId === data.id && p.isMoon);
+      moonListHtml = `
+        <div class="info-section-title">🛰️ Các vệ tinh chính</div>
+        <div class="moon-chips-container" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+          ${moons.map(m => `<button class="moon-chip" data-id="${m.id}" style="padding: 4px 8px; font-size: 11px; background: rgba(110, 198, 255, 0.15); border: 1px solid rgba(110, 198, 255, 0.3); border-radius: 4px; color: #6ec6ff; cursor: pointer; transition: all 0.2s;">${m.name}</button>`).join('')}
+        </div>
+      `;
+    }
+
+    // Phase 7: Chi tiết hệ thống vành đai cho Saturn
+    let ringsInfoHtml = '';
+    if (data.id === 'saturn') {
+      ringsInfoHtml = `
+        <div class="info-section-title">🪐 Hệ thống Vành đai</div>
+        <div class="info-layer" style="border-left-color: #ffd36a; background: rgba(255, 211, 106, 0.05);">
+          <div class="info-row sub"><span class="label">Tổng đường kính</span><span class="value">282,000 km</span></div>
+          <div class="info-row sub"><span class="label">Độ dày trung bình</span><span class="value">Chỉ 10 - 100 mét</span></div>
+          <div class="info-row sub"><span class="label">Thành phần</span><span class="value">99% Băng nước nguyên chất</span></div>
+          <p style="font-size: 10px; color: #8899bb; margin-top: 6px; font-style: italic;">
+            * Mẹo: Rê chuột lên vành đai 3D để xem tên từng vùng!
+          </p>
+        </div>
+      `;
+    }
+
+    // Phase 5.1: Hiển thị thông tin Ghost Moons cho Saturn
+    let ghostMoonsHtml = '';
+    if (data.id === 'saturn') {
+      ghostMoonsHtml = `
+        <div class="info-section-title">🌑 Vùng vệ tinh bất quy tắc</div>
+        <div class="info-layer" style="border-left-color: #6ec6ff; background: rgba(110, 198, 255, 0.05);">
+          <p style="font-size: 11px; color: #aab5c5; line-height: 1.4; margin: 0;">
+            Bên ngoài 24 vệ tinh chính, Sao Thổ còn hơn 260 "mảnh vỡ" bất quy tắc. Đây là tàn dư từ thời sơ khai của Hệ Mặt Trời bị lực hấp dẫn bắt giữ.
+          </p>
+        </div>
+      `;
     }
 
     rows.push(
@@ -769,10 +819,73 @@ export function initUI(callbacks) {
 
     content.innerHTML = rows.map(([label, value]) =>
       `<div class="info-row"><span class="label">${label}</span><span class="value">${value}</span></div>`
-    ).join('') + interiorHtml + summaryHtml;
+    ).join('') + moonListHtml + ringsInfoHtml + ghostMoonsHtml + interiorHtml + summaryHtml;
+
+    // Listeners cho moon chips (Phase 5)
+    content.querySelectorAll('.moon-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        if (callbacks.onPlanetSelect) {
+          callbacks.onPlanetSelect(id);
+        }
+      });
+      // Hover effect
+      btn.addEventListener('mouseenter', () => {
+        btn.style.background = 'rgba(110, 198, 255, 0.3)';
+        btn.style.borderColor = 'rgba(110, 198, 255, 0.6)';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.background = 'rgba(110, 198, 255, 0.15)';
+        btn.style.borderColor = 'rgba(110, 198, 255, 0.3)';
+      });
+    });
 
     infoPanel.classList.add('visible');
   }
+}
+
+// Notification System (Phase 6)
+let notificationTimeout = null;
+export function showNotification(text, duration = 3000) {
+  let notification = document.getElementById('discovery-notification');
+  if (!notification) {
+    notification = document.createElement('div');
+    notification.id = 'discovery-notification';
+    notification.className = 'glass-panel';
+    notification.style.cssText = `
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      padding: 10px 24px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6ec6ff;
+      opacity: 0;
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(110, 198, 255, 0.4);
+      background: rgba(10, 15, 30, 0.85);
+    `;
+    document.body.appendChild(notification);
+  }
+
+  notification.innerHTML = `<span>✨</span> ${text}`;
+  
+  // Reset previous state
+  clearTimeout(notificationTimeout);
+  notification.style.opacity = '1';
+  notification.style.transform = 'translateX(-50%) translateY(0)';
+
+  notificationTimeout = setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateX(-50%) translateY(20px)';
+  }, duration);
 }
 
 let layerTooltipInstance = null;
