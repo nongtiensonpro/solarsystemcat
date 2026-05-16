@@ -100,27 +100,35 @@ export function createPlanet(data) {
       pbrRoughness = 0.95; // Lõi sao chổi carbon tối màu
     }
 
-    // Xác định emissive (phát sáng)
+    // 3. Thi?t l?p Emissive (Ph?t s?ng t? th?n)
+    // T?ng c??ng ?? nh?n r? b? m?t k? c? ? m?t t?i (Phase 9 UX Optimization)
     let emissiveColor = new THREE.Color(0x000000);
     let emissiveInt = 1.0;
+    let finalEmissiveMap = textures.night || null;
+
     if (textures.night) {
-      emissiveColor = new THREE.Color(0xffffee); // Đèn thành phố (Trái Đất)
-      emissiveInt = 5.0; // Tăng x5 để vượt bloom threshold
+      emissiveColor = new THREE.Color(0xffffee);
+      emissiveInt = 6.0; // Tăng độ sáng đèn thành phố
     } else if (data.id === 'io') {
-      emissiveColor = new THREE.Color(0x331100); // Núi lửa phát sáng mờ đỏ/cam
-      emissiveInt = 1.5; // Tăng x10
+      emissiveColor = new THREE.Color(0x442211);
+      emissiveInt = 2.0;
     } else if (data.id === 'saturn') {
-      emissiveColor = new THREE.Color(0x332211); // Nhiệt thặng dư do mưa Heli
-      emissiveInt = 2.0; // Tăng x10
+      emissiveColor = new THREE.Color(0x221105);
+      emissiveInt = 1.5;
     } else if (data.id === 'neptune') {
-      emissiveColor = new THREE.Color(0x112244); // Nhiệt thặng dư x2.6 (Đối lưu dữ dội)
-      emissiveInt = 2.5; // Tăng x10
+      emissiveColor = new THREE.Color(0x112244);
+      emissiveInt = 2.5;
     } else if (data.type === 'comet') {
       emissiveColor = new THREE.Color(0x88ccff); 
-      emissiveInt = 2.0;
+      emissiveInt = 2.5;
     } else if (data.saturnMoon?.lodTier === 'hero') {
       emissiveColor = new THREE.Color(data.render?.fallbackColor || 0xffffff);
-      emissiveInt = 0.2; 
+      emissiveInt = 0.35; 
+    } else if (textures.albedo) {
+      // Fallback: Dùng chính albedo làm emissive mờ để nhìn rõ chi tiết ở mặt tối
+      finalEmissiveMap = textures.albedo;
+      emissiveColor = new THREE.Color(0x555555); // Màu xám trung tính sáng hơn
+      emissiveInt = 0.45; // Tăng mạnh độ sáng để texture hiện rõ mồn một
     }
 
     // Tùy chỉnh bump / normal scale (đặc biệt cho Mimas - Herschel crater)
@@ -138,12 +146,10 @@ export function createPlanet(data) {
       normalScale: nScale,
       bumpMap: textures.bump || null,
       bumpScale: bScale,
-      // Roughness map cho các vùng phản chiếu khác nhau
       roughnessMap: textures.specular || null,
       roughness: pbrRoughness,
       metalness: pbrMetalness,
-      // Night map cho đèn thành phố hoặc emissive mặc định
-      emissiveMap: textures.night || null,
+      emissiveMap: finalEmissiveMap,
       emissive: emissiveColor,
       emissiveIntensity: emissiveInt,
     });

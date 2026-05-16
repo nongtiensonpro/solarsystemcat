@@ -1,23 +1,19 @@
 import * as THREE from 'three';
 
 // ═══════════════════════════════════════════════════════════════
-// Sun Surface Shader — Nâng cấp Phase 1
-// Mô phỏng: Granulation (ô đối lưu Rayleigh-Bénard), vết đen,
-// dao động tự cân bằng nhiệt hạch, multi-band plasma flow
+// Sun Surface Shader — Photosphere (Độ sáng đồng nhất & Không burn-out)
 // ═══════════════════════════════════════════════════════════════
 
 const sunSurfaceVertexShader = /* glsl */`
   varying vec2 vUv;
-  varying vec3 vPosition;
-  varying vec3 vNormal;
-  varying vec3 vViewDir;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPosition;
 
   void main() {
     vUv = uv;
-    vPosition = position;
-    vNormal = normalize(normalMatrix * normal);
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vViewDir = normalize(cameraPosition - worldPos.xyz);
+    vWorldPosition = worldPos.xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -25,14 +21,12 @@ const sunSurfaceVertexShader = /* glsl */`
 const sunSurfaceFragmentShader = /* glsl */`
   uniform sampler2D uAlbedo;
   uniform float uTime;
-  uniform float uSelfRegFactor;  // Hệ số tự cân bằng nhiệt hạch [0.95-1.05]
+  uniform float uSelfRegFactor;
 
   varying vec2 vUv;
-  varying vec3 vPosition;
-  varying vec3 vNormal;
-  varying vec3 vViewDir;
+  varying vec3 vWorldNormal;
+  varying vec3 vWorldPosition;
 
-  // ──── Simplex-style 3D noise (GPU-friendly) ────
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -81,114 +75,53 @@ const sunSurfaceFragmentShader = /* glsl */`
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
   }
 
-  // ──── Fractal Brownian Motion (FBM) cho granulation ────
-  float fbm(vec3 p) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 1.0;
-    for (int i = 0; i < 5; i++) {
-      value += amplitude * snoise(p * frequency);
-      amplitude *= 0.5;
-      frequency *= 2.0;
-    }
-    return value;
-  }
-
-  // ──── Granulation: Ô đối lưu Rayleigh-Bénard ────
-  float granulation(vec2 uv, float time) {
-    vec3 p = vec3(uv * 38.0, time * 0.15);
-    float cells = snoise(p) * 0.5 + 0.5;
-    // Tạo viền tối giữa các ô (intergranular lanes)
-    float edges = 1.0 - smoothstep(0.35, 0.55, cells);
-    return mix(0.85, 1.15, cells) - edges * 0.12;
-  }
-
-  // ──── Sunspots: Vết đen mặt trời ────
-  float sunspot(vec2 uv, float time) {
-    // 2-3 vết đen di chuyển chậm
-    float spot = 0.0;
-    vec2 center1 = vec2(0.3 + sin(time * 0.02) * 0.1, 0.45 + cos(time * 0.015) * 0.05);
-    vec2 center2 = vec2(0.7 + cos(time * 0.018) * 0.08, 0.55 + sin(time * 0.025) * 0.04);
-    vec2 center3 = vec2(0.5 + sin(time * 0.012 + 2.0) * 0.12, 0.35 + cos(time * 0.02 + 1.5) * 0.06);
-
-    float d1 = length(uv - center1);
-    float d2 = length(uv - center2);
-    float d3 = length(uv - center3);
-
-    // Umbra (tâm tối) + Penumbra (vòng ngoài ít tối hơn)
-    spot += (1.0 - smoothstep(0.008, 0.025, d1)) * 0.55;  // Umbra
-    spot += (1.0 - smoothstep(0.025, 0.045, d1)) * 0.25;   // Penumbra
-    spot += (1.0 - smoothstep(0.006, 0.020, d2)) * 0.50;
-    spot += (1.0 - smoothstep(0.020, 0.035, d2)) * 0.20;
-    spot += (1.0 - smoothstep(0.004, 0.015, d3)) * 0.45;
-    spot += (1.0 - smoothstep(0.015, 0.028, d3)) * 0.18;
-
-    return clamp(spot, 0.0, 0.7);
-  }
-
   void main() {
     vec2 uv = vUv;
+    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+    vec3 normal = normalize(vWorldNormal);
 
-    // ──── Dòng plasma đa tần số (multi-band flow) ────
-    float flow1 = sin(uv.y * 28.0 + uTime * 0.55) * 0.006;
-    float flow2 = cos((uv.x + uv.y) * 18.0 - uTime * 0.38) * 0.004;
-    float flow3 = sin(uv.x * 35.0 + uv.y * 12.0 + uTime * 0.25) * 0.003;
-    uv.x += flow1 + flow3;
-    uv.y += flow2;
+    // ──── Limb Darkening ────
+    float mu = max(dot(viewDir, normal), 0.0);
+    float darkening = 0.4 + 0.6 * mu;
 
-    // ──── Texture cơ sở ────
+    // ──── Granulation (0.75 - 0.92 range) ────
+    float rawNoise = snoise(vec3(vUv * 45.0, uTime * 0.12));
+    float gran = mix(0.75, 0.92, rawNoise * 0.5 + 0.5);
+
+    // ──── Photosphere Colors (Warm & Uniform) ────
+    // Dùng tông màu vàng ấm đồng nhất hơn
+    vec3 coreColor = vec3(0.95, 0.90, 0.70);
+    vec3 edgeColor = vec3(0.85, 0.40, 0.05);
+    vec3 sunBaseColor = mix(edgeColor, coreColor, pow(mu, 0.4));
+
+    // ──── Texture Sampling & Clamping ────
     vec4 texColor = texture2D(uAlbedo, uv);
+    vec3 clampedTex = min(texColor.rgb, vec3(0.92));
+    
+    float exposure = 1.0 + 0.4 * uSelfRegFactor;
+    vec3 finalColor = sunBaseColor * clampedTex * gran * exposure * darkening;
 
-    // ──── Granulation (ô đối lưu sôi sục) ────
-    float gran = granulation(vUv, uTime);
+    // ──── Final Cap: Giữ màu warm-yellow, tránh wash out ────
+    finalColor = min(finalColor * 1.8, vec3(0.95, 0.90, 0.75));
 
-    // ──── Vết đen Mặt Trời ────
-    float spots = sunspot(vUv, uTime);
-
-    // ──── FBM turbulence cho dòng plasma ────
-    vec3 noiseCoord = vec3(vUv * 6.0, uTime * 0.08);
-    float turb = fbm(noiseCoord) * 0.12 + 1.0;
-
-    // ──── Dao động tự cân bằng nhiệt hạch ────
-    float pulse = uSelfRegFactor;
-    // Thêm micro-pulse cho hiệu ứng sống động
-    pulse *= 1.0 + sin(uTime * 1.7 + uv.y * 12.0) * 0.04;
-
-    // ──── Tổng hợp màu ────
-    vec3 hotTint = vec3(4.0, 3.2, 2.2); // Đủ vượt bloomThreshold (2.0-3.0) nhưng không bị chói
-    vec3 baseColor = texColor.rgb * hotTint * pulse;
-
-    // Áp dụng granulation
-    baseColor *= gran * turb;
-
-    // Áp dụng vết đen (làm tối vùng spot)
-    baseColor *= (1.0 - spots);
-
-    // Limb darkening (rìa tối hơn tâm — hiệu ứng vật lý thực)
-    float limbFactor = max(dot(vViewDir, vNormal), 0.0);
-    float limbDarkening = 0.55 + 0.45 * pow(limbFactor, 0.6);
-    baseColor *= limbDarkening;
-
-    gl_FragColor = vec4(baseColor, 1.0);
+    gl_FragColor = vec4(finalColor, 1.0);
   }
 `;
 
 // ═══════════════════════════════════════════════════════════════
-// Corona Shader — Cải tiến với prominences và chromosphere
+// Corona Shader
 // ═══════════════════════════════════════════════════════════════
 
 const sunCoronaVertexShader = /* glsl */`
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewDir;
-  varying vec3 vWorldPos;
 
   void main() {
-    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-    vWorldPos = worldPosition.xyz;
     vUv = uv;
     vNormal = normalize(normalMatrix * normal);
-    vViewDir = normalize(cameraPosition - worldPosition.xyz);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vViewDir = normalize(cameraPosition - worldPos.xyz);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
@@ -196,15 +129,12 @@ const sunCoronaVertexShader = /* glsl */`
 const sunCoronaFragmentShader = /* glsl */`
   uniform vec3 uInnerColor;
   uniform vec3 uOuterColor;
-  uniform vec3 uChromosphereColor;
   uniform float uTime;
 
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewDir;
-  varying vec3 vWorldPos;
 
-  // Simplified noise for prominences
   float hash(float n) { return fract(sin(n) * 43758.5453123); }
   float noise(vec3 x) {
     vec3 p = floor(x);
@@ -219,53 +149,28 @@ const sunCoronaFragmentShader = /* glsl */`
 
   void main() {
     float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
-    float corona = pow(rim, 1.55);
+    float t = rim; 
+    float falloff = pow(1.0 - t, 3.0);
+    float streamers = pow(1.0 - t, 4.0) * (0.8 + 0.2 * noise(vec3(vUv * 8.0, uTime * 0.1)));
+    
+    vec3 color = mix(uInnerColor, uOuterColor, t);
+    float alpha = (falloff * 0.7 + streamers * 0.3) * smoothstep(1.0, 0.8, t);
+    vec3 finalColor = color * (1.0 + streamers * 1.5);
 
-    // ──── Chromosphere (sắc quyển) — lớp mỏng sát bề mặt ────
-    float chromosphere = pow(rim, 8.0) * 2.5;
-    vec3 chromoColor = uChromosphereColor * chromosphere;
-
-    // ──── Filaments (sợi từ trường) ────
-    float filament = sin(vUv.y * 42.0 + uTime * 0.7) * 0.5 + 0.5;
-    float filament2 = sin(vUv.x * 30.0 + vUv.y * 15.0 - uTime * 0.5) * 0.5 + 0.5;
-    float filamentCombined = mix(filament, filament2, 0.3);
-
-    // ──── Prominences (tia lửa phóng ra) ────
-    vec3 noisePos = vec3(vUv * 8.0, uTime * 0.15);
-    float prom = noise(noisePos);
-    float prominenceStrength = pow(rim, 2.0) * smoothstep(0.55, 0.85, prom) * 1.8;
-
-    // ──── Dao động tổng thể ────
-    float flicker = 0.85 + 0.15 * sin(uTime * 2.3 + filamentCombined * 3.14159);
-
-    // ──── Tổng hợp màu corona ────
-    vec3 color = mix(uInnerColor, uOuterColor, smoothstep(0.25, 1.0, corona));
-
-    // Thêm prominences (cam-đỏ sáng)
-    vec3 promColor = vec3(1.0, 0.4, 0.1) * prominenceStrength;
-
-    float alpha = corona * (0.46 + filamentCombined * 0.18) * flicker;
-    alpha += prominenceStrength * 0.3;
-
-    vec3 finalColor = (color * (1.4 + corona * 1.8) + chromoColor + promColor) * 3.0; // Giảm bớt chói
-
-    gl_FragColor = vec4(finalColor, alpha);
+    gl_FragColor = vec4(finalColor * 0.8, alpha);
   }
 `;
 
 // ═══════════════════════════════════════════════════════════════
-// Chromosphere Layer — Lớp sắc quyển riêng biệt (đỏ-hồng)
+// Chromosphere & Exports
 // ═══════════════════════════════════════════════════════════════
 
 const chromosphereVertexShader = /* glsl */`
   varying vec3 vNormal;
   varying vec3 vViewDir;
-  varying vec2 vUv;
-
   void main() {
-    vUv = uv;
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vNormal = normalize(normalMatrix * normal);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vViewDir = normalize(cameraPosition - worldPos.xyz);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
@@ -274,52 +179,32 @@ const chromosphereVertexShader = /* glsl */`
 const chromosphereFragmentShader = /* glsl */`
   uniform float uTime;
   uniform vec3 uColor;
-
   varying vec3 vNormal;
   varying vec3 vViewDir;
-  varying vec2 vUv;
-
   void main() {
     float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
-    // Sắc quyển chỉ hiện ở rìa rất mỏng
-    float intensity = pow(rim, 5.0) * (1.0 - pow(rim, 2.0));
-    float flicker = 0.9 + 0.1 * sin(uTime * 3.0 + vUv.y * 20.0);
-    intensity *= flicker * 3.0;
-
-    gl_FragColor = vec4(uColor * intensity * 5.0, intensity * 0.7); // Điều chỉnh sáng vừa phải
+    float intensity = pow(rim, 15.0) * (1.0 - pow(rim, 2.0));
+    gl_FragColor = vec4(uColor * intensity * 5.0, intensity * 0.6);
   }
 `;
 
-// ═══════════════════════════════════════════════════════════════
-// Export Functions
-// ═══════════════════════════════════════════════════════════════
-
 export function createSunSurfaceMaterial(albedoTexture, fallbackColor) {
-  if (!albedoTexture) {
-    return new THREE.MeshBasicMaterial({ color: fallbackColor || 0xffffff });
-  }
-
+  if (!albedoTexture) return new THREE.MeshBasicMaterial({ color: fallbackColor || 0xffffff });
   const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uAlbedo: { value: albedoTexture },
-      uTime: { value: 0 },
-      uSelfRegFactor: { value: 1.0 },
-    },
+    uniforms: { uAlbedo: { value: albedoTexture }, uTime: { value: 0 }, uSelfRegFactor: { value: 1.0 } },
     vertexShader: sunSurfaceVertexShader,
     fragmentShader: sunSurfaceFragmentShader,
   });
-
   material.userData.isSunSurfaceShader = true;
   return material;
 }
 
 export function createSunCorona(radius, oblateness = 0) {
-  const geometry = new THREE.SphereGeometry(1.14, 96, 96);
+  const geometry = new THREE.SphereGeometry(1.3, 96, 96);
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      uInnerColor: { value: new THREE.Color(0xffd36a) },
-      uOuterColor: { value: new THREE.Color(0xff6a1a) },
-      uChromosphereColor: { value: new THREE.Color(0xff2244) }, // Đỏ-hồng đặc trưng H-alpha
+      uInnerColor: { value: new THREE.Color(0xffe8a0) }, 
+      uOuterColor: { value: new THREE.Color(0xffc040) }, 
       uTime: { value: 0 },
     },
     vertexShader: sunCoronaVertexShader,
@@ -329,26 +214,17 @@ export function createSunCorona(radius, oblateness = 0) {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-
   material.userData.isSunCoronaShader = true;
-
   const coronaMesh = new THREE.Mesh(geometry, material);
   coronaMesh.name = 'sun_corona';
   coronaMesh.scale.set(radius, radius * (1 - oblateness), radius);
   return coronaMesh;
 }
 
-/**
- * Tạo lớp sắc quyển (chromosphere) — lớp mỏng đỏ-hồng sát bề mặt
- * Nằm giữa quang quyển và corona
- */
 export function createChromosphere(radius, oblateness = 0) {
   const geometry = new THREE.SphereGeometry(1.005, 80, 80);
   const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color(0xff3355) }, // H-alpha emission color
-    },
+    uniforms: { uTime: { value: 0 }, uColor: { value: new THREE.Color(0xffaa44) } }, 
     vertexShader: chromosphereVertexShader,
     fragmentShader: chromosphereFragmentShader,
     side: THREE.FrontSide,
@@ -356,9 +232,7 @@ export function createChromosphere(radius, oblateness = 0) {
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   });
-
   material.userData.isSunChromosphereShader = true;
-
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'sun_chromosphere';
   mesh.scale.set(radius, radius * (1 - oblateness), radius);
