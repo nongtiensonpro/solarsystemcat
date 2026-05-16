@@ -203,7 +203,7 @@ async function bootstrap() {
       cinematicCamera.setTarget(trackedBody);
       const target = new THREE.Vector3();
       trackedBody.pivot.getWorldPosition(target);
-      const zoomDist = Math.max(trackedBody.data.radius * 5, 10);
+      const zoomDist = Math.max(trackedBody.data.radius * 5, 0.25);
       const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
       startFlyTo(camTarget, target);
     }
@@ -582,7 +582,7 @@ async function bootstrap() {
 
     // Cập nhật controls và Camera Tracking
     if (isFlying) {
-      flyProgress += 0.02;
+      flyProgress += 0.015;
       if (flyProgress >= 1) {
         flyProgress = 1;
         isFlying = false;

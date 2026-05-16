@@ -306,7 +306,8 @@ export function createCinematicCameraController(camera, controls, domElement) {
   function handleChase(deltaTime) {
     if (!targetBody) return;
     const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
-    const offset = shotParams.offset || new THREE.Vector3(0, 50, 150);
+    const fallbackOffset = new THREE.Vector3(0, targetBody.data.radius * 1.5, Math.max(targetBody.data.radius * 5, 0.5));
+    const offset = shotParams.offset || fallbackOffset;
     const targetCamPos = targetPos.clone().add(offset.clone().applyQuaternion(targetBody.pivot.quaternion));
     camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
   }

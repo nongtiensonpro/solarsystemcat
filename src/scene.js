@@ -41,6 +41,7 @@ export function initScene(canvas) {
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.maxDistance = 50000;
+  controls.minDistance = 0.2;
 
   // 5. Lighting
   // Ánh sáng môi trường để phần khuất không bị đen hoàn toàn
