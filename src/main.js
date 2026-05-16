@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { initScene } from './scene.js';
-import { loadSolarSystemData } from './dataLoader.js';
+import { loadSolarSystemData, loadSaturnGhostConfig } from './dataLoader.js';
 import { setPlanetData, planetData } from './planetData.js';
 import { createPlanet } from './createPlanet.js';
 import { computeOrbitalPosition } from './kepler.js';
@@ -14,12 +14,14 @@ import { createAsteroidBelt } from './asteroidBelt.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
 import { createCinematicCameraController } from './cinematicCamera.js';
+import { GhostMoonSystem } from './ghostMoonSystem.js';
 
 // ═══ Bootstrap — Tải dữ liệu trước khi khởi tạo ═══
 async function bootstrap() {
   // 0. Tải dữ liệu từ JSON
   const solarData = await loadSolarSystemData();
   setPlanetData(solarData);
+  const saturnGhostConfig = await loadSaturnGhostConfig();
 
   // 1. Khởi tạo canvas và scene
   const canvas = document.querySelector('canvas.webgl');
@@ -74,14 +76,16 @@ async function bootstrap() {
   let flyStartTarget = new THREE.Vector3();
   let flyEndPos = new THREE.Vector3();
   let flyEndTarget = new THREE.Vector3();
+  let flyDuration = 1.1; // seconds
 
-  function startFlyTo(targetPos, targetLookAt) {
+  function startFlyTo(targetPos, targetLookAt, durationSec = 1.1) {
     isFlying = true;
     flyProgress = 0;
     flyStartPos.copy(camera.position);
     flyStartTarget.copy(controls.target);
     flyEndPos.copy(targetPos);
     flyEndTarget.copy(targetLookAt);
+    flyDuration = durationSec;
   }
 
   // 3e. Auto Director Logic
@@ -190,6 +194,37 @@ async function bootstrap() {
   }
 
   // 4. Khởi tạo UI với callbacks (planetData đã được populate)
+  let hasVisitedSaturn = false;
+  
+  // Các preset camera cho Sao Thổ
+  const SATURN_PRESETS = {
+    'default': { distance: 180, inclination: 28, azimuth: 30, duration: 2.2 },
+    'edge': { distance: 220, inclination: 3, azimuth: 30, duration: 1.5 },
+    'pole': { distance: 280, inclination: 82, azimuth: 0, duration: 2.0 },
+    'close': { distance: 55, inclination: 35, azimuth: 45, duration: 1.5 }
+  };
+
+  function applySaturnCameraPreset(presetKey) {
+    if (!trackedBody || trackedBody.data.id !== 'saturn') return;
+    const preset = SATURN_PRESETS[presetKey];
+    if (!preset) return;
+    
+    const target = new THREE.Vector3();
+    trackedBody.pivot.getWorldPosition(target);
+    
+    // Tính toán vị trí camera theo tọa độ cầu
+    const inclRad = THREE.MathUtils.degToRad(preset.inclination);
+    const azimRad = THREE.MathUtils.degToRad(preset.azimuth);
+    
+    const offset = new THREE.Vector3(
+      preset.distance * Math.sin(inclRad) * Math.cos(azimRad),
+      preset.distance * Math.cos(inclRad),
+      preset.distance * Math.sin(inclRad) * Math.sin(azimRad)
+    );
+    
+    startFlyTo(target.clone().add(offset), target, preset.duration);
+  }
+
   // Hàm dùng chung để chọn hành tinh từ cả UI lẫn double-tap mobile
   function selectPlanet(planetId) {
     // Reset manual cross section if there's any pending
@@ -203,9 +238,29 @@ async function bootstrap() {
       cinematicCamera.setTarget(trackedBody);
       const target = new THREE.Vector3();
       trackedBody.pivot.getWorldPosition(target);
-      const zoomDist = Math.max(trackedBody.data.radius * 5, 0.25);
-      const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
-      startFlyTo(camTarget, target);
+      
+      if (planetId === 'saturn') {
+        const preset = SATURN_PRESETS['default'];
+        const isFirstTime = !hasVisitedSaturn;
+        hasVisitedSaturn = true;
+        
+        // Tính toán vị trí camera default
+        const inclRad = THREE.MathUtils.degToRad(preset.inclination);
+        const azimRad = THREE.MathUtils.degToRad(preset.azimuth);
+        const offset = new THREE.Vector3(
+          preset.distance * Math.sin(inclRad) * Math.cos(azimRad),
+          preset.distance * Math.cos(inclRad),
+          preset.distance * Math.sin(inclRad) * Math.sin(azimRad)
+        );
+        const camTarget = target.clone().add(offset);
+        
+        // Intro animation 2200ms cho lần đầu, sau đó mượt hơn
+        startFlyTo(camTarget, target, isFirstTime ? 2.2 : 1.5);
+      } else {
+        const zoomDist = Math.max(trackedBody.data.radius * 5, 0.25);
+        const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
+        startFlyTo(camTarget, target, 1.1);
+      }
     }
   }
 
@@ -213,6 +268,7 @@ async function bootstrap() {
     onTimeScaleChange: (scale) => { timeScale = scale; },
     onPauseToggle: (paused) => { isPaused = paused; },
     onPlanetSelect: (planetId) => { selectPlanet(planetId); },
+    onSaturnCameraPreset: (presetKey) => { applySaturnCameraPreset(presetKey); },
     onOverview: () => {
       if (trackedBody && trackedBody.isCrossSectionActive) {
         toggleCrossSection(trackedBody, false);
@@ -459,6 +515,50 @@ async function bootstrap() {
     }, { passive: true });
   }
 
+  // Khởi tạo Ghost Moon System nếu có
+  let saturnGhostSystem = null;
+  if (saturnGhostConfig) {
+    const saturnBody = bodyById.get('saturn');
+    if (saturnBody) {
+      saturnGhostSystem = new GhostMoonSystem(saturnGhostConfig);
+      saturnBody.tiltGroup.add(saturnGhostSystem.group);
+    }
+  }
+
+  // Lắng nghe click cho Ghost Moon System
+  renderer.domElement.addEventListener('click', (event) => {
+    if (!saturnGhostSystem || cameraMode !== 'follow' || trackedBody?.data?.id !== 'saturn') return;
+    
+    // Convert click to NDC
+    const mouseClick = new THREE.Vector2(
+      (event.clientX / window.innerWidth) * 2 - 1,
+      -(event.clientY / window.innerHeight) * 2 + 1
+    );
+    raycaster.setFromCamera(mouseClick, camera);
+    const intersects = raycaster.intersectObject(saturnGhostSystem.hitMesh);
+    if (intersects.length > 0) {
+      // Hiển thị popup custom thay vì alert
+      let popup = document.getElementById('ghost-moon-popup');
+      if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'ghost-moon-popup';
+        popup.className = 'glass-panel';
+        popup.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; width: 320px; z-index: 1000; text-align: center; border: 1px solid rgba(110, 198, 255, 0.3);';
+        popup.innerHTML = `
+          <h3 style="margin-bottom: 12px; color: #6ec6ff;">🌑 Vùng vệ tinh bất quy tắc</h3>
+          <p style="font-size: 13px; color: #aab5c5; line-height: 1.5; text-align: left; margin-bottom: 16px;">
+            Sao Thổ có hơn 260 vệ tinh bất quy tắc trong vùng này — đa số là các thiên thạch bị bắt giữ từ vành đai Kuiper hàng tỷ năm trước.
+          </p>
+          <button id="btn-close-ghost-popup" class="btn-action" style="padding: 8px 16px;">Đóng</button>
+        `;
+        document.getElementById('ui-container').appendChild(popup);
+        document.getElementById('btn-close-ghost-popup').addEventListener('click', () => {
+          popup.style.display = 'none';
+        });
+      }
+      popup.style.display = 'block';
+    }
+  });
 
   function animate() {
     requestAnimationFrame(animate);
@@ -471,7 +571,8 @@ async function bootstrap() {
     for (const body of bodies) {
       // A. Cập nhật vị trí quỹ đạo (Kepler) - Bỏ qua Mặt Trời
       if (body.data.type !== 'star') {
-        if (body.data.semiMajorAxis > 0 && !isPaused) {
+        const hasOrbit = body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0;
+        if (hasOrbit && !isPaused) {
           const pos = computeOrbitalPosition(body.data, simulationTime);
           body.pivot.position.set(pos.x, pos.y, pos.z);
           
@@ -578,16 +679,23 @@ async function bootstrap() {
           body.ironSnowMesh.material.uniforms.uTime.value += deltaTime;
         }
       }
+      // G. Update Enceladus Plume
+      if (body.enceladusPlume && !isPaused) {
+        body.enceladusPlume.update(deltaTime);
+      }
     }
 
     // Cập nhật controls và Camera Tracking
     if (isFlying) {
-      flyProgress += 0.015;
+      flyProgress += deltaTime / flyDuration;
       if (flyProgress >= 1) {
         flyProgress = 1;
         isFlying = false;
       }
-      const ease = 1 - Math.pow(1 - flyProgress, 3);
+      // easeInOutCubic: t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+      const t = flyProgress;
+      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      
       camera.position.lerpVectors(flyStartPos, flyEndPos, ease);
       controls.target.lerpVectors(flyStartTarget, flyEndTarget, ease);
     } else {
@@ -621,6 +729,14 @@ async function bootstrap() {
       cinematicCamera.update(deltaTime);
     } else {
       controls.update();
+    }
+
+    // Cập nhật Ghost Moon System
+    if (saturnGhostSystem && trackedBody?.data?.id === 'saturn') {
+      const saturnWorldPos = new THREE.Vector3();
+      trackedBody.pivot.getWorldPosition(saturnWorldPos);
+      const distToCamera = camera.position.distanceTo(saturnWorldPos);
+      saturnGhostSystem.update(deltaTime, timeScale, distToCamera);
     }
 
     // -- Raycasting cho Tooltip --

@@ -202,6 +202,23 @@ export async function loadSolarSystemData() {
     throw new Error('[DataLoader] Schema error: thiếu trường "bodies" (phải là mảng)');
   }
 
+  // Load thêm saturn-moons catalog
+  const catalogUrl = `${baseUrl}data/saturn-moons.catalog.json`;
+  try {
+    const catalogRes = await fetch(catalogUrl);
+    if (catalogRes.ok) {
+      const catalogJson = await catalogRes.json();
+      if (catalogJson.bodies && Array.isArray(catalogJson.bodies)) {
+        json.bodies.push(...catalogJson.bodies);
+        console.log(`[DataLoader] Đã merge thêm ${catalogJson.bodies.length} moons từ catalog.`);
+      }
+    } else {
+      console.warn(`[DataLoader] HTTP ${catalogRes.status} khi tải ${catalogUrl}`);
+    }
+  } catch (err) {
+    console.warn(`[DataLoader] Lỗi khi tải catalog: ${err.message}`);
+  }
+
   // Xác thực từng body
   const allErrors = [];
   for (let i = 0; i < json.bodies.length; i++) {
@@ -237,4 +254,21 @@ export async function loadSolarSystemData() {
   console.log(`[DataLoader] Đã tải ${bodies.length} thiên thể thành công.`);
 
   return bodies;
+}
+
+/**
+ * Tải cấu hình Ghost Moon System cho Sao Thổ
+ */
+export async function loadSaturnGhostConfig() {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const url = `${baseUrl}data/saturn-moons.ghost-config.json`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (err) {
+    console.warn(`[DataLoader] Không thể tải cấu hình Ghost Moons: ${err.message}`);
+    return null;
+  }
 }

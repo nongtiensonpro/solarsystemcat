@@ -586,46 +586,7 @@
         "compositionVi": "Băng và đá, bề mặt đầy hố thiên thạch, có thể có đại dương ngầm"
       }
     },
-    {
-      "id": "titan",
-      "parentId": "saturn",
-      "name": { "vi": "Titan", "en": "Titan" },
-      "type": "moon",
-      "physical": {
-        "radius": 0.404,
-        "massKg": 1.345e23,
-        "density": 1.88,
-        "meanTemperatureC": -179
-      },
-      "orbit": {
-        "semiMajorAxis": 0.00817,
-        "orbitalPeriod": 15.95,
-        "eccentricity": 0.0288,
-        "inclination": 0.33
-      },
-      "rotation": {
-        "axialTilt": 0,
-        "rotationPeriod": 382.7,
-        "oblateness": 0
-      },
-      "render": {
-        "fallbackColor": "#D4A840",
-        "orbitScale": 4
-      },
-      "textures": {
-        "albedo": "/textures/planets/titan/albedo.jpg"
-      },
-      "atmosphere": {
-        "color": "#D4964A",
-        "opacity": 0.7,
-        "power": 2.0
-      },
-      "rings": null,
-      "info": {
-        "summaryVi": "Vệ tinh duy nhất có bầu khí quyển dày đặc, với hồ metan lỏng.",
-        "compositionVi": "Nitơ (98.4%), Metan (1.4%), băng nước, bề mặt hydrocarbon"
-      }
-    },
+
     {
       "id": "halley",
       "parentId": "sun",

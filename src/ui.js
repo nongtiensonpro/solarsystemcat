@@ -244,6 +244,19 @@ export function initUI(callbacks) {
   btnRestoreUI.addEventListener('mouseout', () => btnRestoreUI.style.background = 'rgba(20, 30, 50, 0.7)');
   document.body.appendChild(btnRestoreUI);
 
+  // ═══ Saturn Camera Presets Panel ═══
+  const saturnCameraPanel = document.createElement('div');
+  saturnCameraPanel.className = 'glass-panel saturn-camera-panel';
+  saturnCameraPanel.id = 'saturn-camera-panel';
+  saturnCameraPanel.style.display = 'none'; // Chỉ hiển thị khi chọn Sao Thổ
+  saturnCameraPanel.innerHTML = `
+    <button class="preset-btn active" data-preset="default" title="Phím 1">🪐 Mặc định</button>
+    <button class="preset-btn" data-preset="edge" title="Phím 2">↔ Ngang vành</button>
+    <button class="preset-btn" data-preset="pole" title="Phím 3">⬆ Cực</button>
+    <button class="preset-btn" data-preset="close" title="Phím 4">🔍 Gần</button>
+  `;
+  container.appendChild(saturnCameraPanel);
+
   // ═══════ Event Handlers ═══════
 
   // Search Panel Toggle & Logic
@@ -502,7 +515,44 @@ export function initUI(callbacks) {
       btnFollow.classList.add('active');
       btnOverview.classList.remove('active');
     }
+    
+    // Hiện panel preset camera nếu là Sao Thổ
+    if (bodyId === 'saturn') {
+      saturnCameraPanel.style.display = 'flex';
+      saturnCameraPanel.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      saturnCameraPanel.querySelector('[data-preset="default"]').classList.add('active');
+    } else {
+      saturnCameraPanel.style.display = 'none';
+    }
   }
+
+  // Handle Saturn Camera Presets
+  const saturnPresetBtns = saturnCameraPanel.querySelectorAll('.preset-btn');
+  saturnPresetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      saturnPresetBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (callbacks.onSaturnCameraPreset) {
+        callbacks.onSaturnCameraPreset(btn.dataset.preset);
+      }
+    });
+  });
+
+  // Handle keyboard shortcuts for Saturn presets
+  window.addEventListener('keydown', (e) => {
+    if (saturnCameraPanel.style.display === 'flex') {
+      let preset = null;
+      if (e.key === '1') preset = 'default';
+      else if (e.key === '2') preset = 'edge';
+      else if (e.key === '3') preset = 'pole';
+      else if (e.key === '4') preset = 'close';
+      
+      if (preset) {
+        const btn = saturnCameraPanel.querySelector(`[data-preset="${preset}"]`);
+        if (btn) btn.click();
+      }
+    }
+  });
 
   // Close Info Panel
   function closeInfoPanel() {

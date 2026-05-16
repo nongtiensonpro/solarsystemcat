@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-05-16",
+  "totalIrregularMoons": 268,
+  "note": "Ghost cloud đại diện cho 268 vệ tinh bất quy tắc không có đủ dữ liệu vật lý để render riêng",
+  "zones": {
+    "innerBand":  { "seedOffset": 1000, "ghostCount": 50,  "radiusMin": 32,  "radiusMax": 46,  "inclinationRangeDeg": [0, 2],    "retrogradeRatio": 0.00, "color": "#D0E8F0", "sizeMin": 0.08, "sizeMax": 0.18, "opacityMin": 0.4, "opacityMax": 0.7 },
+    "midBand":    { "seedOffset": 2000, "ghostCount": 65,  "radiusMin": 48,  "radiusMax": 108, "inclinationRangeDeg": [0, 5],    "retrogradeRatio": 0.05, "color": "#B8C8D0", "sizeMin": 0.06, "sizeMax": 0.14, "opacityMin": 0.3, "opacityMax": 0.5 },
+    "outerCloud": { "seedOffset": 3000, "ghostCount": 150, "radiusMin": 120, "radiusMax": 260, "inclinationRangeDeg": [30, 50],  "retrogradeRatio": 0.30, "color": "#788090", "sizeMin": 0.04, "sizeMax": 0.10, "opacityMin": 0.15,"opacityMax": 0.35 }
+  }
+}

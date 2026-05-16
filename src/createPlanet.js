@@ -10,6 +10,7 @@ import { createMagneticField } from './magneticField.js';
 import { createHeliumRain } from './heliumRain.js';
 import { createDiamondRain } from './diamondRain.js';
 import { createIronSnow } from './ironSnow.js';
+import { createEnceladusPlume } from './enceladusPlume.js';
 
 // Lấy fallback color từ data (đã normalize bởi dataLoader.js)
 function getFallbackColor(data) {
@@ -119,12 +120,21 @@ export function createPlanet(data) {
       emissiveInt = 2.0; // Tăng x10
     }
 
+    // Tùy chỉnh bump / normal scale (đặc biệt cho Mimas - Herschel crater)
+    let bScale = 0.05;
+    let nScale = new THREE.Vector2(1, 1);
+    if (data.id === 'mimas') {
+      bScale = 0.5;
+      nScale.set(3.0, 3.0);
+    }
+
     material = new THREE.MeshStandardMaterial({
       color: textures.albedo ? 0xffffff : getFallbackColor(data),
       map: textures.albedo || null,
       normalMap: textures.normal || null,
+      normalScale: nScale,
       bumpMap: textures.bump || null,
-      bumpScale: 0.05,
+      bumpScale: bScale,
       // Roughness map cho các vùng phản chiếu khác nhau
       roughnessMap: textures.specular || null,
       roughness: pbrRoughness,
@@ -271,14 +281,22 @@ export function createPlanet(data) {
     tiltGroup.add(ironSnowMesh);
   }
 
+  // 4k. Mạch phun Enceladus (Plume)
+  let enceladusPlume = null;
+  if (data.id === 'enceladus') {
+    enceladusPlume = createEnceladusPlume(r);
+    tiltGroup.add(enceladusPlume.mesh);
+  }
+
   // 5. Pivot — vị trí trên quỹ đạo (sẽ được cập nhật bởi Kepler engine)
   const pivot = new THREE.Object3D();
   pivot.name = `${data.id}_pivot`;
   pivot.add(tiltGroup);
 
-  // Đặt vị trí ban đầu trên trục X theo bán trục lớn
-  if (data.semiMajorAxis > 0) {
-    pivot.position.x = data.semiMajorAxis * AU;
+  // Đặt vị trí ban đầu trên trục X theo bán kính
+  const orbitRadius = data.displayOrbitRadius ?? (data.semiMajorAxis * AU * (data.orbitScale || 1));
+  if (orbitRadius > 0) {
+    pivot.position.x = orbitRadius;
   }
 
   // 4g. Đuôi sao chổi
@@ -310,6 +328,7 @@ export function createPlanet(data) {
     heliumRainMesh,
     diamondRainMesh,
     ironSnowMesh,
+    enceladusPlume,
     data
   };
 }

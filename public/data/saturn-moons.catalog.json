@@ -1,0 +1,78 @@
+{
+  "bodies": [
+    {
+      "id": "mimas", "parentId": "saturn", "name": { "vi": "Mimas" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.031 },
+      "orbit": { "semiMajorAxis": 0.001240, "orbitalPeriod": 0.942, "eccentricity": 0.02, "inclination": 1.57 },
+      "render": { "displayOrbitRadius": 49.0, "initialPhaseDeg": 25, "orbitPlane": "parentEquator", "fallbackColor": "#8a8a8a" },
+      "info": { "summaryVi": "Có hình dáng giống Death Star do hố va chạm Herschel khổng lồ." }
+    },
+    {
+      "id": "enceladus", "parentId": "saturn", "name": { "vi": "Enceladus" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.039 },
+      "orbit": { "semiMajorAxis": 0.001591, "orbitalPeriod": 1.370, "eccentricity": 0.0047, "inclination": 0.009 },
+      "render": { "displayOrbitRadius": 61.0, "initialPhaseDeg": 205, "orbitPlane": "parentEquator", "fallbackColor": "#e8f0f8" },
+      "info": { "summaryVi": "Phun nước lỏng ra vũ trụ từ các vết nứt ở cực nam — bằng chứng đại dương ngầm." }
+    },
+    {
+      "id": "tethys", "parentId": "saturn", "name": { "vi": "Tethys" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.084 },
+      "orbit": { "semiMajorAxis": 0.001969, "orbitalPeriod": 1.887, "eccentricity": 0.0001, "inclination": 1.12 },
+      "render": { "displayOrbitRadius": 68.0, "initialPhaseDeg": 250, "orbitPlane": "parentEquator", "fallbackColor": "#cfcfcf" },
+      "info": { "summaryVi": "Có vết nứt Ithaca Chasma dài khổng lồ và hố va chạm Odysseus." }
+    },
+    {
+      "id": "dione", "parentId": "saturn", "name": { "vi": "Dione" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.088 },
+      "orbit": { "semiMajorAxis": 0.002523, "orbitalPeriod": 2.736, "eccentricity": 0.0022, "inclination": 0.02 },
+      "render": { "displayOrbitRadius": 79.0, "initialPhaseDeg": 20, "orbitPlane": "parentEquator", "fallbackColor": "#c4c4c4" },
+      "info": { "summaryVi": "Có các vách đá băng trắng sáng (wispy terrain) cắt ngang bề mặt." }
+    },
+    {
+      "id": "rhea", "parentId": "saturn", "name": { "vi": "Rhea" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.120 },
+      "orbit": { "semiMajorAxis": 0.003523, "orbitalPeriod": 4.518, "eccentricity": 0.0012, "inclination": 0.34 },
+      "render": { "displayOrbitRadius": 93.0, "initialPhaseDeg": 185, "orbitPlane": "parentEquator", "fallbackColor": "#b8b8b8" },
+      "info": { "summaryVi": "Vệ tinh lớn thứ 2 của Sao Thổ, bề mặt chi chít hố va chạm." }
+    },
+    {
+      "id": "titan", "parentId": "saturn", "name": { "vi": "Titan" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.404 },
+      "orbit": { "semiMajorAxis": 0.008168, "orbitalPeriod": 15.945, "eccentricity": 0.0288, "inclination": 0.34 },
+      "render": { "displayOrbitRadius": 115.0, "initialPhaseDeg": 240, "orbitPlane": "parentEquator", "fallbackColor": "#d69a47" },
+      "textures": { "albedo": "/textures/planets/titan/albedo.jpg" },
+      "atmosphere": { "color": "#ffaa00", "opacity": 0.85, "power": 1.5 },
+      "info": { "summaryVi": "Vệ tinh lớn nhất của Sao Thổ, có bầu khí quyển đặc và hồ methane lỏng." }
+    },
+    {
+      "id": "hyperion", "parentId": "saturn", "name": { "vi": "Hyperion" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.021 },
+      "orbit": { "semiMajorAxis": 0.009899, "orbitalPeriod": 21.276, "eccentricity": 0.123, "inclination": 0.43 },
+      "render": { "displayOrbitRadius": 130.0, "initialPhaseDeg": 300, "orbitPlane": "parentEquator", "fallbackColor": "#8a755d" },
+      "info": { "summaryVi": "Hình dạng xốp bất quy tắc, quay hỗn loạn." }
+    },
+    {
+      "id": "iapetus", "parentId": "saturn", "name": { "vi": "Iapetus" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.115 },
+      "orbit": { "semiMajorAxis": 0.023802, "orbitalPeriod": 79.321, "eccentricity": 0.0286, "inclination": 15.47 },
+      "render": { "displayOrbitRadius": 155.0, "initialPhaseDeg": 345, "orbitPlane": "parentEquator", "fallbackColor": "#a1a1a1" },
+      "info": { "summaryVi": "Hai bán cầu có màu trắng đen đối lập hoàn toàn." }
+    },
+    {
+      "id": "phoebe", "parentId": "saturn", "name": { "vi": "Phoebe" }, "type": "moon",
+      "saturnMoon": { "lodTier": "hero" },
+      "physical": { "radius": 0.016 },
+      "orbit": { "semiMajorAxis": 0.086578, "orbitalPeriod": -550.56, "eccentricity": 0.164, "inclination": 175.2 },
+      "render": { "displayOrbitRadius": 195.0, "initialPhaseDeg": 40, "orbitPlane": "parentEquator", "fallbackColor": "#4d4d4d" },
+      "info": { "summaryVi": "Vệ tinh tối màu, quỹ đạo ngược chiều (retrograde)." }
+    }
+  ]
+}
