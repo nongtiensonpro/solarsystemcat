@@ -67,14 +67,26 @@ export function createCinematicCameraController(camera, controls, domElement) {
   const onKeyUp = (e) => { keys[e.code] = false; };
   const onMouseDown = (e) => { if (e.button === 2) isRightMouseDown = true; };
   const onMouseUp = (e) => { if (e.button === 2) isRightMouseDown = false; };
+  function getMouseDistanceScale() {
+    if (targetBody) {
+      const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+      const dist = camera.position.distanceTo(targetPos);
+      return THREE.MathUtils.clamp(dist / (targetBody.data.radius * 10), 0.2, 4.0);
+    }
+    const dist = camera.position.length();
+    return THREE.MathUtils.clamp(dist / 100, 0.2, 4.0);
+  }
+
   const onMouseMove = (e) => {
     if (active && isRightMouseDown && (mode === 'free' || mode === 'orbit')) {
-      yaw -= e.movementX * mouseSensitivity;
-      pitch -= e.movementY * mouseSensitivity;
+      const distScale = getMouseDistanceScale();
+      yaw -= e.movementX * mouseSensitivity * distScale;
+      pitch -= e.movementY * mouseSensitivity * distScale;
       pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
       
       if (mode === 'orbit') {
-        shotParams.orbitAngleOffset = (shotParams.orbitAngleOffset || 0) - e.movementX * mouseSensitivity;
+        const orbitDistScale = getMouseDistanceScale();
+        shotParams.orbitAngleOffset = (shotParams.orbitAngleOffset || 0) - e.movementX * mouseSensitivity * orbitDistScale;
       }
     }
   };
@@ -212,6 +224,14 @@ export function createCinematicCameraController(camera, controls, domElement) {
       shotParams.startDir = startDir;
     }
 
+    if (mode === 'planetFocus' && targetBody) {
+      const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+      const dist = camera.position.distanceTo(targetPos);
+      shotParams.radius = shotParams.radius || Math.max(dist, targetBody.data.radius * 4);
+      shotParams.speed = shotParams.speed || 0.12;
+      shotParams.inclination = shotParams.inclination || 30;
+    }
+
     dispatchCinematicUpdate(active);
     console.log(`[CinematicCamera] Shot Preset: ${presetName}`);
   }
@@ -221,10 +241,10 @@ export function createCinematicCameraController(camera, controls, domElement) {
     // FOV_v = 2 * Math.atan( (sensor_height / 2) / focalLength )
     // sensor_height for 35mm full frame is 24mm
     const fov = 2 * Math.atan(12 / focalLength) * (180 / Math.PI);
-    targetFOV = fov;
+    targetFOV = THREE.MathUtils.clamp(fov, 5, 150);
     
     dispatchCinematicUpdate(active);
-    console.log(`[CinematicCamera] Lens set to: ${focalLength}mm (FOV: ${fov.toFixed(1)}°)`);
+    console.log(`[CinematicCamera] Lens set to: ${focalLength}mm (FOV: ${targetFOV.toFixed(1)}°)`);
   }
 
   function update(deltaTime) {
@@ -251,6 +271,21 @@ export function createCinematicCameraController(camera, controls, domElement) {
       case 'sunOrbit':
         handleSunOrbit(deltaTime);
         break;
+      case 'planetFocus':
+        handlePlanetFocus(deltaTime);
+        break;
+    }
+
+    // Safety: prevent camera from going inside the target body in any shot mode
+    if (targetBody && (mode === 'orbit' || mode === 'sunOrbit' || mode === 'chase' || mode === 'flyBy' || mode === 'dollyZoom' || mode === 'planetFocus')) {
+      const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+      const toTarget = new THREE.Vector3().subVectors(camera.position, targetPos);
+      const distToTarget = toTarget.length();
+      const minSafeDist = targetBody.data.radius * 1.2;
+      if (distToTarget < minSafeDist && distToTarget > 0.001) {
+        toTarget.normalize().multiplyScalar(minSafeDist);
+        camera.position.copy(targetPos).add(toTarget);
+      }
     }
 
     applyTransform(deltaTime);
@@ -312,11 +347,18 @@ export function createCinematicCameraController(camera, controls, domElement) {
     if (!targetBody) return;
     const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
     
-    const angle = shotTime * (shotParams.speed || 0.2) + (shotParams.orbitAngleOffset || 0);
-    const x = Math.cos(angle) * (shotParams.radius || 100);
-    const z = Math.sin(angle) * (shotParams.radius || 100);
+    const orbitRadius = Math.max(shotParams.radius || 100, targetBody.data.radius * 2);
+    // Clamp height to prevent extreme viewing angles
+    const height = THREE.MathUtils.clamp(shotParams.height || 0, -orbitRadius * 0.6, orbitRadius * 0.6);
+    // Dynamic speed: scale with distance so perceived visual speed is consistent
+    const distRatio = orbitRadius / targetBody.data.radius;
+    const speedScale = THREE.MathUtils.clamp(distRatio / 8, 0.3, 3.0);
+    const effectiveSpeed = (shotParams.speed || 0.2) * speedScale;
+    const angle = shotTime * effectiveSpeed + (shotParams.orbitAngleOffset || 0);
+    const x = Math.cos(angle) * orbitRadius;
+    const z = Math.sin(angle) * orbitRadius;
     
-    let targetCamPos = targetPos.clone().add(new THREE.Vector3(x, shotParams.height || 0, z));
+    let targetCamPos = targetPos.clone().add(new THREE.Vector3(x, height, z));
     // Shift orbit center toward the sun so camera stays on lit side
     if (shotParams.orbitCenterOffset) {
       targetCamPos.add(shotParams.orbitCenterOffset);
@@ -346,7 +388,15 @@ export function createCinematicCameraController(camera, controls, domElement) {
     const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
     const fallbackOffset = new THREE.Vector3(0, targetBody.data.radius * 1.5, Math.max(targetBody.data.radius * 5, 0.5));
     const offset = shotParams.offset || fallbackOffset;
-    const targetCamPos = targetPos.clone().add(offset.clone().applyQuaternion(targetBody.pivot.quaternion));
+    let targetCamPos = targetPos.clone().add(offset.clone().applyQuaternion(targetBody.pivot.quaternion));
+    // Safety: ensure minimum distance from planet center
+    const toTarget = new THREE.Vector3().subVectors(targetCamPos, targetPos);
+    const dist = toTarget.length();
+    const minDist = targetBody.data.radius * 1.5;
+    if (dist < minDist && dist > 0.001) {
+      toTarget.normalize().multiplyScalar(minDist);
+      targetCamPos.copy(targetPos).add(toTarget);
+    }
     // Smooth follow with slight lag for natural feel
     camera.position.lerp(targetCamPos, 1 - Math.exp(-8 * deltaTime));
   }
@@ -359,17 +409,21 @@ export function createCinematicCameraController(camera, controls, domElement) {
     const progress = rawProgress * rawProgress * (3 - 2 * rawProgress);
     
     // Dolly Zoom: Zoom in while pulling back, keeping the subject the same size on screen
-    const currentFrameFov = THREE.MathUtils.lerp(shotParams.startFov || 135, shotParams.endFov || 24, progress);
+    const startFov = THREE.MathUtils.clamp(shotParams.startFov || 135, 5, 150);
+    const endFov = THREE.MathUtils.clamp(shotParams.endFov || 24, 5, 150);
+    const currentFrameFov = THREE.MathUtils.lerp(startFov, endFov, progress);
     targetFOV = currentFrameFov;
     
     // Base scale calculation for constant subject size
-    const startDist = shotParams.startDist || targetBody.data.radius * 3;
-    const ratio = startDist * Math.tan(THREE.MathUtils.degToRad((shotParams.startFov || 135) / 2));
+    const startDist = Math.max(shotParams.startDist || targetBody.data.radius * 3, targetBody.data.radius * 2);
+    const ratio = startDist * Math.tan(THREE.MathUtils.degToRad(startFov / 2));
     const currentDist = ratio / Math.tan(THREE.MathUtils.degToRad(currentFrameFov / 2));
+    // Safety: ensure camera never gets too close to the planet
+    const safeDist = Math.max(currentDist, targetBody.data.radius * 1.5);
     
     // Use stored initial direction for consistent movement
     const dir = shotParams.startDir || new THREE.Vector3(0, 0, 1);
-    const targetCamPos = targetPos.clone().add(dir.clone().multiplyScalar(currentDist));
+    const targetCamPos = targetPos.clone().add(dir.clone().multiplyScalar(safeDist));
     camera.position.copy(targetCamPos);
     
     if (rawProgress >= 1) {
@@ -381,26 +435,47 @@ export function createCinematicCameraController(camera, controls, domElement) {
   function handleSunOrbit(deltaTime) {
     if (!targetBody) return;
     const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
-    const sunDir = new THREE.Vector3(0, 0, 0).sub(targetPos).normalize();
+    const sunPos = new THREE.Vector3(0, 0, 0);
+    const sunDir = new THREE.Vector3().subVectors(sunPos, targetPos);
 
-    const baseRadius = shotParams.radius || targetBody.data.radius * 5;
-    const speed = shotParams.speed || 0.12;
+    // Fix: khi target là Mặt Trời (tại gốc), sunDir = vector 0 → dùng fallback
+    if (sunDir.lengthSq() < 0.001) {
+      sunDir.set(0, 0, 1);
+    } else {
+      sunDir.normalize();
+    }
+
+    const minRadius = targetBody.data.radius * 3;
+    const baseRadius = Math.max(shotParams.radius || targetBody.data.radius * 5, minRadius);
+
+    // ── Tốc độ quay nhất quán cho mọi hành tinh ──
+    // Dùng orbit period (giây/vòng) thay vì angular speed random
+    // Mặc định 45s/vòng, có thể ghi đè qua shotParams
+    const orbitPeriod = shotParams.orbitPeriod || 45;
+    // Tốc độ góc cho phi rotation (quay quanh hành tinh dọc theo mặt sáng)
+    const angularSpeed = (2 * Math.PI) / orbitPeriod;
 
     // Spherical cap on the lit hemisphere — oscillate theta, rotate phi
+    // Các tần số dao động đều dựa trên angularSpeed để nhất quán
     const thetaBase = Math.PI * 0.3;
     const thetaOsc = 0.25;
-    const theta = thetaBase + Math.sin(shotTime * speed * 1.7) * thetaOsc;
-    const phi = shotTime * speed * 0.8;
+    const thetaFreq = shotParams.thetaFreq || 2.0;
+    const theta = thetaBase + Math.sin(shotTime * angularSpeed * thetaFreq) * thetaOsc;
+    const phi = shotTime * angularSpeed;
 
     // Build local coordinate system aligned with sun direction
     const ref = Math.abs(sunDir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
     const right = new THREE.Vector3().crossVectors(sunDir, ref).normalize();
     const up = new THREE.Vector3().crossVectors(right, sunDir).normalize();
 
-    // Gentle distance oscillation + height variation
-    const distOsc = Math.sin(shotTime * speed * 1.3) * baseRadius * 0.08;
-    const dist = baseRadius + distOsc;
-    const heightOffset = Math.sin(shotTime * speed * 0.9) * baseRadius * 0.15;
+    // Gentle distance oscillation + height variation (clamped to safe minimum)
+    const distFreq = shotParams.distFreq || 1.5;
+    const distOsc = Math.sin(shotTime * angularSpeed * distFreq) * baseRadius * 0.08;
+    const dist = Math.max(baseRadius + distOsc, targetBody.data.radius * 2);
+    const heightFreq = shotParams.heightFreq || 1.0;
+    const baseHeightOsc = Math.sin(shotTime * angularSpeed * heightFreq) * baseRadius * 0.15;
+    const extraVertOsc = (shotParams.vertOscAmplitude || 0) * Math.sin(shotTime * angularSpeed * 0.5);
+    const heightOffset = baseHeightOsc + extraVertOsc;
 
     const camPos = targetPos.clone()
       .addScaledVector(sunDir, Math.cos(theta) * dist)
@@ -412,8 +487,42 @@ export function createCinematicCameraController(camera, controls, domElement) {
     camera.position.lerp(camPos, blend);
   }
 
+  function handlePlanetFocus(deltaTime) {
+    if (!targetBody) return;
+    const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+
+    // Safe distance: tối thiểu 2.5× bán kính để tránh xuyên hành tinh
+    const radius = Math.max(shotParams.radius || targetBody.data.radius * 4, targetBody.data.radius * 2.5);
+    // Inclination cố định ~25-35° cho góc nhìn 3/4 đẹp nhất
+    const inclination = THREE.MathUtils.degToRad(shotParams.inclination || 30);
+    // Tốc độ góc (rad/s) — có thể điều chỉnh qua UI
+    const speed = shotParams.speed || 0.12;
+
+    const angle = shotTime * speed;
+
+    // Orbit trong mặt phẳng nghiêng — tạo góc 3/4 view hoàn hảo
+    const x = radius * Math.cos(angle);
+    const y = radius * Math.sin(inclination) * Math.sin(angle);
+    const z = radius * Math.cos(inclination) * Math.sin(angle);
+
+    const camPos = targetPos.clone().add(new THREE.Vector3(x, y, z));
+
+    // Smooth blend for first second
+    const blend = Math.min(1, shotTime * 3);
+    camera.position.lerp(camPos, blend);
+  }
+
+  function setShotSpeed(speedValue) {
+    shotParams.speed = THREE.MathUtils.clamp(speedValue, 0.01, 2.0);
+  }
+
+  function adjustShotSpeed(factor) {
+    const current = shotParams.speed || 0.12;
+    shotParams.speed = THREE.MathUtils.clamp(current * factor, 0.01, 2.0);
+  }
+
   function applyTransform(deltaTime) {
-    if ((mode === 'targetLock' || mode === 'orbit' || mode === 'flyBy' || mode === 'chase' || mode === 'dollyZoom' || mode === 'sunOrbit') && targetBody) {
+    if ((mode === 'targetLock' || mode === 'orbit' || mode === 'flyBy' || mode === 'chase' || mode === 'dollyZoom' || mode === 'sunOrbit' || mode === 'planetFocus') && targetBody) {
       // Look at target body
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
       
@@ -429,8 +538,8 @@ export function createCinematicCameraController(camera, controls, domElement) {
       m1.lookAt(camera.position, targetPos, new THREE.Vector3(0, 1, 0));
       const targetQuat = new THREE.Quaternion().setFromRotationMatrix(m1);
       
-      // Combine manual roll and Dutch Angle
-      const currentRoll = roll + (shotParams.dutchAngle || 0);
+      // Combine manual roll and Dutch Angle (clamped to prevent disorientation)
+      const currentRoll = THREE.MathUtils.clamp(roll + (shotParams.dutchAngle || 0), -Math.PI / 6, Math.PI / 6);
       
       // Handheld camera micro-shake — very subtle to avoid nausea
       if (shotParams.handheld) {
@@ -472,6 +581,10 @@ export function createCinematicCameraController(camera, controls, domElement) {
     update,
     isActive: () => active,
     getMode: () => mode,
-    setMode: (m) => { mode = m; }
+    setMode: (m) => { mode = m; },
+    setShotSpeed,
+    adjustShotSpeed,
+    getShotSpeed: () => shotParams.speed || 0.12,
+    getRadius: () => shotParams.radius || (targetBody ? targetBody.data.radius * 4 : 100)
   };
 }

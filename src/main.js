@@ -5,7 +5,7 @@ import { setPlanetData, planetData } from './planetData.js';
 import { createPlanet } from './createPlanet.js';
 import { computeOrbitalPosition } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
-import { initUI, updateLayerTooltip, showNotification } from './ui.js';
+import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName } from './ui.js';
 import { createOrbitLine } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
@@ -141,11 +141,11 @@ async function bootstrap() {
     // Pick a shot tailored to planet type — sunOrbit always looks at the lit side
     const isGasGiant = trackedBody.data.type === 'gas-giant' || trackedBody.data.type === 'ice-giant';
     const shots = isGasGiant
-      ? ['sunOrbit', 'orbit', 'flyBy', 'dollyZoom']
-      : ['sunOrbit', 'orbit', 'flyBy', 'chase', 'dollyZoom'];
+      ? ['sunOrbit', 'sunOrbit', 'orbit', 'flyBy', 'dollyZoom']
+      : ['sunOrbit', 'sunOrbit', 'orbit', 'flyBy', 'chase', 'dollyZoom'];
     const weights = isGasGiant
-      ? [0.35, 0.3, 0.25, 0.1]
-      : [0.3, 0.25, 0.2, 0.15, 0.1];
+      ? [0.3, 0.2, 0.25, 0.15, 0.1]
+      : [0.25, 0.2, 0.2, 0.15, 0.1, 0.1];
     let randomVal = Math.random();
     let selectedShot = shots[0];
     for (let i = 0; i < shots.length; i++) {
@@ -156,71 +156,89 @@ async function bootstrap() {
       randomVal -= weights[i];
     }
 
-    // Pick lens based on planet type — wider for gas giants, tighter for terrestrials
+    // Pick lens based on planet type and distance
+    const useDramaticLens = Math.random() < 0.35;
     const lenses = isGasGiant
-      ? [24, 35, 50]
-      : [35, 50, 85, 135];
+      ? (useDramaticLens ? [20, 24, 28] : [35, 50, 70])
+      : (useDramaticLens ? [24, 28, 35] : [50, 85, 135]);
     const selectedLens = lenses[Math.floor(Math.random() * lenses.length)];
 
-    // Base configuration — handheld disabled, always face the lit side
+    // Base configuration
     const shotParams = {
-      handheld: false,
-      dutchAngle: (Math.random() - 0.5) * 0.12,
+      handheld: Math.random() < 0.25,
+      dutchAngle: 0,
       sunDir: sunDir
     };
 
-    // Rule of Thirds framing (30% chance)
-    if (Math.random() < 0.3) {
+    // Slow dutch drift for cinematic feel (40% chance)
+    if (Math.random() < 0.4) {
+      shotParams.dutchAngle = (Math.random() - 0.5) * 0.08;
+    }
+
+    // Rule of Thirds framing (50% chance — increased for better quality)
+    if (Math.random() < 0.5) {
       shotParams.framingOffset = {
-        x: (Math.random() > 0.5 ? 1 : -1) * (0.3 + Math.random() * 0.4),
-        y: (Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.3)
+        x: (Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.3),
+        y: (Math.random() > 0.5 ? 1 : -1) * (0.15 + Math.random() * 0.25)
       };
     }
 
     // Shot specific params — all biased toward the sun-lit side
     if (selectedShot === 'flyBy') {
-      shotParams.duration = 12 + Math.random() * 8;
-      shotParams.dutchAngle = (Math.random() - 0.5) * 0.4;
+      shotParams.duration = 8 + Math.random() * 6;
+      shotParams.dutchAngle = (Math.random() - 0.5) * 0.3;
+      if (Math.random() < 0.3) shotParams.handheld = true;
     }
     if (selectedShot === 'chase') {
-      const chaseDist = trackedBody.data.radius * (2 + Math.random() * 2);
-      // Offset the chase camera toward the sun-lit side
+      const chaseDist = trackedBody.data.radius * (3 + Math.random() * 3);
+      const chaseHeight = (Math.random() - 0.5) * trackedBody.data.radius * 0.5;
       shotParams.offset = new THREE.Vector3(
         sunDir.x * chaseDist * 0.3,
-        sunDir.y * chaseDist * 0.2 + chaseDist * 0.15,
+        sunDir.y * chaseDist * 0.2 + chaseHeight,
         sunDir.z * chaseDist * 0.3
       );
     }
     if (selectedShot === 'orbit') {
       const orbitRadius = isGasGiant
-        ? trackedBody.data.radius * (4 + Math.random() * 6)
-        : trackedBody.data.radius * (2.5 + Math.random() * 4);
+        ? trackedBody.data.radius * (5 + Math.random() * 8)
+        : trackedBody.data.radius * (3 + Math.random() * 5);
       shotParams.radius = orbitRadius;
-      shotParams.speed = 0.04 + Math.random() * 0.08;
-      shotParams.height = (Math.random() - 0.5) * trackedBody.data.radius * 1.5;
-      // Shift orbit center toward the sun so camera stays on the lit side
+      shotParams.speed = 0.04 + Math.random() * 0.06;
+      shotParams.height = (Math.random() - 0.5) * orbitRadius * 0.4;
       shotParams.orbitCenterOffset = sunDir.clone().multiplyScalar(orbitRadius * 0.35);
     }
     if (selectedShot === 'sunOrbit') {
+      const useCloseUp = Math.random() < 0.35;
       shotParams.radius = isGasGiant
-        ? trackedBody.data.radius * (5 + Math.random() * 8)
-        : trackedBody.data.radius * (3 + Math.random() * 5);
-      shotParams.speed = 0.08 + Math.random() * 0.1;
+        ? trackedBody.data.radius * (6 + Math.random() * 10)
+        : useCloseUp
+          ? trackedBody.data.radius * (3 + Math.random() * 2.5)
+          : trackedBody.data.radius * (4 + Math.random() * 6);
+      // Orbit period: thời gian quay hết 1 vòng (giây) — nhất quán cho mọi hành tinh
+      shotParams.orbitPeriod = 35 + Math.random() * 25; // 35-60s/vòng
+      // Dao động theta/thay đổi độ cao nhẹ tạo sự đa dạng
+      shotParams.thetaFreq = 1.5 + Math.random() * 1.0; // 1.5-2.5
+      shotParams.distFreq = 1.0 + Math.random() * 1.0;  // 1.0-2.0
+      shotParams.heightFreq = 0.7 + Math.random() * 0.8; // 0.7-1.5
+      // Vertical drift cho một số shot
+      if (Math.random() < 0.3) {
+        shotParams.vertOscAmplitude = (0.1 + Math.random() * 0.15) * trackedBody.data.radius;
+      }
     }
     if (selectedShot === 'dollyZoom') {
-      shotParams.duration = 14 + Math.random() * 6;
-      shotParams.startFov = Math.random() > 0.5 ? 120 : 24;
-      shotParams.endFov = shotParams.startFov === 120 ? 24 : 120;
-      shotParams.startDist = trackedBody.data.radius * 4;
-      // Point dolly toward the sun-lit side
+      shotParams.duration = 12 + Math.random() * 6;
+      const useDramaticDolly = Math.random() < 0.5;
+      shotParams.startFov = useDramaticDolly ? 100 : 50;
+      shotParams.endFov = useDramaticDolly ? 20 : 90;
+      shotParams.startDist = trackedBody.data.radius * 5;
       shotParams.startDir = sunDir.clone().negate();
     }
 
     cinematicCamera.setShotPreset(selectedShot, shotParams);
     cinematicCamera.setLens(selectedLens);
 
-    // Reset timer
-    autoDirectorTimer = 10 + Math.random() * 8; // 10-18 seconds
+    // Reset timer — varied shot duration for pacing
+    autoDirectorTimer = 12 + Math.random() * 10; // 12-22 seconds
   }
 
   // 4. Kh?i t?o UI v?i callbacks (planetData ?? ???c populate)
@@ -264,38 +282,48 @@ async function bootstrap() {
     }
     cameraMode = 'follow';
     trackedBody = bodyById.get(planetId);
-    if (trackedBody) {
-      cinematicCamera.setTarget(trackedBody);
-      const target = new THREE.Vector3();
-      trackedBody.pivot.getWorldPosition(target);
+    if (!trackedBody) return;
+    cinematicCamera.setTarget(trackedBody);
+
+    // ── Ch? ?? Ng?m h?nh tinh: mode riêng, kh?ng b? auto-director hay flyTo ghi ?è ──
+    if (cinematicCamera.isActive() && cinematicCamera.getMode() === 'planetFocus') {
+      cinematicCamera.setShotPreset('planetFocus');
+      showNotification(`🪐 Ngắm: ${trackedBody.data.name.vi || trackedBody.data.name}`);
+      updateCurrentPlanetName(trackedBody.data.name.vi || trackedBody.data.name);
+      return;
+    }
+
+    // ── Ch? ?? th??ng (kh?ng ph?i planetFocus) ──
+    // N?u cinematic ?ang active ? mode kh?c, disable n? tr??c khi flyTo
+    if (cinematicCamera.isActive()) {
+      cinematicCamera.disable();
+    }
+
+    const target = new THREE.Vector3();
+    trackedBody.pivot.getWorldPosition(target);
+    
+    if (planetId === 'saturn') {
+      const preset = SATURN_PRESETS['default'];
+      const isFirstTime = !hasVisitedSaturn;
+      hasVisitedSaturn = true;
       
-      if (planetId === 'saturn') {
-        const preset = SATURN_PRESETS['default'];
-        const isFirstTime = !hasVisitedSaturn;
-        hasVisitedSaturn = true;
-        
-        // T?nh to?n v? tr? camera default
-        const inclRad = THREE.MathUtils.degToRad(preset.inclination);
-        const azimRad = THREE.MathUtils.degToRad(preset.azimuth);
-        const offset = new THREE.Vector3(
-          preset.distance * Math.sin(inclRad) * Math.cos(azimRad),
-          preset.distance * Math.cos(inclRad),
-          preset.distance * Math.sin(inclRad) * Math.sin(azimRad)
-        );
-        const camTarget = target.clone().add(offset);
-        
-        // Intro animation 2200ms cho l?n ??u, sau ?? m??t h?n
-        startFlyTo(camTarget, target, isFirstTime ? 2.2 : 1.5);
-      } else {
-        const zoomDist = Math.max(trackedBody.data.radius * 5, 0.25);
-        const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
-        startFlyTo(camTarget, target, 1.1);
-      }
-      // Discovery Notification (Phase 6)
-      if (!visitedBodies.has(planetId)) {
-        visitedBodies.add(planetId);
-        showNotification(`Khám phá mới: ${trackedBody.data.name.vi || trackedBody.data.name}`);
-      }
+      const inclRad = THREE.MathUtils.degToRad(preset.inclination);
+      const azimRad = THREE.MathUtils.degToRad(preset.azimuth);
+      const offset = new THREE.Vector3(
+        preset.distance * Math.sin(inclRad) * Math.cos(azimRad),
+        preset.distance * Math.cos(inclRad),
+        preset.distance * Math.sin(inclRad) * Math.sin(azimRad)
+      );
+      const camTarget = target.clone().add(offset);
+      startFlyTo(camTarget, target, isFirstTime ? 2.2 : 1.5);
+    } else {
+      const zoomDist = Math.max(trackedBody.data.radius * 5, 0.25);
+      const camTarget = target.clone().add(new THREE.Vector3(zoomDist, zoomDist * 0.5, zoomDist));
+      startFlyTo(camTarget, target, 1.1);
+    }
+    if (!visitedBodies.has(planetId)) {
+      visitedBodies.add(planetId);
+      showNotification(`Khám phá mới: ${trackedBody.data.name.vi || trackedBody.data.name}`);
     }
   }
 
@@ -390,6 +418,21 @@ async function bootstrap() {
     onCinematicShotChange: (shot) => {
       if (shot === 'free' || shot === 'targetLock') {
         cinematicCamera.setMode(shot);
+      } else if (shot === 'planetFocus') {
+        if (!trackedBody) {
+          const planets = getCinematicPlanets();
+          if (planets.length > 0) {
+            trackedBody = planets[0];
+            cinematicCamera.setTarget(trackedBody);
+          }
+        }
+        cinematicCamera.setShotPreset('planetFocus');
+        if (trackedBody) {
+          updateCurrentPlanetName(trackedBody.data.name.vi || trackedBody.data.name);
+        }
+        // Luôn hiển thị planet selector khi ở chế độ này
+        const ps = document.getElementById('planet-selector');
+        if (ps) ps.style.display = '';
       } else {
         cinematicCamera.setShotPreset(shot);
       }
@@ -412,6 +455,11 @@ async function bootstrap() {
     onToggleFps: (enabled) => {
       const fpsEl = document.getElementById('fps-counter');
       if (fpsEl) fpsEl.style.display = enabled ? 'block' : 'none';
+    },
+    onSpeedChange: (factor) => {
+      cinematicCamera.adjustShotSpeed(factor);
+      const newSpeed = cinematicCamera.getShotSpeed();
+      updateSpeedDisplay(newSpeed);
     }
   });
 
@@ -1040,11 +1088,16 @@ async function bootstrap() {
 
     // Cập nhật Cinematic Camera nếu đang active
     if (cinematicCamera.isActive()) {
-      if (isAutoDirectorActive) {
+      // Không chạy auto-director khi đang ở planetFocus — mode này do user kiểm soát
+      if (isAutoDirectorActive && cinematicCamera.getMode() !== 'planetFocus') {
         autoDirectorTimer -= deltaTime;
         if (autoDirectorTimer <= 0) {
           triggerRandomCinematicCut();
         }
+      }
+      // Reset auto-director timer nếu vào planetFocus để tránh trigger ngay khi thoát
+      if (cinematicCamera.getMode() === 'planetFocus') {
+        autoDirectorTimer = 999;
       }
       cinematicCamera.update(deltaTime);
     } else {

@@ -268,13 +268,14 @@ export function initUI(callbacks) {
     
     <div class="cinematic-section">
       <div class="cinematic-label">Cú máy (Shot)</div>
-      <div class="cinematic-controls grid-3" id="cine-shot-group">
+      <div class="cinematic-controls grid-4" id="cine-shot-group">
         <button class="cine-btn active" data-shot="free">Tự do</button>
         <button class="cine-btn" data-shot="targetLock">Khóa mục tiêu</button>
         <button class="cine-btn" data-shot="orbit">Bay vòng</button>
         <button class="cine-btn" data-shot="flyBy">Lướt qua</button>
         <button class="cine-btn" data-shot="chase">Bám đuổi</button>
         <button class="cine-btn" data-shot="sunOrbit">☀ Bay quanh Mặt Trời</button>
+        <button class="cine-btn" data-shot="planetFocus">🪐 Ngắm hành tinh</button>
       </div>
     </div>
 
@@ -286,6 +287,20 @@ export function initUI(callbacks) {
         <button class="cine-btn" data-lens="50">50mm</button>
         <button class="cine-btn" data-lens="85">85mm</button>
         <button class="cine-btn" data-lens="135">135m</button>
+      </div>
+    </div>
+
+    <div class="cinematic-section" id="cine-planet-section" style="display:none;">
+      <div class="cinematic-label">Đang ngắm</div>
+      <div id="cine-current-planet" style="text-align:center;font-size:15px;color:#ffd36a;font-weight:600;padding:4px 0;">—</div>
+    </div>
+
+    <div class="cinematic-section" id="cine-speed-section" style="display:none;">
+      <div class="cinematic-label">Tốc độ quay</div>
+      <div class="cinematic-controls" style="display:flex;gap:8px;align-items:center;">
+        <button class="cine-btn" id="btn-speed-down" style="font-size:18px;width:44px;">−</button>
+        <span id="speed-display" style="flex:1;text-align:center;font-size:13px;color:#8ab4f8;font-weight:600;">1.0×</span>
+        <button class="cine-btn" id="btn-speed-up" style="font-size:18px;width:44px;">+</button>
       </div>
     </div>
 
@@ -569,14 +584,40 @@ export function initUI(callbacks) {
   });
 
   // Cinematic Panel Controls
+  const planetSection = document.getElementById('cine-planet-section');
+  const speedSection = document.getElementById('cine-speed-section');
+  const speedDisplay = document.getElementById('speed-display');
+
   const shotBtns = cinematicPanelDOM.querySelectorAll('#cine-shot-group .cine-btn');
   shotBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       shotBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      if (callbacks.onCinematicShotChange) callbacks.onCinematicShotChange(btn.dataset.shot);
+      const shot = btn.dataset.shot;
+      const isPlanetFocus = shot === 'planetFocus';
+      if (planetSection) planetSection.style.display = isPlanetFocus ? 'block' : 'none';
+      if (speedSection) speedSection.style.display = isPlanetFocus ? 'block' : 'none';
+      if (callbacks.onCinematicShotChange) callbacks.onCinematicShotChange(shot);
     });
   });
+
+  // Speed control for planetFocus mode
+  function updateSpeedDisplay(speed) {
+    if (speedDisplay) speedDisplay.textContent = speed.toFixed(1) + '×';
+  }
+
+  const btnSpeedDown = document.getElementById('btn-speed-down');
+  const btnSpeedUp = document.getElementById('btn-speed-up');
+  if (btnSpeedDown) {
+    btnSpeedDown.addEventListener('click', () => {
+      if (callbacks.onSpeedChange) callbacks.onSpeedChange(0.7);
+    });
+  }
+  if (btnSpeedUp) {
+    btnSpeedUp.addEventListener('click', () => {
+      if (callbacks.onSpeedChange) callbacks.onSpeedChange(1.4);
+    });
+  }
 
   const lensBtns = cinematicPanelDOM.querySelectorAll('#cine-lens-group .cine-btn');
   lensBtns.forEach(btn => {
@@ -1029,4 +1070,14 @@ export function updateLayerTooltip(visible, x, y, name, desc) {
   } else {
     layerTooltipInstance.classList.remove('visible');
   }
+}
+
+export function updateSpeedDisplay(speed) {
+  const el = document.getElementById('speed-display');
+  if (el) el.textContent = speed.toFixed(1) + '×';
+}
+
+export function updateCurrentPlanetName(name) {
+  const el = document.getElementById('cine-current-planet');
+  if (el) el.textContent = name || '—';
 }
