@@ -23,6 +23,8 @@ export const QUALITY_PRESETS = {
     ringsEnabled: true,
     coronaEnabled: true,
     antialias: true,
+    orbitQuality: 1.5,
+    orbitCatmullRom: true,
     cinematic: {
       dofEnabled: true,
       vignetteEnabled: true,
@@ -45,6 +47,8 @@ export const QUALITY_PRESETS = {
     ringsEnabled: true,
     coronaEnabled: true,
     antialias: true,
+    orbitQuality: 1.0,
+    orbitCatmullRom: true,
     cinematic: {
       dofEnabled: false,
       vignetteEnabled: true,
@@ -67,6 +71,8 @@ export const QUALITY_PRESETS = {
     ringsEnabled: true,
     coronaEnabled: false,
     antialias: false,
+    orbitQuality: 0.5,
+    orbitCatmullRom: false,
     cinematic: {
       dofEnabled: false,
       vignetteEnabled: true,

@@ -6,12 +6,12 @@ import { createPlanet } from './createPlanet.js';
 import { computeOrbitalPosition } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
 import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName } from './ui.js';
-import { createOrbitLine } from './orbits.js';
+import { createOrbitLine, createNbodyOrbitLine, updateOrbitLineGeometry, getSegmentCount } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
 import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
-import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds } from './gravity.js';
+import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds, predictTrajectory } from './gravity.js';
 import { initSpacetimeGrid, setSpacetimeGridEnabled, updateSpacetimeGrid } from './spacetimeGrid.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
@@ -57,6 +57,8 @@ async function bootstrap() {
   let isAuroraEnabled = false;
   let isCloudsEnabled = false;
   let newtonGravityActive = false;
+  const nbodyOrbitLines = new Map();
+  const NBODY_PREDICTION_INTERVAL = 45;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
@@ -400,7 +402,15 @@ async function bootstrap() {
     onToggleOrbits: (show) => {
       for (const orbit of orbits) {
         orbit.visible = show;
-        // B?t shadow logic cho ring n?u orbit ???c b?t? Kh?ng, ring shadow n?n lu?n ch?y.
+      }
+      // ??ng b? N-body orbit lines v?i visuals toggle
+      if (newtonGravityActive) {
+        for (const [, line] of nbodyOrbitLines) {
+          line.visible = show;
+        }
+        if (show) {
+          updateNbodyPredictions();
+        }
       }
     },
     onToggleLabels: (show) => {
@@ -461,6 +471,8 @@ async function bootstrap() {
         if (trackedBody) {
           applyGravityFocus(trackedBody.data.id);
         }
+        // D? ?oán qu? ??o N-body ngay l?p t?c
+        updateNbodyPredictions();
       } else {
         disableNewtonGravity(bodies, scene);
         restoreAllMeshesVisibility();
@@ -469,6 +481,13 @@ async function bootstrap() {
         for (const orbit of orbits) {
           orbit.visible = !!visualsActive;
         }
+        // D?n d?p N-body orbit lines
+        for (const [, line] of nbodyOrbitLines) {
+          scene.remove(line);
+          if (line.geometry) line.geometry.dispose();
+          if (line.material) line.material.dispose();
+        }
+        nbodyOrbitLines.clear();
       }
       newtonGravityActive = enabled;
     },
@@ -864,6 +883,57 @@ async function bootstrap() {
     renderer.toneMappingExposure = exposure;
   }
 
+  // ── N-body Trajectory Prediction (c?p nh?t ???ng qu? ??o ??ng) ──
+  function updateNbodyPredictions() {
+    if (!newtonGravityActive) return;
+
+    const visualsBtn = document.getElementById('toggle-visuals');
+    const visualsActive = visualsBtn && visualsBtn.classList.contains('active');
+    if (!visualsActive) return;
+
+    // Xác ??nh danh sách thiên th? c?n d? ?oán (focus ho?c t?t c?)
+    const focusedIds = getFocusedBodyIds();
+    const targetBodyIds = focusedIds
+      ? Array.from(focusedIds)
+      : bodies.filter(b => b.data.type !== 'star').map(b => b.data.id);
+    const targetSet = new Set(targetBodyIds);
+
+    // D?n d?p lines c?a thiên th? không còn trong focus
+    for (const [id, line] of nbodyOrbitLines) {
+      if (!targetSet.has(id)) {
+        scene.remove(line);
+        if (line.geometry) line.geometry.dispose();
+        if (line.material) line.material.dispose();
+        nbodyOrbitLines.delete(id);
+      }
+    }
+
+    for (const bodyId of targetBodyIds) {
+      const body = bodyById.get(bodyId);
+      if (!body) continue;
+
+      const qualityMultiplier = getCurrentPreset().orbitQuality ?? 1;
+      const numPoints = Math.min(256,
+        getSegmentCount(body.data.eccentricity || 0, body.data.isMoon, qualityMultiplier));
+
+      const trajectory = predictTrajectory(bodyId, numPoints);
+      if (trajectory.length < 3) continue;
+
+      const points = trajectory.map(p => new THREE.Vector3(p.x, p.y, p.z));
+
+      let orbitLine = nbodyOrbitLines.get(bodyId);
+      if (orbitLine) {
+        updateOrbitLineGeometry(orbitLine, points);
+        orbitLine.visible = true;
+      } else {
+        orbitLine = createNbodyOrbitLine(body.data, numPoints);
+        nbodyOrbitLines.set(bodyId, orbitLine);
+        scene.add(orbitLine);
+        orbitLine.visible = true;
+      }
+    }
+  }
+
   function animate() {
     requestAnimationFrame(animate);
 
@@ -878,6 +948,11 @@ async function bootstrap() {
     // Newton Gravity N-body (thay thế Kepler)
     if (newtonGravityActive && !isPaused) {
       updateNewtonGravity(bodies, deltaTime * timeScale);
+    }
+
+    // D? ?oán qu? ??o N-body (throttle m?i NBODY_PREDICTION_INTERVAL frame)
+    if (newtonGravityActive && frameCount % NBODY_PREDICTION_INTERVAL === 0) {
+      updateNbodyPredictions();
     }
 
     // Cập nhật lưới Không-Thời Gian (throttle mỗi 2 frame)
@@ -1086,6 +1161,12 @@ async function bootstrap() {
     for (const orbit of orbits) {
       if (orbit.visible && orbit.material.uniforms?.uTime) {
         orbit.material.uniforms.uTime.value += deltaTime;
+      }
+    }
+    // C?p nh?t uTime cho N-body hero moon orbit lines
+    for (const [, line] of nbodyOrbitLines) {
+      if (line.visible && line.material.uniforms?.uTime) {
+        line.material.uniforms.uTime.value += deltaTime;
       }
     }
 

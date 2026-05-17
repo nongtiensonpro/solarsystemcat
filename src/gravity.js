@@ -476,5 +476,62 @@ export function disableNewtonGravity(bodies, scene) {
   console.log('[Gravity] Newton engine disabled, reverted to Kepler');
 }
 
+// ── N-body Trajectory Prediction ──
+// D? ?oán qu? ??o t??ng lai b?ng cách tích phân forward,
+// sau ?ó khôi ph?c l?i tr?ng thái g?c.
+
+const PREDICT_MAX_STEPS = 2000;
+
+/**
+* Tích phân forward t? tr?ng thái hi?n t?i, ghi l?i qu? ??o c?a bodyId.
+* Không làm ?nh h??ng ??n tr?ng thái mô ph?ng th?c t?.
+*
+* @param {string} bodyId - ID c?a thiên th? c?n d? ?oán
+* @param {number} numPoints - S? ?i?m qu? ??o mong mu?n
+* @param {number} [maxSteps=PREDICT_MAX_STEPS] - S? b??c tích phân t?i ?a
+* @returns {Array<{x:number,y:number,z:number}>} M?ng t?a ??
+*/
+export function predictTrajectory(bodyId, numPoints, maxSteps = PREDICT_MAX_STEPS) {
+  if (!state.has(bodyId) || maxSteps <= 0) return [];
+
+  // L?u tr?ng thái hi?n t?i
+  const savedState = [];
+  for (const [id, s] of state) {
+    savedState.push({
+      id,
+      px: s.px, py: s.py, pz: s.pz,
+      vx: s.vx, vy: s.vy, vz: s.vz,
+      massNorm: s.massNorm,
+      gravityAffected: s.gravityAffected
+    });
+  }
+
+  const trajectory = [];
+  const recordInterval = Math.max(1, Math.floor(maxSteps / numPoints));
+
+  for (let i = 0; i < maxSteps; i++) {
+    const entries = getRelevantEntries();
+    const stepSize = computeAdaptiveStep(entries);
+    gravitySubstep(stepSize);
+
+    if (i % recordInterval === 0) {
+      const s = state.get(bodyId);
+      if (s) trajectory.push({ x: s.px, y: s.py, z: s.pz });
+    }
+  }
+
+  // Khôi ph?c tr?ng thái g?c
+  for (const saved of savedState) {
+    state.set(saved.id, {
+      px: saved.px, py: saved.py, pz: saved.pz,
+      vx: saved.vx, vy: saved.vy, vz: saved.vz,
+      massNorm: saved.massNorm,
+      gravityAffected: saved.gravityAffected
+    });
+  }
+
+  return trajectory;
+}
+
 // ── Test helpers ──
 export { gravitySubstep as _gravitySubstep };
