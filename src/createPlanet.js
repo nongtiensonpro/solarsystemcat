@@ -7,6 +7,8 @@ import { loadPlanetTextures } from './textureLoader.js';
 import { createUnifiedCorona, createSunSurfaceMaterial, createChromosphere } from './sun.js';
 import { createCometTail, createCometComa } from './comets.js';
 import { createMagneticField } from './magneticField.js';
+import { createAurora } from './aurora.js';
+import { createVolumetricClouds } from './cloudsVolumetric.js';
 import { createHeliumRain } from './heliumRain.js';
 import { createDiamondRain } from './diamondRain.js';
 import { createIronSnow } from './ironSnow.js';
@@ -346,15 +348,30 @@ export function createPlanet(data) {
     tiltGroup.add(magneticFieldGroup);
   }
 
-  // 4h. Mưa Heli (Jupiter, Saturn)
+  // 4h. Cực quang (Aurora) — Earth only
+  let auroraGroup = null;
+  const auroraSystem = createAurora(r, data.id);
+  if (auroraSystem) {
+    auroraGroup = auroraSystem;
+    tiltGroup.add(auroraGroup);
+  }
+
+  // 4i. Mây thể tích (Volumetric Clouds) — Earth only
+  let volumetricCloudMesh = null;
+  if (data.id === 'earth') {
+    volumetricCloudMesh = createVolumetricClouds(r, { opacity: 0.35 });
+    tiltGroup.add(volumetricCloudMesh);
+  }
+
+  // 4j. Mưa Heli (Jupiter, Saturn)
   let heliumRainMesh = null;
   if (data.id === 'jupiter' || data.id === 'saturn') {
-    const startRadius = data.id === 'jupiter' ? 0.8 : 0.7; // Saturn mưa rộng hơn
+    const startRadius = data.id === 'jupiter' ? 0.8 : 0.7;
     heliumRainMesh = createHeliumRain(r, startRadius, 3000);
     tiltGroup.add(heliumRainMesh);
   }
 
-  // 4i. Mưa Kim Cương (Uranus, Neptune)
+  // 4k. Mưa Kim Cương (Uranus, Neptune)
   let diamondRainMesh = null;
   if (data.id === 'uranus' || data.id === 'neptune') {
     const startRadius = data.id === 'uranus' ? 0.70 : 0.75;
@@ -362,14 +379,14 @@ export function createPlanet(data) {
     tiltGroup.add(diamondRainMesh);
   }
 
-  // 4j. Tuyết Sắt (Mercury)
+  // 4l. Tuyết Sắt (Mercury)
   let ironSnowMesh = null;
   if (data.id === 'mercury') {
     ironSnowMesh = createIronSnow(r, 0.75, 1500);
     tiltGroup.add(ironSnowMesh);
   }
 
-  // 4k. Mạch phun Enceladus (Plume)
+  // 4m. Mạch phun Enceladus (Plume)
   let enceladusPlume = null;
   if (data.id === 'enceladus') {
     enceladusPlume = createEnceladusPlume(r);
@@ -414,6 +431,8 @@ export function createPlanet(data) {
     tailMesh,
     comaMesh,
     magneticFieldGroup,
+    auroraGroup,
+    volumetricCloudMesh,
     heliumRainMesh,
     diamondRainMesh,
     ironSnowMesh,

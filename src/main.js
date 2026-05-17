@@ -488,6 +488,17 @@ async function bootstrap() {
         body.cloudMesh.visible = preset.cloudsEnabled;
       }
 
+      // Volumetric clouds
+      if (body.volumetricCloudMesh) {
+        body.volumetricCloudMesh.material.uniforms.uOpacity.value = preset.cloudOpacityScale * 0.35;
+        body.volumetricCloudMesh.visible = preset.cloudsEnabled;
+      }
+
+      // Aurora visibility
+      if (body.auroraGroup) {
+        body.auroraGroup.visible = preset.atmosphereEnabled;
+      }
+
       // Venus atmosphere texture
       if (body.atmosphereTextureMesh) {
         body.atmosphereTextureMesh.visible = preset.atmosphereEnabled;
@@ -698,7 +709,33 @@ async function bootstrap() {
           }
         }
       }
+
       const distToCamera = camera.position.distanceTo(bodyWorldPos);
+
+      // D5. C?p nh?t c?c quang (aurora)
+      if (body.auroraGroup) {
+        const isAuroraNear = distToCamera < body.data.radius * 8;
+        body.auroraGroup.visible = isAuroraNear && cameraMode === 'follow';
+        if (isAuroraNear) {
+          body.auroraGroup.traverse((child) => {
+            if (child.material?.uniforms?.uTime) {
+              child.material.uniforms.uTime.value += deltaTime;
+            }
+          });
+        }
+      }
+
+      // D6. C?p nh?t mây th? tích (volumetric clouds)
+      if (body.volumetricCloudMesh) {
+        const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
+        if (body.volumetricCloudMesh.material.uniforms?.uTime) {
+          body.volumetricCloudMesh.material.uniforms.uTime.value += deltaTime;
+        }
+        if (body.volumetricCloudMesh.material.uniforms?.uSunDirection) {
+          body.volumetricCloudMesh.material.uniforms.uSunDirection.value.copy(sunDir);
+        }
+      }
+
       const isClose = distToCamera < body.data.radius * 30;
       const isSlicing = body.isCrossSectionActive;
 

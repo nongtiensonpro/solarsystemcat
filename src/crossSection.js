@@ -149,6 +149,12 @@ export function toggleCrossSection(body, isActive) {
   }
   applyClipping(body.atmosphereTextureMesh);
   applyClipping(body.cloudMesh);
+  if (body.volumetricCloudMesh) applyClipping(body.volumetricCloudMesh);
+  if (body.auroraGroup) {
+    body.auroraGroup.traverse((child) => {
+      if (child.isMesh) applyClipping(child);
+    });
+  }
   applyClipping(body.coronaMesh);
   applyClipping(body.chromosphereMesh);
   
