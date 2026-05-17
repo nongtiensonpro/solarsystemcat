@@ -51,6 +51,9 @@ async function bootstrap() {
   let timeScale = 1000; // Gi? tr? m?c ??nh, s? ???c UI slider ghi ??
   let isPaused = false;
   let isAutoSliceEnabled = false;
+  let isMagneticFieldEnabled = false;
+  let isAuroraEnabled = false;
+  let isCloudsEnabled = false;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
@@ -325,6 +328,30 @@ async function bootstrap() {
     onToggleSunlightPaths: (enabled) => {
       toggleSunlightPaths(enabled);
     },
+    onToggleMagneticField: (enabled) => {
+      isMagneticFieldEnabled = enabled;
+      for (const body of bodies) {
+        if (body.magneticFieldGroup) {
+          body.magneticFieldGroup.visible = enabled;
+        }
+      }
+    },
+    onToggleAurora: (enabled) => {
+      isAuroraEnabled = enabled;
+      for (const body of bodies) {
+        if (body.auroraGroup) {
+          body.auroraGroup.visible = enabled;
+        }
+      }
+    },
+    onToggleClouds: (enabled) => {
+      isCloudsEnabled = enabled;
+      for (const body of bodies) {
+        if (body.volumetricCloudMesh) {
+          body.volumetricCloudMesh.visible = enabled;
+        }
+      }
+    },
     onToggleCinematic: (enabled) => {
       if (enabled) {
         cinematicCamera.setTarget(trackedBody);
@@ -354,10 +381,10 @@ async function bootstrap() {
       if (topBar) topBar.style.display = displayStyle;
       if (planetSelector) planetSelector.style.display = displayStyle;
       if (infoPanel && infoPanel.classList.contains('visible')) infoPanel.style.display = displayStyle;
-      if (minimap && !isClean && document.getElementById('btn-hud-toggle').classList.contains('active')) minimap.style.display = 'block';
+      if (minimap && !isClean && document.getElementById('toggle-hud')?.classList.contains('active')) minimap.style.display = 'block';
       else if (minimap) minimap.style.display = 'none';
       
-      if (zoomInd && !isClean && document.getElementById('btn-hud-toggle').classList.contains('active')) zoomInd.style.display = 'flex';
+      if (zoomInd && !isClean && document.getElementById('toggle-hud')?.classList.contains('active')) zoomInd.style.display = 'flex';
       else if (zoomInd) zoomInd.style.display = 'none';
       
       // Also hide labels and orbits
@@ -371,6 +398,10 @@ async function bootstrap() {
       if (active) {
         autoDirectorTimer = 0; // Trigger immediately
       }
+    },
+    onToggleFps: (enabled) => {
+      const fpsEl = document.getElementById('fps-counter');
+      if (fpsEl) fpsEl.style.display = enabled ? 'block' : 'none';
     }
   });
 
@@ -488,15 +519,15 @@ async function bootstrap() {
         body.cloudMesh.visible = preset.cloudsEnabled;
       }
 
-      // Volumetric clouds
+      // Volumetric clouds (default OFF — controlled by toggle)
       if (body.volumetricCloudMesh) {
         body.volumetricCloudMesh.material.uniforms.uOpacity.value = preset.cloudOpacityScale * 0.35;
-        body.volumetricCloudMesh.visible = preset.cloudsEnabled;
+        body.volumetricCloudMesh.visible = false;
       }
 
-      // Aurora visibility
+      // Aurora visibility (default OFF — controlled by toggle)
       if (body.auroraGroup) {
-        body.auroraGroup.visible = preset.atmosphereEnabled;
+        body.auroraGroup.visible = false;
       }
 
       // Venus atmosphere texture
@@ -523,6 +554,13 @@ async function bootstrap() {
 
   // ?p d?ng preset ban ??u
   applyPresetToEffects(getCurrentPreset());
+
+  // M?c ??nh t?t c?c t?nh n?ng m?i (t? tr??ng, c?c quang, m?y th? tích)
+  for (const body of bodies) {
+    if (body.magneticFieldGroup) body.magneticFieldGroup.visible = false;
+    if (body.auroraGroup) body.auroraGroup.visible = false;
+    if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = false;
+  }
 
   // L?ng nghe thay ??i preset
   onPresetChange((newPreset) => {
@@ -606,6 +644,9 @@ async function bootstrap() {
       simulationTime += deltaTime * timeScale;
     }
 
+    const solarWindStrength = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(simulationTime * 0.00003)) 
+      * (0.6 + 0.4 * Math.sin(simulationTime * 0.00008 + 1.3));
+
     for (const body of bodies) {
       // A. C?p nh?t v? tr? qu? ??o (Kepler) - B? qua M?t Tr?i
       if (body.data.type !== 'star') {
@@ -682,7 +723,7 @@ async function bootstrap() {
       body.pivot.getWorldPosition(bodyWorldPos);
 
       // D3. C?p nh?t t? tr??ng (magnetosphere + field lines)
-      if (body.magneticFieldGroup?.userData?.isMagneticSystem) {
+      if (isMagneticFieldEnabled && body.magneticFieldGroup?.userData?.isMagneticSystem) {
         const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
 
         body.magneticFieldGroup.traverse((child) => {
@@ -691,6 +732,9 @@ async function bootstrap() {
           }
           if (child.material?.uniforms?.uSunDirection) {
             child.material.uniforms.uSunDirection.value.copy(sunDir);
+          }
+          if (child.material?.uniforms?.uSolarWind) {
+            child.material.uniforms.uSolarWind.value = solarWindStrength;
           }
         });
 
@@ -707,26 +751,35 @@ async function bootstrap() {
           if (atmMesh.material.uniforms?.uSunDirection) {
             atmMesh.material.uniforms.uSunDirection.value.copy(sunDir);
           }
+          if (atmMesh.material.uniforms?.uSolarWind) {
+            atmMesh.material.uniforms.uSolarWind.value = solarWindStrength;
+          }
+          if (atmMesh.material.uniforms?.uPlanetRadius) {
+            atmMesh.material.uniforms.uPlanetRadius.value = body.data.radius;
+          }
         }
       }
 
       const distToCamera = camera.position.distanceTo(bodyWorldPos);
 
       // D5. C?p nh?t c?c quang (aurora)
-      if (body.auroraGroup) {
+      if (isAuroraEnabled && body.auroraGroup) {
         const isAuroraNear = distToCamera < body.data.radius * 8;
-        body.auroraGroup.visible = isAuroraNear && cameraMode === 'follow';
+        body.auroraGroup.visible = isAuroraNear && cameraMode === 'follow' && isAuroraEnabled;
         if (isAuroraNear) {
           body.auroraGroup.traverse((child) => {
             if (child.material?.uniforms?.uTime) {
               child.material.uniforms.uTime.value += deltaTime;
+            }
+            if (child.material?.uniforms?.uSolarWind) {
+              child.material.uniforms.uSolarWind.value = solarWindStrength;
             }
           });
         }
       }
 
       // D6. C?p nh?t mây th? tích (volumetric clouds)
-      if (body.volumetricCloudMesh) {
+      if (isCloudsEnabled && body.volumetricCloudMesh) {
         const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
         if (body.volumetricCloudMesh.material.uniforms?.uTime) {
           body.volumetricCloudMesh.material.uniforms.uTime.value += deltaTime;
@@ -949,9 +1002,24 @@ async function bootstrap() {
     // Phase 3.1: Adaptive Exposure
     updateSunlightExposure();
 
+    // FPS Counter
+    frameCount2++;
+    if (Date.now() - fpsLastTime >= 500) {
+      const fps = Math.round(frameCount2 * 1000 / (Date.now() - fpsLastTime));
+      const fpsEl = document.getElementById('fps-counter');
+      if (fpsEl && fpsEl.style.display !== 'none') {
+        fpsEl.textContent = fps + ' FPS';
+      }
+      frameCount2 = 0;
+      fpsLastTime = Date.now();
+    }
+
     // K?t xu?t qua post-processing pipeline (bloom)
     composer.render();
   }
+
+  let frameCount2 = 0;
+  let fpsLastTime = Date.now();
 
   function updateMinimap() {
     const minimapCanvas = document.getElementById('minimap-canvas');

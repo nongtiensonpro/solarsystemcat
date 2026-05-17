@@ -12,6 +12,7 @@ const fieldLineFragmentShader = /* glsl */`
   uniform vec3 uColor;
   uniform float uTime;
   uniform float uOpacity;
+  uniform float uSolarWind;
 
   varying vec2 vUv;
 
@@ -19,7 +20,8 @@ const fieldLineFragmentShader = /* glsl */`
     float flow = fract(vUv.x * 8.0 - uTime * 0.4);
     float line = 1.0 - smoothstep(0.0, 0.3, abs(flow - 0.5) * 2.0 - 0.3);
     float fade = sin(vUv.x * 3.14159);
-    float alpha = line * fade * uOpacity;
+    float windPulse = 0.8 + 0.2 * uSolarWind;
+    float alpha = line * fade * uOpacity * windPulse;
     alpha *= 0.7 + 0.3 * sin(uTime * 1.5 + vUv.x * 10.0);
     gl_FragColor = vec4(uColor, alpha);
   }
@@ -28,6 +30,7 @@ const fieldLineFragmentShader = /* glsl */`
 const magnetosphereVertexShader = /* glsl */`
   uniform vec3 uSunDirection;
   uniform float uTime;
+  uniform float uSolarWind;
 
   varying vec3 vNormal;
   varying vec3 vViewDir;
@@ -41,8 +44,9 @@ const magnetosphereVertexShader = /* glsl */`
     vec3 dir = normalize(position);
     float sunDot = dot(dir, uSunDirection);
 
-    float daysideCompress = 0.65;
-    float nightsideStretch = 1.8;
+    float windFactor = 0.6 + 0.4 * uSolarWind;
+    float daysideCompress = 0.75 - 0.15 * windFactor;
+    float nightsideStretch = 1.5 + 0.4 * windFactor;
     float smoothEdge = smoothstep(-0.3, 0.3, sunDot);
 
     float deform = mix(nightsideStretch, daysideCompress, smoothEdge);
@@ -58,6 +62,7 @@ const magnetosphereFragmentShader = /* glsl */`
   uniform vec3 uColor;
   uniform float uTime;
   uniform float uOpacity;
+  uniform float uSolarWind;
 
   varying vec3 vNormal;
   varying vec3 vViewDir;
@@ -67,10 +72,11 @@ const magnetosphereFragmentShader = /* glsl */`
     float fresnel = 1.0 - max(dot(vViewDir, vNormal), 0.0);
     float intensity = pow(fresnel, 2.5);
 
-    float stripes = sin(vDeform * 4.0 + uTime * 0.2) * 0.5 + 0.5;
+    float windBright = 0.7 + 0.3 * uSolarWind;
+    float stripes = sin(vDeform * 4.0 + uTime * 0.2 + uSolarWind * 2.0) * 0.5 + 0.5;
     stripes = smoothstep(0.3, 0.8, stripes);
 
-    float alpha = intensity * uOpacity * (0.5 + 0.5 * stripes);
+    float alpha = intensity * uOpacity * (0.5 + 0.5 * stripes) * windBright;
     alpha *= 0.6 + 0.4 * sin(uTime * 0.5 + vDeform);
 
     gl_FragColor = vec4(uColor, alpha);
@@ -98,7 +104,7 @@ function createDipoleFieldLinePoints(L, azimuth, numPoints, radius) {
   return points;
 }
 
-function createFieldLineSet(radius, L, azimuths, color) {
+function createFieldLineSet(radius, L, azimuths, color, opacity) {
   const group = new THREE.Group();
   const numPoints = 48;
 
@@ -118,7 +124,8 @@ function createFieldLineSet(radius, L, azimuths, color) {
       uniforms: {
         uColor: { value: new THREE.Color(color) },
         uTime: { value: 0 },
-        uOpacity: { value: 0.6 },
+        uOpacity: { value: opacity ?? 0.6 },
+        uSolarWind: { value: 0.5 },
       },
       vertexShader: fieldLineVertexShader,
       fragmentShader: fieldLineFragmentShader,
@@ -134,14 +141,16 @@ function createFieldLineSet(radius, L, azimuths, color) {
   return group;
 }
 
-function createMagnetosphereShell(radius, color) {
-  const geometry = new THREE.SphereGeometry(radius * 4.0, 48, 48);
+function createMagnetosphereShell(radius, config) {
+  const baseRadius = radius * (config.shellSize ?? 4.0);
+  const geometry = new THREE.SphereGeometry(baseRadius, 48, 48);
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uSunDirection: { value: new THREE.Vector3(0, 0, 1) },
       uTime: { value: 0 },
-      uColor: { value: new THREE.Color(color) },
-      uOpacity: { value: 0.15 },
+      uColor: { value: new THREE.Color(config.color) },
+      uOpacity: { value: config.shellOpacity ?? 0.15 },
+      uSolarWind: { value: 0.5 },
     },
     vertexShader: magnetosphereVertexShader,
     fragmentShader: magnetosphereFragmentShader,
@@ -157,44 +166,107 @@ function createMagnetosphereShell(radius, color) {
 }
 
 export function createMagneticField(radius, planetId) {
-  let config = null;
-
-  if (planetId === 'earth') {
-    config = {
+  const configs = {
+    mercury: {
+      strength: 0.15,
+      color: 0xffaa66,
+      fieldLineColor: '#ffaa66',
+      LOuter: 1.8,
+      LInner: 1.3,
+      shellOpacity: 0.06,
+      shellSize: 1.8,
+      lineOpacity: 0.3,
+    },
+    earth: {
       strength: 1.0,
       color: 0x4488ff,
       fieldLineColor: '#4488ff',
-      shellColor: 0x4488ff,
       LOuter: 2.5,
       LInner: 1.5,
       shellOpacity: 0.15,
-    };
-  } else {
-    return null;
-  }
+      shellSize: 4.0,
+      lineOpacity: 0.6,
+    },
+    mars: {
+      isCrustal: true,
+      strength: 0.6,
+      color: 0xff4422,
+      fieldLineColor: '#ff4422',
+      LOuter: 1.3,
+      LInner: 1.1,
+      shellOpacity: 0.05,
+      shellSize: 1.3,
+      lineOpacity: 0.3,
+    },
+    jupiter: {
+      strength: 2.0,
+      color: 0x88bbff,
+      fieldLineColor: '#88bbff',
+      LOuter: 3.0,
+      LInner: 2.0,
+      shellOpacity: 0.12,
+      shellSize: 6.0,
+      lineOpacity: 0.5,
+    },
+    saturn: {
+      strength: 0.8,
+      color: 0xffcc66,
+      fieldLineColor: '#ffcc66',
+      LOuter: 2.8,
+      LInner: 1.8,
+      shellOpacity: 0.10,
+      shellSize: 5.0,
+      lineOpacity: 0.4,
+    },
+    uranus: {
+      strength: 0.4,
+      color: 0x66ddcc,
+      fieldLineColor: '#66ddcc',
+      LOuter: 2.2,
+      LInner: 1.5,
+      shellOpacity: 0.08,
+      shellSize: 3.0,
+      lineOpacity: 0.35,
+    },
+    neptune: {
+      strength: 0.3,
+      color: 0x4488ff,
+      fieldLineColor: '#4488ff',
+      LOuter: 2.2,
+      LInner: 1.5,
+      shellOpacity: 0.08,
+      shellSize: 3.0,
+      lineOpacity: 0.35,
+    },
+  };
+
+  const config = configs[planetId];
+  if (!config) return null;
 
   const group = new THREE.Group();
   group.name = `${planetId}_magnetic_system`;
 
-  const shell = createMagnetosphereShell(radius, config.shellColor);
-  group.add(shell);
+  if (!config.isCrustal) {
+    const shell = createMagnetosphereShell(radius, config);
+    group.add(shell);
+    group.userData.magnetosphereShell = shell;
 
-  const outerAzimuths = [];
-  const innerAzimuths = [];
-  for (let i = 0; i < 8; i++) {
-    outerAzimuths.push((i / 8) * Math.PI * 2);
-    innerAzimuths.push((i / 8 + 0.0625) * Math.PI * 2);
+    const outerAzimuths = [];
+    const innerAzimuths = [];
+    for (let i = 0; i < 8; i++) {
+      outerAzimuths.push((i / 8) * Math.PI * 2);
+      innerAzimuths.push((i / 8 + 0.0625) * Math.PI * 2);
+    }
+
+    const outerLines = createFieldLineSet(radius, config.LOuter, outerAzimuths, config.fieldLineColor, config.lineOpacity);
+    const innerLines = createFieldLineSet(radius, config.LInner, innerAzimuths, config.fieldLineColor, config.lineOpacity);
+    group.add(outerLines);
+    group.add(innerLines);
+    group.userData.fieldLines = [outerLines, innerLines];
   }
-
-  const outerLines = createFieldLineSet(radius, config.LOuter, outerAzimuths, config.fieldLineColor);
-  const innerLines = createFieldLineSet(radius, config.LInner, innerAzimuths, config.fieldLineColor);
-  group.add(outerLines);
-  group.add(innerLines);
 
   group.userData.isMagneticSystem = true;
   group.userData.planetId = planetId;
-  group.userData.magnetosphereShell = shell;
-  group.userData.fieldLines = [outerLines, innerLines];
 
   return group;
 }

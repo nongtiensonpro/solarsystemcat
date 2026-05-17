@@ -74,16 +74,73 @@ export function initUI(callbacks) {
         <option value="31536000">1 Năm/s</option>
       </select>
     </div>
-    <button class="btn-icon" id="btn-visuals-toggle" title="Quỹ đạo & Nhãn tên">◎</button>
-    <button class="btn-icon" id="btn-sunlight-toggle" title="Đường ánh sáng Mặt Trời">☀️</button>
-    <button class="btn-icon" id="btn-slice-toggle" title="Tự động Cắt lớp">🔬</button>
+    <button class="btn-icon" id="btn-settings" title="Cài đặt">⚙️</button>
     <button class="btn-icon" id="btn-cinematic-toggle" title="Chế độ Điện ảnh (Tự do)">🎥</button>
-    <button class="btn-hud-icon btn-icon" id="btn-hud-toggle" title="Radar & Zoom HUD">📡</button>
-    <div class="quality-preset-group" title="Chất lượng đồ họa">
-      ${presetButtonsHTML}
-    </div>
   `;
   container.appendChild(topBar);
+
+  // ═══ Settings Panel ═══
+  const settingsPanel = document.createElement('div');
+  settingsPanel.className = 'glass-panel settings-panel';
+  settingsPanel.id = 'settings-panel';
+  settingsPanel.innerHTML = `
+    <div class="settings-header">
+      <h3>Cài đặt</h3>
+      <button class="btn-close-settings" id="btn-close-settings">✕</button>
+    </div>
+    <div class="settings-scroll">
+      <div class="settings-section">
+        <div class="settings-section-title">Chất lượng đồ họa</div>
+        <div class="settings-preset-group" id="settings-preset-group">
+          ${presetButtonsHTML}
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Hiệu ứng</div>
+        <label class="toggle-row" data-setting="visuals">
+          <span class="toggle-icon">◎</span>
+          <span class="toggle-label">Quỹ đạo & Nhãn tên</span>
+          <span class="toggle-switch active" id="toggle-visuals"></span>
+        </label>
+        <label class="toggle-row" data-setting="magnet">
+          <span class="toggle-icon">🧲</span>
+          <span class="toggle-label">Từ trường</span>
+          <span class="toggle-switch" id="toggle-magnet"></span>
+        </label>
+        <label class="toggle-row" data-setting="aurora">
+          <span class="toggle-icon">🌌</span>
+          <span class="toggle-label">Cực quang</span>
+          <span class="toggle-switch" id="toggle-aurora"></span>
+        </label>
+        <label class="toggle-row" data-setting="clouds">
+          <span class="toggle-icon">☁️</span>
+          <span class="toggle-label">Mây thể tích</span>
+          <span class="toggle-switch" id="toggle-clouds"></span>
+        </label>
+        <label class="toggle-row" data-setting="sunlight">
+          <span class="toggle-icon">☀️</span>
+          <span class="toggle-label">Đường ánh sáng Mặt Trời</span>
+          <span class="toggle-switch" id="toggle-sunlight"></span>
+        </label>
+        <label class="toggle-row" data-setting="slice">
+          <span class="toggle-icon">🔬</span>
+          <span class="toggle-label">Tự động Cắt lớp</span>
+          <span class="toggle-switch" id="toggle-slice"></span>
+        </label>
+        <label class="toggle-row" data-setting="hud">
+          <span class="toggle-icon">📡</span>
+          <span class="toggle-label">Radar & Zoom HUD</span>
+          <span class="toggle-switch" id="toggle-hud"></span>
+        </label>
+        <label class="toggle-row" data-setting="fps">
+          <span class="toggle-icon">📊</span>
+          <span class="toggle-label">Hiển thị FPS</span>
+          <span class="toggle-switch" id="toggle-fps"></span>
+        </label>
+      </div>
+    </div>
+  `;
+  container.appendChild(settingsPanel);
 
   // ═══ Search Panel ═══
   const searchPanel = document.createElement('div');
@@ -364,14 +421,13 @@ export function initUI(callbacks) {
     });
   });
 
-  // Quality Preset Buttons
-  const presetBtns = topBar.querySelectorAll('.preset-btn');
+  // Quality Preset Buttons (trong settings panel)
+  const presetBtns = settingsPanel.querySelectorAll('.preset-btn');
   presetBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.preset;
       presetBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      applyPreset(key);
+      applyPreset(btn.dataset.preset);
     });
   });
 
@@ -396,33 +452,87 @@ export function initUI(callbacks) {
     if (callbacks.onPauseToggle) callbacks.onPauseToggle(isPaused);
   });
 
-  // Visuals (Orbits & Labels) Toggle
-  const btnVisualsToggle = document.getElementById('btn-visuals-toggle');
-  btnVisualsToggle.addEventListener('click', () => {
-    const isActive = btnVisualsToggle.classList.toggle('active');
-    if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(isActive);
-    if (callbacks.onToggleLabels) callbacks.onToggleLabels(isActive);
+  // ═══ Settings Panel Toggle (mở/đóng) ═══
+  const btnSettings = document.getElementById('btn-settings');
+  const btnCloseSettings = document.getElementById('btn-close-settings');
+
+  function toggleSettingsPanel(show) {
+    settingsPanel.style.display = show ? 'flex' : 'none';
+    if (!show) {
+      settingsPanel.classList.remove('visible');
+    }
+  }
+
+  btnSettings.addEventListener('click', () => {
+    const isVisible = settingsPanel.style.display !== 'none';
+    toggleSettingsPanel(!isVisible);
   });
 
-  // Sunlight Paths Toggle
-  const btnSunlightToggle = document.getElementById('btn-sunlight-toggle');
-  btnSunlightToggle.addEventListener('click', () => {
-    const isActive = btnSunlightToggle.classList.toggle('active');
-    if (callbacks.onToggleSunlightPaths) callbacks.onToggleSunlightPaths(isActive);
-  });
+  btnCloseSettings.addEventListener('click', () => toggleSettingsPanel(false));
 
-  // Auto Slice Toggle
-  const btnSliceToggle = document.getElementById('btn-slice-toggle');
-  btnSliceToggle.addEventListener('click', () => {
-    const isActive = btnSliceToggle.classList.toggle('active');
-    if (callbacks.onToggleSlice) callbacks.onToggleSlice(isActive);
-  });
+  // ═══ Gán s? ki?n cho t?ng toggle trong settings panel ═══
+  const settingMap = {
+    visuals: {
+      on: () => {
+        if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(true);
+        if (callbacks.onToggleLabels) callbacks.onToggleLabels(true);
+      },
+      off: () => {
+        if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(false);
+        if (callbacks.onToggleLabels) callbacks.onToggleLabels(false);
+      }
+    },
+    magnet: {
+      on: () => { if (callbacks.onToggleMagneticField) callbacks.onToggleMagneticField(true); },
+      off: () => { if (callbacks.onToggleMagneticField) callbacks.onToggleMagneticField(false); }
+    },
+    aurora: {
+      on: () => { if (callbacks.onToggleAurora) callbacks.onToggleAurora(true); },
+      off: () => { if (callbacks.onToggleAurora) callbacks.onToggleAurora(false); }
+    },
+    clouds: {
+      on: () => { if (callbacks.onToggleClouds) callbacks.onToggleClouds(true); },
+      off: () => { if (callbacks.onToggleClouds) callbacks.onToggleClouds(false); }
+    },
+    sunlight: {
+      on: () => { if (callbacks.onToggleSunlightPaths) callbacks.onToggleSunlightPaths(true); },
+      off: () => { if (callbacks.onToggleSunlightPaths) callbacks.onToggleSunlightPaths(false); }
+    },
+    slice: {
+      on: () => { if (callbacks.onToggleSlice) callbacks.onToggleSlice(true); },
+      off: () => { if (callbacks.onToggleSlice) callbacks.onToggleSlice(false); }
+    },
+    hud: {
+      on: () => {
+        if (callbacks.onToggleMinimap) callbacks.onToggleMinimap(true);
+        if (callbacks.onToggleZoomIndicator) callbacks.onToggleZoomIndicator(true);
+      },
+      off: () => {
+        if (callbacks.onToggleMinimap) callbacks.onToggleMinimap(false);
+        if (callbacks.onToggleZoomIndicator) callbacks.onToggleZoomIndicator(false);
+      }
+    },
+    fps: {
+      on: () => { if (callbacks.onToggleFps) callbacks.onToggleFps(true); },
+      off: () => { if (callbacks.onToggleFps) callbacks.onToggleFps(false); }
+    }
+  };
 
-  const btnHudToggle = document.getElementById('btn-hud-toggle');
-  btnHudToggle.addEventListener('click', () => {
-    const isActive = btnHudToggle.classList.toggle('active');
-    if (callbacks.onToggleMinimap) callbacks.onToggleMinimap(isActive);
-    if (callbacks.onToggleZoomIndicator) callbacks.onToggleZoomIndicator(isActive);
+  settingsPanel.querySelectorAll('.toggle-row').forEach(row => {
+    const setting = row.dataset.setting;
+    const toggleSwitch = row.querySelector('.toggle-switch');
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.toggle-switch')) return;
+      toggleSwitch.click();
+    });
+    toggleSwitch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isActive = toggleSwitch.classList.toggle('active');
+      const action = settingMap[setting];
+      if (action) {
+        if (isActive) action.on(); else action.off();
+      }
+    });
   });
   
   // Cinematic Toggle

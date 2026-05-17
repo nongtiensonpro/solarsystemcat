@@ -20,6 +20,8 @@ const atmosphereFragmentShader = /* glsl */`
   uniform float uPower;
   uniform vec3 uSunDirection;
   uniform float uTime;
+  uniform float uSolarWind;
+  uniform float uPlanetRadius;
 
   varying vec3 vNormal;
   varying vec3 vViewDir;
@@ -39,7 +41,6 @@ const atmosphereFragmentShader = /* glsl */`
     float intensity = pow(fresnel, uPower);
 
     vec3 sunDir = normalize(uSunDirection);
-
     float cosTheta = dot(vViewDir, sunDir);
 
     float rayleighIntensity = rayleighPhase(cosTheta) * 0.6;
@@ -49,18 +50,37 @@ const atmosphereFragmentShader = /* glsl */`
     vec3 mieColor = vec3(1.0, 0.85, 0.6);
 
     float backLight = max(0.0, -cosTheta);
-    float sunAltitude = sunDir.y;
-    float sunsetFactor = smoothstep(0.0, 0.3, 1.0 - abs(sunAltitude));
-    vec3 sunsetTint = mix(vec3(1.0, 1.0, 1.0), vec3(1.0, 0.4, 0.15), sunsetFactor * 0.6);
-
     float scatterBacklight = pow(backLight, 2.0);
     float scatterFade = smoothstep(0.0, 1.0, scatterBacklight);
 
-    vec3 finalRayleigh = rayleighColor * rayleighIntensity * scatterFade * 0.5;
-    vec3 finalMie = mieColor * mieIntensity * (0.3 + 0.7 * scatterBacklight);
+    float sunAltitude = sunDir.y;
+
+    float twilightLow = -0.09;
+    float twilightHigh = 0.09;
+    float dayHigh = 0.35;
+
+    float horizonFactor = 1.0 - smoothstep(twilightLow, twilightHigh, sunAltitude);
+    float dayFactor = smoothstep(twilightLow, dayHigh, sunAltitude);
+
+    vec3 dayTint = vec3(1.0, 0.95, 0.9);
+    vec3 twilightTint = vec3(1.0, 0.35, 0.08);
+    vec3 nightTint = vec3(0.1, 0.05, 0.2);
+
+    float nightBlend = 1.0 - smoothstep(twilightLow - 0.1, twilightLow, sunAltitude);
+    vec3 sunsetTint = mix(twilightTint, dayTint, smoothstep(twilightLow, dayHigh, sunAltitude));
+    sunsetTint = mix(nightTint, sunsetTint, 1.0 - nightBlend);
+
+    float horizonGlow = exp(-abs(sunAltitude) * 15.0) * 2.0;
+    float horizonBright = 1.0 + horizonGlow * (1.0 - dayFactor);
+
+    vec3 finalRayleigh = rayleighColor * rayleighIntensity * scatterFade * 0.5 * horizonBright;
+    vec3 finalMie = mieColor * mieIntensity * (0.3 + 0.7 * scatterBacklight) * horizonBright;
 
     vec3 scatterColor = finalRayleigh + finalMie;
     scatterColor *= sunsetTint;
+
+    float windBright = 0.9 + 0.1 * uSolarWind;
+    scatterColor *= windBright;
 
     vec3 rimColor = scatterFade > 0.05
       ? mix(uColor, scatterColor, smoothstep(0.0, 0.6, scatterFade))
@@ -68,11 +88,11 @@ const atmosphereFragmentShader = /* glsl */`
 
     vec3 finalColor = mix(uColor, rimColor, intensity);
 
-    float cloudEdge = 0.0;
     float nightSide = smoothstep(-0.3, 0.2, dot(vNormal, sunDir));
     float pulse = 0.97 + 0.03 * sin(uTime * 0.3 + fresnel * 2.0);
 
-    float alpha = intensity * uOpacity * pulse * nightSide;
+    float horizonAlpha = 1.0 + horizonGlow * 0.3 * (1.0 - dayFactor);
+    float alpha = intensity * uOpacity * pulse * nightSide * horizonAlpha;
 
     gl_FragColor = vec4(finalColor, alpha);
   }
@@ -91,6 +111,8 @@ export function createAtmosphere(planetRadius, config) {
       uPower: { value: power },
       uSunDirection: { value: new THREE.Vector3(0, 0, 1) },
       uTime: { value: 0 },
+      uSolarWind: { value: 0.5 },
+      uPlanetRadius: { value: 1.0 },
     },
     side: THREE.BackSide,
     transparent: true,
@@ -123,6 +145,8 @@ export function createAtmosphereLayers(planetRadius, layers) {
         uPower: { value: layer.power },
         uSunDirection: { value: new THREE.Vector3(0, 0, 1) },
         uTime: { value: 0 },
+        uSolarWind: { value: 0.5 },
+        uPlanetRadius: { value: planetRadius },
       },
       side: layer.side === 'front' ? THREE.FrontSide : THREE.BackSide,
       transparent: true,

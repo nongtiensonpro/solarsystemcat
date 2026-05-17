@@ -100,9 +100,11 @@
         "atmosphere": "/textures/planets/venus/atmosphere.jpg"
       },
       "atmosphere": {
-        "color": "#FFA500",
-        "opacity": 0.9,
-        "power": 2.0
+        "layers": [
+          { "color": "#FF8800", "opacity": 0.6, "power": 3.0, "scale": 1.03, "scatterStrength": 0.6 },
+          { "color": "#CC6600", "opacity": 0.5, "power": 2.0, "scale": 1.08, "side": "front", "scatterStrength": 0.4 },
+          { "color": "#FFCC44", "opacity": 0.2, "power": 1.5, "scale": 1.15, "side": "front", "scatterStrength": 0.2 }
+        ]
       },
       "rings": null,
       "info": {
@@ -184,9 +186,10 @@
         "albedo": "/textures/planets/mars/albedo.jpg"
       },
       "atmosphere": {
-        "color": "#C06030",
-        "opacity": 0.2,
-        "power": 5.0
+        "layers": [
+          { "color": "#C06030", "opacity": 0.15, "power": 6.0, "scale": 1.02, "scatterStrength": 0.3 },
+          { "color": "#E08050", "opacity": 0.1, "power": 4.0, "scale": 1.05, "side": "front", "scatterStrength": 0.2 }
+        ]
       },
       "rings": null,
       "info": {
@@ -222,7 +225,13 @@
       "textures": {
         "albedo": "/textures/planets/jupiter/albedo.jpg"
       },
-      "atmosphere": null,
+      "atmosphere": {
+        "layers": [
+          { "color": "#D4A060", "opacity": 0.2, "power": 4.0, "scale": 1.04, "scatterStrength": 0.3 },
+          { "color": "#C09050", "opacity": 0.15, "power": 3.0, "scale": 1.08, "side": "front", "scatterStrength": 0.2 },
+          { "color": "#E0C080", "opacity": 0.08, "power": 2.0, "scale": 1.15, "side": "front", "scatterStrength": 0.1 }
+        ]
+      },
       "rings": null,
       "info": {
         "summaryVi": "Hành tinh lớn nhất hệ mặt trời, khối lượng gấp 318 lần Trái Đất.",
@@ -259,9 +268,11 @@
         "ring": "/textures/planets/saturn/ring.png"
       },
       "atmosphere": {
-        "color": "#C8A832",
-        "opacity": 0.15,
-        "power": 4.0
+        "layers": [
+          { "color": "#C8A832", "opacity": 0.12, "power": 5.0, "scale": 1.03, "scatterStrength": 0.3 },
+          { "color": "#D4B842", "opacity": 0.1, "power": 3.5, "scale": 1.06, "side": "front", "scatterStrength": 0.2 },
+          { "color": "#E0C860", "opacity": 0.06, "power": 2.0, "scale": 1.12, "side": "front", "scatterStrength": 0.1 }
+        ]
       },
       "rings": {
         "innerRadius": 1.2,
@@ -303,9 +314,11 @@
         "ring": "/textures/planets/uranus/ring.png"
       },
       "atmosphere": {
-        "color": "#64B5C8",
-        "opacity": 0.4,
-        "power": 3.5
+        "layers": [
+          { "color": "#64B5C8", "opacity": 0.25, "power": 4.0, "scale": 1.03, "scatterStrength": 0.4 },
+          { "color": "#84D5E0", "opacity": 0.2, "power": 3.0, "scale": 1.06, "side": "front", "scatterStrength": 0.3 },
+          { "color": "#A0E8F0", "opacity": 0.1, "power": 2.0, "scale": 1.12, "side": "front", "scatterStrength": 0.15 }
+        ]
       },
       "rings": {
         "innerRadius": 1.5,
@@ -346,9 +359,11 @@
         "albedo": "/textures/planets/neptune/albedo.jpg"
       },
       "atmosphere": {
-        "color": "#3264C8",
-        "opacity": 0.5,
-        "power": 3.5
+        "layers": [
+          { "color": "#2255BB", "opacity": 0.3, "power": 4.0, "scale": 1.03, "scatterStrength": 0.5 },
+          { "color": "#4477DD", "opacity": 0.25, "power": 3.0, "scale": 1.06, "side": "front", "scatterStrength": 0.35 },
+          { "color": "#6699EE", "opacity": 0.12, "power": 2.0, "scale": 1.12, "side": "front", "scatterStrength": 0.2 }
+        ]
       },
       "rings": null,
       "info": {

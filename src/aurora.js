@@ -46,6 +46,7 @@ const auroraFragmentShader = /* glsl */`
   uniform vec3 uColor2;
   uniform float uTime;
   uniform float uIntensity;
+  uniform float uSolarWind;
 
   varying vec3 vPosition;
   varying float vHeight;
@@ -71,24 +72,27 @@ const auroraFragmentShader = /* glsl */`
     float heightFade = 1.0 - vHeight;
     heightFade = heightFade * heightFade;
 
-    float bandNoise = noise(vec3(vAngle * 4.0, vHeight * 2.0, uTime * 0.05));
+    float windSpeed = 1.0 + uSolarWind * 0.5;
+    float windBright = 0.5 + 0.5 * uSolarWind;
+
+    float bandNoise = noise(vec3(vAngle * 4.0, vHeight * 2.0, uTime * 0.05 * windSpeed));
     float band = smoothstep(0.2, 0.6, bandNoise);
 
-    float streakNoise = noise(vec3(vAngle * 8.0, vHeight * 4.0 + uTime * 0.02, uTime * 0.03));
+    float streakNoise = noise(vec3(vAngle * 8.0, vHeight * 4.0 + uTime * 0.02 * windSpeed, uTime * 0.03 * windSpeed));
     float streaks = smoothstep(0.3, 0.7, streakNoise);
 
-    float curtain = noise(vec3(vAngle * 3.0 + uTime * 0.04, vHeight * 3.0, uTime * 0.06));
+    float curtain = noise(vec3(vAngle * 3.0 + uTime * 0.04 * windSpeed, vHeight * 3.0, uTime * 0.06 * windSpeed));
     float curtainMask = smoothstep(0.25, 0.55, curtain);
 
     vec3 color = mix(uColor1, uColor2, band);
     color += vec3(0.2, 0.1, 0.3) * streaks * 0.3;
 
-    float alpha = band * curtainMask * heightFade * uIntensity;
-    alpha *= 0.5 + 0.5 * sin(vAngle * 5.0 + uTime * 0.1 + vHeight * 2.0);
+    float alpha = band * curtainMask * heightFade * uIntensity * windBright;
+    alpha *= 0.5 + 0.5 * sin(vAngle * 5.0 + uTime * 0.1 * windSpeed + vHeight * 2.0);
 
     alpha = clamp(alpha, 0.0, 1.0);
 
-    float pulse = 0.85 + 0.15 * sin(uTime * 0.2 + vAngle * 2.0);
+    float pulse = 0.85 + 0.15 * sin(uTime * 0.2 * windSpeed + vAngle * 2.0);
     alpha *= pulse;
 
     gl_FragColor = vec4(color, alpha);
@@ -169,6 +173,7 @@ export function createAurora(radius, planetId) {
           uColor2: { value: new THREE.Color(cfg.color2) },
           uTime: { value: 0 },
           uIntensity: { value: cfg.intensity },
+          uSolarWind: { value: 0.5 },
         },
         vertexShader: auroraVertexShader,
         fragmentShader: auroraFragmentShader,
