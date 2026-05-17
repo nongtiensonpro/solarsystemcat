@@ -124,26 +124,28 @@ async function bootstrap() {
     trackedBody = nextBody;
     cinematicCamera.setTarget(trackedBody);
 
-    // Teleport camera close to the new body to prevent dark screen flying
+    // Teleport camera to the sun-lit side of the planet
     const targetWorldPos = trackedBody.pivot.getWorldPosition(new THREE.Vector3());
-    const startDist = trackedBody.data.radius * (Math.random() * 4 + 3); // 3x to 7x radius
-    const angle = Math.random() * Math.PI * 2;
-    const height = (Math.random() - 0.5) * startDist;
-    const offset = new THREE.Vector3(
-      Math.cos(angle) * startDist,
-      height,
-      Math.sin(angle) * startDist
-    );
-    camera.position.copy(targetWorldPos).add(offset);
+    const sunDir = new THREE.Vector3(0, 0, 0).sub(targetWorldPos).normalize();
+    const startDist = trackedBody.data.radius * (Math.random() * 4 + 3);
 
-    // Pick a shot tailored to planet type
+    // Generate random offset but guarantee it faces the sun
+    const randomDir = new THREE.Vector3(
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2
+    ).normalize().multiplyScalar(startDist);
+    if (randomDir.dot(sunDir) < 0) randomDir.reflect(sunDir);
+    camera.position.copy(targetWorldPos).add(randomDir);
+
+    // Pick a shot tailored to planet type — sunOrbit always looks at the lit side
     const isGasGiant = trackedBody.data.type === 'gas-giant' || trackedBody.data.type === 'ice-giant';
     const shots = isGasGiant
-      ? ['orbit', 'flyBy', 'dollyZoom']
-      : ['orbit', 'flyBy', 'chase', 'dollyZoom'];
+      ? ['sunOrbit', 'orbit', 'flyBy', 'dollyZoom']
+      : ['sunOrbit', 'orbit', 'flyBy', 'chase', 'dollyZoom'];
     const weights = isGasGiant
-      ? [0.45, 0.35, 0.2]
-      : [0.3, 0.3, 0.25, 0.15];
+      ? [0.35, 0.3, 0.25, 0.1]
+      : [0.3, 0.25, 0.2, 0.15, 0.1];
     let randomVal = Math.random();
     let selectedShot = shots[0];
     for (let i = 0; i < shots.length; i++) {
@@ -160,10 +162,11 @@ async function bootstrap() {
       : [35, 50, 85, 135];
     const selectedLens = lenses[Math.floor(Math.random() * lenses.length)];
 
-    // Base configuration
+    // Base configuration — handheld disabled, always face the lit side
     const shotParams = {
-      handheld: Math.random() < 0.4,
-      dutchAngle: (Math.random() - 0.5) * 0.15
+      handheld: false,
+      dutchAngle: (Math.random() - 0.5) * 0.12,
+      sunDir: sunDir
     };
 
     // Rule of Thirds framing (30% chance)
@@ -174,27 +177,43 @@ async function bootstrap() {
       };
     }
 
-    // Shot specific params
+    // Shot specific params — all biased toward the sun-lit side
     if (selectedShot === 'flyBy') {
       shotParams.duration = 12 + Math.random() * 8;
       shotParams.dutchAngle = (Math.random() - 0.5) * 0.4;
     }
     if (selectedShot === 'chase') {
-      const chaseOffset = trackedBody.data.radius * (2 + Math.random() * 2);
-      shotParams.offset = new THREE.Vector3(chaseOffset * 0.3, chaseOffset * 0.2, chaseOffset);
+      const chaseDist = trackedBody.data.radius * (2 + Math.random() * 2);
+      // Offset the chase camera toward the sun-lit side
+      shotParams.offset = new THREE.Vector3(
+        sunDir.x * chaseDist * 0.3,
+        sunDir.y * chaseDist * 0.2 + chaseDist * 0.15,
+        sunDir.z * chaseDist * 0.3
+      );
     }
     if (selectedShot === 'orbit') {
-      shotParams.radius = isGasGiant
+      const orbitRadius = isGasGiant
         ? trackedBody.data.radius * (4 + Math.random() * 6)
         : trackedBody.data.radius * (2.5 + Math.random() * 4);
+      shotParams.radius = orbitRadius;
       shotParams.speed = 0.04 + Math.random() * 0.08;
       shotParams.height = (Math.random() - 0.5) * trackedBody.data.radius * 1.5;
+      // Shift orbit center toward the sun so camera stays on the lit side
+      shotParams.orbitCenterOffset = sunDir.clone().multiplyScalar(orbitRadius * 0.35);
+    }
+    if (selectedShot === 'sunOrbit') {
+      shotParams.radius = isGasGiant
+        ? trackedBody.data.radius * (5 + Math.random() * 8)
+        : trackedBody.data.radius * (3 + Math.random() * 5);
+      shotParams.speed = 0.08 + Math.random() * 0.1;
     }
     if (selectedShot === 'dollyZoom') {
       shotParams.duration = 14 + Math.random() * 6;
       shotParams.startFov = Math.random() > 0.5 ? 120 : 24;
       shotParams.endFov = shotParams.startFov === 120 ? 24 : 120;
       shotParams.startDist = trackedBody.data.radius * 4;
+      // Point dolly toward the sun-lit side
+      shotParams.startDir = sunDir.clone().negate();
     }
 
     cinematicCamera.setShotPreset(selectedShot, shotParams);
@@ -953,13 +972,17 @@ async function bootstrap() {
       camera.position.lerpVectors(flyStartPos, flyEndPos, ease);
       controls.target.lerpVectors(flyStartTarget, flyEndTarget, ease);
 
-      // Phase 6: Cinematic FOV Pulse during fly
-      const fovEffect = Math.sin(ease * Math.PI) * 10; 
-      camera.fov = 45 + fovEffect; 
-      camera.updateProjectionMatrix();
+      // Only override FOV when cinematic camera is NOT active
+      if (!cinematicCamera.isActive()) {
+        const fovEffect = Math.sin(ease * Math.PI) * 10;
+        camera.fov = 45 + fovEffect;
+        camera.updateProjectionMatrix();
+      }
     } else {
-      camera.fov = 45;
-      camera.updateProjectionMatrix();
+      if (!cinematicCamera.isActive()) {
+        camera.fov = 45;
+        camera.updateProjectionMatrix();
+      }
 
       if (cameraMode === 'follow' && trackedBody) {
         const targetPos = new THREE.Vector3();

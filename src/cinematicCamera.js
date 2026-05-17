@@ -182,19 +182,32 @@ export function createCinematicCameraController(camera, controls, domElement) {
     if (mode === 'flyBy' && targetBody) {
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
       const radius = targetBody.data.radius * 5;
-      
-      // Create a smooth curve passing near the planet
-      const p1 = targetPos.clone().add(new THREE.Vector3(-radius * 5, radius * 2, radius * 3));
-      const p2 = targetPos.clone().add(new THREE.Vector3(0, radius * 0.5, radius * 2));
-      const p3 = targetPos.clone().add(new THREE.Vector3(radius * 5, radius * 0.5, -radius * 3));
-      
+      const sunDir = shotParams.sunDir || new THREE.Vector3(0, 0, -1);
+
+      // Build basis aligned with sun direction for lit-side flyby
+      const ref = Math.abs(sunDir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+      const right = new THREE.Vector3().crossVectors(sunDir, ref).normalize();
+      const up = new THREE.Vector3().crossVectors(right, sunDir).normalize();
+
+      // Curve passes through the sun-lit side of the planet
+      const p1 = targetPos.clone()
+        .add(right.clone().multiplyScalar(-radius * 5))
+        .add(up.clone().multiplyScalar(radius * 1.5))
+        .add(sunDir.clone().multiplyScalar(radius * 4));
+      const p2 = targetPos.clone()
+        .add(sunDir.clone().multiplyScalar(radius * 2.5));
+      const p3 = targetPos.clone()
+        .add(right.clone().multiplyScalar(radius * 5))
+        .add(up.clone().multiplyScalar(radius * 0.8))
+        .add(sunDir.clone().multiplyScalar(-radius * 3));
+
       shotParams.curve = new THREE.CatmullRomCurve3([p1, p2, p3]);
       shotParams.duration = params.duration || 10;
     }
 
     if (mode === 'dollyZoom' && targetBody) {
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
-      const startDir = new THREE.Vector3().subVectors(camera.position, targetPos).normalize();
+      const startDir = shotParams.startDir || new THREE.Vector3().subVectors(camera.position, targetPos).normalize();
       if (startDir.lengthSq() < 0.1) startDir.set(0, 0, 1);
       shotParams.startDir = startDir;
     }
@@ -234,6 +247,9 @@ export function createCinematicCameraController(camera, controls, domElement) {
         break;
       case 'dollyZoom':
         handleDollyZoom(deltaTime);
+        break;
+      case 'sunOrbit':
+        handleSunOrbit(deltaTime);
         break;
     }
 
@@ -300,9 +316,14 @@ export function createCinematicCameraController(camera, controls, domElement) {
     const x = Math.cos(angle) * (shotParams.radius || 100);
     const z = Math.sin(angle) * (shotParams.radius || 100);
     
-    const targetCamPos = targetPos.clone().add(new THREE.Vector3(x, shotParams.height || 0, z));
-    // Direct position for buttery smooth circular motion
-    camera.position.copy(targetCamPos);
+    let targetCamPos = targetPos.clone().add(new THREE.Vector3(x, shotParams.height || 0, z));
+    // Shift orbit center toward the sun so camera stays on lit side
+    if (shotParams.orbitCenterOffset) {
+      targetCamPos.add(shotParams.orbitCenterOffset);
+    }
+    // Smooth blend for first second to avoid initial snap
+    const blend = Math.min(1, shotTime * 3);
+    camera.position.lerp(targetCamPos, blend);
   }
 
   function handleFlyBy(deltaTime) {
@@ -357,8 +378,42 @@ export function createCinematicCameraController(camera, controls, domElement) {
     }
   }
 
+  function handleSunOrbit(deltaTime) {
+    if (!targetBody) return;
+    const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+    const sunDir = new THREE.Vector3(0, 0, 0).sub(targetPos).normalize();
+
+    const baseRadius = shotParams.radius || targetBody.data.radius * 5;
+    const speed = shotParams.speed || 0.12;
+
+    // Spherical cap on the lit hemisphere — oscillate theta, rotate phi
+    const thetaBase = Math.PI * 0.3;
+    const thetaOsc = 0.25;
+    const theta = thetaBase + Math.sin(shotTime * speed * 1.7) * thetaOsc;
+    const phi = shotTime * speed * 0.8;
+
+    // Build local coordinate system aligned with sun direction
+    const ref = Math.abs(sunDir.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+    const right = new THREE.Vector3().crossVectors(sunDir, ref).normalize();
+    const up = new THREE.Vector3().crossVectors(right, sunDir).normalize();
+
+    // Gentle distance oscillation + height variation
+    const distOsc = Math.sin(shotTime * speed * 1.3) * baseRadius * 0.08;
+    const dist = baseRadius + distOsc;
+    const heightOffset = Math.sin(shotTime * speed * 0.9) * baseRadius * 0.15;
+
+    const camPos = targetPos.clone()
+      .addScaledVector(sunDir, Math.cos(theta) * dist)
+      .addScaledVector(right, Math.sin(theta) * Math.cos(phi) * dist)
+      .addScaledVector(up, Math.sin(theta) * Math.sin(phi) * dist + heightOffset);
+
+    // Smooth blend for first second
+    const blend = Math.min(1, shotTime * 3);
+    camera.position.lerp(camPos, blend);
+  }
+
   function applyTransform(deltaTime) {
-    if ((mode === 'targetLock' || mode === 'orbit' || mode === 'flyBy' || mode === 'chase' || mode === 'dollyZoom') && targetBody) {
+    if ((mode === 'targetLock' || mode === 'orbit' || mode === 'flyBy' || mode === 'chase' || mode === 'dollyZoom' || mode === 'sunOrbit') && targetBody) {
       // Look at target body
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
       
@@ -377,13 +432,12 @@ export function createCinematicCameraController(camera, controls, domElement) {
       // Combine manual roll and Dutch Angle
       const currentRoll = roll + (shotParams.dutchAngle || 0);
       
-      // Handheld / Zero-G floating camera shake
+      // Handheld camera micro-shake — very subtle to avoid nausea
       if (shotParams.handheld) {
-         // Subtle perlin-like noise using sine waves
          const time = shotTime;
-         const shakeX = Math.sin(time * 1.5) * 0.002 + Math.sin(time * 3.1) * 0.001;
-         const shakeY = Math.cos(time * 1.3) * 0.002 + Math.sin(time * 2.7) * 0.001;
-         const shakeZ = Math.sin(time * 0.8) * 0.005;
+         const shakeX = Math.sin(time * 1.5) * 0.0006 + Math.sin(time * 3.1) * 0.0003;
+         const shakeY = Math.cos(time * 1.3) * 0.0006 + Math.sin(time * 2.7) * 0.0003;
+         const shakeZ = Math.sin(time * 0.8) * 0.001;
          
          const shakeQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(shakeX, shakeY, shakeZ));
          targetQuat.multiply(shakeQuat);

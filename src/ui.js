@@ -274,6 +274,7 @@ export function initUI(callbacks) {
         <button class="cine-btn" data-shot="orbit">Bay vòng</button>
         <button class="cine-btn" data-shot="flyBy">Lướt qua</button>
         <button class="cine-btn" data-shot="chase">Bám đuổi</button>
+        <button class="cine-btn" data-shot="sunOrbit">☀ Bay quanh Mặt Trời</button>
       </div>
     </div>
 
