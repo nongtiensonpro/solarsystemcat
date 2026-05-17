@@ -27,7 +27,7 @@ async function bootstrap() {
 
   // 1. Kh?i t?o canvas v? scene
   const canvas = document.querySelector('canvas.webgl');
-  const { scene, camera, renderer, controls } = initScene(canvas);
+  const { scene, camera, renderer, controls, sunLightPrimary, sunLightFill, hemiLight } = initScene(canvas);
 
   // 1b. Kh?i t?o post-processing (Sun Bloom)
   const { composer, bloomPass } = initPostProcessing(renderer, scene, camera);
@@ -322,6 +322,9 @@ async function bootstrap() {
       const zoom = document.getElementById('zoom-indicator');
       if (zoom) zoom.style.display = enabled ? 'flex' : 'none';
     },
+    onToggleSunlightPaths: (enabled) => {
+      toggleSunlightPaths(enabled);
+    },
     onToggleCinematic: (enabled) => {
       if (enabled) {
         cinematicCamera.setTarget(trackedBody);
@@ -434,6 +437,34 @@ async function bootstrap() {
   const asteroidBelt = createAsteroidBelt(5000);
   scene.add(asteroidBelt.mesh);
 
+  // Phase 4.2: Light Direction Indicators — đường mờ từ hành tinh về Mặt Trời
+  const sunlightPaths = [];
+  function createSunlightPaths() {
+    for (const body of bodies) {
+      if (body.data.type === 'star') continue;
+      const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0)];
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({
+        color: 0xffdd88,
+        transparent: true,
+        opacity: 0.08,
+        depthWrite: false,
+      });
+      const line = new THREE.Line(geometry, material);
+      line.visible = false; // Ẩn mặc định
+      scene.add(line);
+      sunlightPaths.push({ line, body });
+    }
+  }
+  createSunlightPaths();
+
+  // Toggle function cho sunlight paths
+  function toggleSunlightPaths(visible) {
+    for (const sp of sunlightPaths) {
+      sp.line.visible = visible;
+    }
+  }
+
   // 5b. ?p d?ng preset hi?n t?i cho atmosphere/cloud/corona visibility
   function applyPresetToEffects(preset) {
     // C?p nh?t s? l??ng ti?u h?nh tinh
@@ -461,9 +492,19 @@ async function bootstrap() {
         body.atmosphereTextureMesh.visible = preset.atmosphereEnabled;
       }
 
-      // Corona visibility
+      // Corona visibility — Mặt Trời luôn ở chất lượng thấp, không phụ thuộc preset
       if (body.coronaMesh) {
-        body.coronaMesh.visible = preset.coronaEnabled;
+        body.coronaMesh.visible = true;
+      }
+
+      // Phase 5.2: Outer Glow visibility — luôn hiển thị
+      if (body.outerGlowMesh) {
+        body.outerGlowMesh.visible = true;
+      }
+
+      // Sun Glow Sprite — luôn hiển thị
+      if (body.sunGlowSprite) {
+        body.sunGlowSprite.visible = true;
       }
 
       // Ring visibility
@@ -535,6 +576,21 @@ async function bootstrap() {
 
   // Ghost Moon System interaction removed as per user request (moved to Info Panel)
 
+  // ── Phase 3.1: Adaptive Exposure (Logarithmic Compensation)
+  // Tự động tăng phơi sáng khi camera zoom xa — bù đắp inverse-square light decay
+  function updateSunlightExposure() {
+    const dist = camera.position.length();
+    const normalized = dist / 4500; // Neptune ≈ 1.0
+    // log1p(0) = 0 → exposure = 1.0 (gần Mặt Trời)
+    // log1p(1) ≈ 0.693 → exposure ≈ 1.55 (Neptune)
+    const exposure = THREE.MathUtils.clamp(
+      1.0 + Math.log1p(normalized) * 0.8,
+      1.0,
+      2.5
+    );
+    renderer.toneMappingExposure = exposure;
+  }
+
   function animate() {
     requestAnimationFrame(animate);
 
@@ -604,14 +660,24 @@ async function bootstrap() {
         );
       }
 
-      if (body.coronaMesh?.material.userData?.isSunCoronaShader) {
-        body.coronaMesh.material.uniforms.uTime.value += deltaTime;
-        body.coronaMesh.rotation.y += deltaTime * 0.03;
+      // Phase 6: Multi-layer corona — animate mỗi layer với tốc độ khác nhau
+      if (body.coronaMesh && body.coronaMesh.isGroup) {
+        body.coronaMesh.children.forEach((layer, i) => {
+          if (layer.material?.userData?.isSunCoronaShader) {
+            layer.material.uniforms.uTime.value += deltaTime * (0.3 + i * 0.1);
+          }
+        });
+        body.coronaMesh.rotation.y += deltaTime * 0.02;
       }
 
       // D2. C?p nh?t s?c quy?n (chromosphere)
       if (body.chromosphereMesh?.material.userData?.isSunChromosphereShader) {
         body.chromosphereMesh.material.uniforms.uTime.value += deltaTime;
+      }
+
+      // Phase 5.2: C?p nh?t outer glow
+      if (body.outerGlowMesh?.material.userData?.isSunOuterGlowShader) {
+        body.outerGlowMesh.material.uniforms.uTime.value += deltaTime;
       }
 
       // D3. C?p nh?t t? tr??ng
@@ -809,12 +875,32 @@ async function bootstrap() {
     }
     frameCount++;
 
+    // Phase 4.2: Update sunlight path positions
+    if (frameCount % 3 === 0) { // Throttle: update mỗi 3 frame
+      for (const sp of sunlightPaths) {
+        if (!sp.line.visible) continue;
+        const worldPos = new THREE.Vector3();
+        sp.body.pivot.getWorldPosition(worldPos);
+        const positions = sp.line.geometry.attributes.position.array;
+        positions[0] = worldPos.x;
+        positions[1] = worldPos.y;
+        positions[2] = worldPos.z;
+        positions[3] = 0; // Sun at origin
+        positions[4] = 0;
+        positions[5] = 0;
+        sp.line.geometry.attributes.position.needsUpdate = true;
+      }
+    }
+
     // C?p nh?t v?nh ?ai ti?u h?nh tinh
     asteroidBelt.update(simulationTime, deltaTime);
 
     // C?p nh?t Minimap & Zoom Indicator
     updateMinimap();
     updateZoomIndicator();
+
+    // Phase 3.1: Adaptive Exposure
+    updateSunlightExposure();
 
     // K?t xu?t qua post-processing pipeline (bloom)
     composer.render();

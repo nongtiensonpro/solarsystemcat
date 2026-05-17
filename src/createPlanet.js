@@ -1,10 +1,10 @@
 // Factory function tạo thiên thể với hệ phân cấp Pivot → Tilt → Mesh
 import * as THREE from 'three';
-import { AU } from './constants.js';
+import { AU, BLOOM_LAYER } from './constants.js';
 import { createAtmosphere } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
-import { createSunCorona, createSunSurfaceMaterial, createChromosphere } from './sun.js';
+import { createSunCorona, createSunSurfaceMaterial, createChromosphere, createSunOuterGlow } from './sun.js';
 import { createCometTail, createCometComa } from './comets.js';
 import { createMagneticField } from './magneticField.js';
 import { createHeliumRain } from './heliumRain.js';
@@ -35,6 +35,47 @@ function createVenusAtmosphereShell(radius, oblateness, atmosphereTexture, segme
   shell.name = 'venus_atmosphere_texture';
   shell.scale.set(radius, radius * (1 - oblateness), radius);
   return shell;
+}
+
+/**
+ * Tạo Sun Glow Sprite — radial gradient phát sáng quanh Mặt Trời
+ * Luôn nhìn thấy ở mọi khoảng cách, giúp user nhận diện nguồn sáng trung tâm
+ */
+function createSunGlowSprite(radius) {
+  const canvas = document.createElement('canvas');
+  const size = 256;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Radial gradient: rất mềm, fade đều ra ngoài, không viền cứng
+  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gradient.addColorStop(0, 'rgba(255, 230, 150, 0.35)');
+  gradient.addColorStop(0.1, 'rgba(255, 220, 120, 0.25)');
+  gradient.addColorStop(0.3, 'rgba(255, 200, 80, 0.12)');
+  gradient.addColorStop(0.6, 'rgba(255, 170, 50, 0.04)');
+  gradient.addColorStop(1, 'rgba(255, 140, 30, 0.0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      color: 0xffdd88,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    })
+  );
+  sprite.name = 'sun_glow';
+  // Scale lớn, mềm — blend với corona
+  const glowSize = radius * 16;
+  sprite.scale.set(glowSize, glowSize, 1);
+
+  return sprite;
 }
 
 /**
@@ -100,6 +141,13 @@ export function createPlanet(data) {
       pbrRoughness = 0.95; // Lõi sao chổi carbon tối màu
     }
 
+    // Phase 3.2: Planet Material Brightness — hành tinh xa nhận ít ánh sáng
+    // nên giảm roughness + emissive nhẹ để "bắt sáng" tốt hơn
+    const orbitDist = data.displayOrbitRadius ?? 0;
+    if (orbitDist > 2000) {
+      pbrRoughness = Math.max(0.3, pbrRoughness * 0.7);
+    }
+
     // 3. Thi?t l?p Emissive (Ph?t s?ng t? th?n)
     // T?ng c??ng ?? nh?n r? b? m?t k? c? ? m?t t?i (Phase 9 UX Optimization)
     let emissiveColor = new THREE.Color(0x000000);
@@ -129,6 +177,12 @@ export function createPlanet(data) {
       finalEmissiveMap = textures.albedo;
       emissiveColor = new THREE.Color(0x555555); // Màu xám trung tính sáng hơn
       emissiveInt = 0.45; // Tăng mạnh độ sáng để texture hiện rõ mồn một
+    }
+
+    // Phase 3.2: Hành tinh xa → emissive ấm nhẹ bù đắp vùng tối
+    if (orbitDist > 2000 && emissiveColor.getHex() === 0x000000) {
+      emissiveColor = new THREE.Color(0x332200);
+      emissiveInt = 0.15;
     }
 
     // Tùy chỉnh bump / normal scale (đặc biệt cho Mimas - Herschel crater)
@@ -194,13 +248,32 @@ export function createPlanet(data) {
   // 4b. Corona và Chromosphere riêng cho Mặt Trời
   let coronaMesh = null;
   let chromosphereMesh = null;
+  let sunGlowSprite = null;
+  let outerGlowMesh = null;
   if (data.type === 'star') {
+    // Gán Mặt Trời vào BLOOM_LAYER để selective bloom
+    lod.layers.enable(BLOOM_LAYER);
+
+    // Phase 6: Multi-layer corona — Group chứa 3 layers
     coronaMesh = createSunCorona(r, ob);
+    coronaMesh.traverse((child) => {
+      if (child.isMesh) child.layers.enable(BLOOM_LAYER);
+    });
     tiltGroup.add(coronaMesh);
 
     // Lớp sắc quyển (chromosphere) — H-alpha đỏ-hồng giữa bề mặt và corona
     chromosphereMesh = createChromosphere(r, ob);
+    chromosphereMesh.layers.enable(BLOOM_LAYER);
     tiltGroup.add(chromosphereMesh);
+
+    // Phase 5.2: Outer Glow — lớp sáng rộng ngoài cùng (2.0x radius)
+    outerGlowMesh = createSunOuterGlow(r, ob);
+    outerGlowMesh.layers.enable(BLOOM_LAYER);
+    tiltGroup.add(outerGlowMesh);
+
+    // Phase 4.1: Sun Glow Sprite — luôn nhìn thấy dù ở khoảng cách nào
+    sunGlowSprite = createSunGlowSprite(r);
+    tiltGroup.add(sunGlowSprite);
   }
 
   // 4c. Lớp mây dày của Sao Kim che gần toàn bộ surface texture.
@@ -335,6 +408,8 @@ export function createPlanet(data) {
     cloudMesh,
     coronaMesh,
     chromosphereMesh,
+    outerGlowMesh,
+    sunGlowSprite,
     tailMesh,
     comaMesh,
     magneticFieldMesh,

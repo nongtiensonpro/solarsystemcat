@@ -75,6 +75,7 @@ export function initUI(callbacks) {
       </select>
     </div>
     <button class="btn-icon" id="btn-visuals-toggle" title="Quỹ đạo & Nhãn tên">◎</button>
+    <button class="btn-icon" id="btn-sunlight-toggle" title="Đường ánh sáng Mặt Trời">☀️</button>
     <button class="btn-icon" id="btn-slice-toggle" title="Tự động Cắt lớp">🔬</button>
     <button class="btn-icon" id="btn-cinematic-toggle" title="Chế độ Điện ảnh (Tự do)">🎥</button>
     <button class="btn-hud-icon btn-icon" id="btn-hud-toggle" title="Radar & Zoom HUD">📡</button>
@@ -401,6 +402,13 @@ export function initUI(callbacks) {
     const isActive = btnVisualsToggle.classList.toggle('active');
     if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(isActive);
     if (callbacks.onToggleLabels) callbacks.onToggleLabels(isActive);
+  });
+
+  // Sunlight Paths Toggle
+  const btnSunlightToggle = document.getElementById('btn-sunlight-toggle');
+  btnSunlightToggle.addEventListener('click', () => {
+    const isActive = btnSunlightToggle.classList.toggle('active');
+    if (callbacks.onToggleSunlightPaths) callbacks.onToggleSunlightPaths(isActive);
   });
 
   // Auto Slice Toggle

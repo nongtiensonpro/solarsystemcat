@@ -47,24 +47,36 @@ export function initScene(canvas) {
   controls.maxDistance = 50000;
   controls.minDistance = 0.2;
 
-  // 5. Lighting
-  // Ánh sáng môi trường - Tăng mạnh lên 0.45 để làm sáng toàn bộ hệ thống
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
-  scene.add(ambientLight);
+  // 5. Lighting — Multi-Layer Sunlight System (Phase 1)
 
-  // Ánh sáng điểm từ Mặt Trời - Tăng lên 80000 để chiếu sáng cực mạnh
-  const sunLight = new THREE.PointLight(0xfff5e0, 80000, 0); 
-  sunLight.position.set(0, 0, 0);
-  
+  // ── Hemisphere Light: ánh sáng tán xạ từ không gian
+  // Sky = hướng Mặt Trời (ấm), ground = không gian sâu (tối)
+  const hemiLight = new THREE.HemisphereLight(0xfff0cc, 0x080815, 0.25);
+  scene.add(hemiLight);
+
+  // ── Primary PointLight: inverse-square (decay=2), physically correct cho vùng gần
+  // Cường độ 80000, decay mặc định 2 — chi tiết & shadow
+  const sunLightPrimary = new THREE.PointLight(0xfff5e0, 80000, 0);
+  sunLightPrimary.position.set(0, 0, 0);
+  sunLightPrimary.decay = 2; // Mặc định Three.js (inverse-square)
+
   // Shadow config cho Sun
-  sunLight.castShadow = true;
-  sunLight.shadow.mapSize.width = 2048;
-  sunLight.shadow.mapSize.height = 2048;
-  sunLight.shadow.camera.near = 0.5;
-  sunLight.shadow.camera.far = 100000;
-  sunLight.shadow.bias = -0.0001; // Giảm shadow acne
+  sunLightPrimary.castShadow = true;
+  sunLightPrimary.shadow.mapSize.width = 2048;
+  sunLightPrimary.shadow.mapSize.height = 2048;
+  sunLightPrimary.shadow.camera.near = 0.5;
+  sunLightPrimary.shadow.camera.far = 100000;
+  sunLightPrimary.shadow.bias = -0.0001;
 
-  scene.add(sunLight);
+  scene.add(sunLightPrimary);
+
+  // ── Secondary Fill Light: decay thấp (0.8) để vùng xa vẫn nhận ánh sáng
+  // Cường độ thấp hơn nhưng giảm chậm hơn → bù đắp ở khoảng cách lớn
+  const sunLightFill = new THREE.PointLight(0xffeedd, 8000, 0);
+  sunLightFill.position.set(0, 0, 0);
+  sunLightFill.decay = 0.8; // Custom decay: giảm chậm hơn inverse-square
+
+  scene.add(sunLightFill);
 
   // 6. Xử lý Resize
   window.addEventListener('resize', () => {
@@ -86,7 +98,7 @@ export function initScene(canvas) {
     starMesh = createStarfield(scene, newPreset.starCount);
   });
 
-  return { scene, camera, renderer, controls };
+  return { scene, camera, renderer, controls, sunLightPrimary, sunLightFill, hemiLight };
 }
 
 /**

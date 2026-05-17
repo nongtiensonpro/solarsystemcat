@@ -109,7 +109,8 @@ const sunSurfaceFragmentShader = /* glsl */`
 `;
 
 // ═══════════════════════════════════════════════════════════════
-// Corona Shader
+// Corona Shader — Single Shader + Noise Distortion (Outer Edge Only)
+// Noise chỉ distort phần fade ra ngoài, KHÔNG động đến phần sáng gần mặt trời
 // ═══════════════════════════════════════════════════════════════
 
 const sunCoronaVertexShader = /* glsl */`
@@ -128,36 +129,67 @@ const sunCoronaVertexShader = /* glsl */`
 
 const sunCoronaFragmentShader = /* glsl */`
   uniform vec3 uInnerColor;
+  uniform vec3 uMidColor;
   uniform vec3 uOuterColor;
   uniform float uTime;
+  uniform float uOpacity;
 
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewDir;
 
-  float hash(float n) { return fract(sin(n) * 43758.5453123); }
-  float noise(vec3 x) {
-    vec3 p = floor(x);
-    vec3 f = fract(x);
-    f = f * f * (3.0 - 2.0 * f);
-    float n = p.x + p.y * 57.0 + 113.0 * p.z;
-    return mix(mix(mix(hash(n), hash(n+1.0), f.x),
-                   mix(hash(n+57.0), hash(n+58.0), f.x), f.y),
-               mix(mix(hash(n+113.0), hash(n+114.0), f.x),
-                   mix(hash(n+170.0), hash(n+171.0), f.x), f.y), f.z);
+  // ── Noise functions ──
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+      mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+      u.y
+    );
+  }
+
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) {
+      v += a * valueNoise(p);
+      p *= 2.1;
+      a *= 0.5;
+    }
+    return v;
   }
 
   void main() {
-    float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
-    float t = rim; 
-    float falloff = pow(1.0 - t, 3.0);
-    float streamers = pow(1.0 - t, 4.0) * (0.8 + 0.2 * noise(vec3(vUv * 8.0, uTime * 0.1)));
-    
-    vec3 color = mix(uInnerColor, uOuterColor, t);
-    float alpha = (falloff * 0.7 + streamers * 0.3) * smoothstep(1.0, 0.8, t);
-    vec3 finalColor = color * (1.0 + streamers * 1.5);
+    float fresnel = 1.0 - abs(dot(vNormal, normalize(vViewDir)));
 
-    gl_FragColor = vec4(finalColor * 0.8, alpha);
+    // Noise trên sphere coords, rotate rất chậm
+    vec2 noiseUV = vNormal.xy * 3.5 + uTime * 0.04;
+    float n = fbm(noiseUV);
+
+    // Mask: noise chỉ active ở vùng ngoại vi (fresnel thấp)
+    // fresnel > 0.65 → mask = 0 → cạnh gần sun vẫn tròn
+    // fresnel < 0.25 → mask = 1 → outer edge bị irregular
+    float edgeMask = 1.0 - smoothstep(0.25, 0.65, fresnel);
+    float noisedFresnel = fresnel + (n - 0.5) * 0.22 * edgeMask;
+    noisedFresnel = clamp(noisedFresnel, 0.0, 1.0);
+
+    // Alpha: falloff mượt
+    float alpha = pow(noisedFresnel, 2.2) * uOpacity;
+
+    // Màu: 3 điểm gradient theo fresnel gốc (không dùng noisedFresnel)
+    vec3 color = mix(uOuterColor, uMidColor, smoothstep(0.0, 0.4, fresnel));
+    color = mix(color, uInnerColor, smoothstep(0.3, 0.8, fresnel));
+
+    // Streamer: thêm noise vào color để tạo vệt sáng/tối
+    float streamer = fbm(noiseUV * 1.5 + 0.5) * 0.18;
+    color += vec3(streamer * 0.9, streamer * 0.4, 0.0);
+
+    gl_FragColor = vec4(color, alpha);
   }
 `;
 
@@ -182,9 +214,11 @@ const chromosphereFragmentShader = /* glsl */`
   varying vec3 vNormal;
   varying vec3 vViewDir;
   void main() {
-    float rim = 1.0 - max(dot(vViewDir, vNormal), 0.0);
-    float intensity = pow(rim, 15.0) * (1.0 - pow(rim, 2.0));
-    gl_FragColor = vec4(uColor * intensity * 5.0, intensity * 0.6);
+    float rim = 1.0 - abs(dot(vNormal, normalize(vViewDir)));
+    // Mềm hơn: giảm exponent từ 15 → 8, fade mượt
+    float intensity = pow(rim, 8.0) * (1.0 - pow(rim, 3.0));
+    float pulse = 0.96 + 0.04 * sin(uTime * 0.4);
+    gl_FragColor = vec4(uColor * intensity * 3.0 * pulse, intensity * 0.4 * pulse);
   }
 `;
 
@@ -199,26 +233,53 @@ export function createSunSurfaceMaterial(albedoTexture, fallbackColor) {
   return material;
 }
 
+/**
+ * Corona — 2 layers: inner corona + outer halo
+ * Dùng single shader với noise distortion chỉ ở outer edge
+ * @param {number} radius
+ * @param {number} oblateness
+ * @returns {THREE.Group}
+ */
 export function createSunCorona(radius, oblateness = 0) {
-  const geometry = new THREE.SphereGeometry(1.3, 96, 96);
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uInnerColor: { value: new THREE.Color(0xffe8a0) }, 
-      uOuterColor: { value: new THREE.Color(0xffc040) }, 
-      uTime: { value: 0 },
-    },
-    vertexShader: sunCoronaVertexShader,
-    fragmentShader: sunCoronaFragmentShader,
-    side: THREE.BackSide,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
+  const layers = [
+    { scale: 1.35, opacity: 0.88 },  // Inner: sáng, noise vừa
+    { scale: 1.75, opacity: 0.22 },  // Outer halo: rất mờ, noise mạnh
+  ];
+
+  const group = new THREE.Group();
+  group.name = 'sun_corona_group';
+
+  layers.forEach((cfg, i) => {
+    const geometry = new THREE.SphereGeometry(1, 64, 64);
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uInnerColor: { value: new THREE.Color(0xfff5cc) },
+        uMidColor:   { value: new THREE.Color(0xff8c22) },
+        uOuterColor: { value: new THREE.Color(0xe64400) },
+        uTime:       { value: 0 },
+        uOpacity:    { value: cfg.opacity },
+      },
+      vertexShader: sunCoronaVertexShader,
+      fragmentShader: sunCoronaFragmentShader,
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    material.userData.isSunCoronaShader = true;
+    material.userData.layerIndex = i;
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `sun_corona_layer_${i}`;
+    mesh.scale.set(
+      radius * cfg.scale,
+      radius * cfg.scale * (1 - oblateness),
+      radius * cfg.scale
+    );
+    group.add(mesh);
   });
-  material.userData.isSunCoronaShader = true;
-  const coronaMesh = new THREE.Mesh(geometry, material);
-  coronaMesh.name = 'sun_corona';
-  coronaMesh.scale.set(radius, radius * (1 - oblateness), radius);
-  return coronaMesh;
+
+  return group;
 }
 
 export function createChromosphere(radius, oblateness = 0) {
@@ -235,6 +296,64 @@ export function createChromosphere(radius, oblateness = 0) {
   material.userData.isSunChromosphereShader = true;
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'sun_chromosphere';
+  mesh.scale.set(radius, radius * (1 - oblateness), radius);
+  return mesh;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 5.2: Outer Glow Layer — vùng sáng rộng bao quanh Mặt Trời
+// ═══════════════════════════════════════════════════════════════
+
+const outerGlowVertexShader = /* glsl */`
+  varying vec3 vNormal;
+  varying vec3 vViewDir;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vViewDir = normalize(cameraPosition - worldPos.xyz);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const outerGlowFragmentShader = /* glsl */`
+  uniform vec3 uColor;
+  uniform float uTime;
+
+  varying vec3 vNormal;
+  varying vec3 vViewDir;
+
+  void main() {
+    float fresnel = 1.0 - abs(dot(vNormal, normalize(vViewDir)));
+    // Fade rất chậm, rất mềm — không có viền cứng
+    float t = smoothstep(0.0, 1.0, fresnel);
+    float intensity = pow(t, 0.6) * 0.2;
+    // Pulse cực kỳ tinh tế
+    float pulse = 0.97 + 0.03 * sin(uTime * 0.25);
+    gl_FragColor = vec4(uColor * pulse, intensity * pulse);
+  }
+`;
+
+/**
+ * Tạo Outer Glow cho Mặt Trời — lớp sáng rộng ngoài cùng (radius 2.0x)
+ * Giúp user nhận diện Mặt Trời ở mọi khoảng cách
+ */
+export function createSunOuterGlow(radius, oblateness = 0) {
+  const geometry = new THREE.SphereGeometry(2.0, 64, 64);
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(0xffcc66) },
+      uTime: { value: 0 },
+    },
+    vertexShader: outerGlowVertexShader,
+    fragmentShader: outerGlowFragmentShader,
+    side: THREE.BackSide,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  material.userData.isSunOuterGlowShader = true;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'sun_outer_glow';
   mesh.scale.set(radius, radius * (1 - oblateness), radius);
   return mesh;
 }
