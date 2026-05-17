@@ -34,6 +34,8 @@ export function createCinematicCameraController(camera, controls, domElement) {
   // Shot state
   let shotTime = 0;
   let shotParams = {};
+  let shotStartCamPos = new THREE.Vector3();
+  let shotStartQuat = new THREE.Quaternion();
 
   // Input tracking
   const keys = {};
@@ -165,6 +167,8 @@ export function createCinematicCameraController(camera, controls, domElement) {
     mode = presetName;
     shotTime = 0;
     shotParams = { ...params };
+    shotStartCamPos.copy(camera.position);
+    shotStartQuat.copy(camera.quaternion);
 
     if (mode === 'orbit' && targetBody) {
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
@@ -179,13 +183,20 @@ export function createCinematicCameraController(camera, controls, domElement) {
       const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
       const radius = targetBody.data.radius * 5;
       
-      // Create a curve passing near the planet
+      // Create a smooth curve passing near the planet
       const p1 = targetPos.clone().add(new THREE.Vector3(-radius * 5, radius * 2, radius * 3));
-      const p2 = targetPos.clone().add(new THREE.Vector3(0, radius, radius * 2));
+      const p2 = targetPos.clone().add(new THREE.Vector3(0, radius * 0.5, radius * 2));
       const p3 = targetPos.clone().add(new THREE.Vector3(radius * 5, radius * 0.5, -radius * 3));
       
       shotParams.curve = new THREE.CatmullRomCurve3([p1, p2, p3]);
       shotParams.duration = params.duration || 10;
+    }
+
+    if (mode === 'dollyZoom' && targetBody) {
+      const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
+      const startDir = new THREE.Vector3().subVectors(camera.position, targetPos).normalize();
+      if (startDir.lengthSq() < 0.1) startDir.set(0, 0, 1);
+      shotParams.startDir = startDir;
     }
 
     dispatchCinematicUpdate(active);
@@ -228,9 +239,10 @@ export function createCinematicCameraController(camera, controls, domElement) {
 
     applyTransform(deltaTime);
     
-    // Smooth FOV
-    if (Math.abs(camera.fov - targetFOV) > 0.01) {
-      camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 1 - Math.exp(-fovSmoothing * deltaTime));
+    // Smooth FOV transition — frame-rate independent
+    const fovDiff = targetFOV - camera.fov;
+    if (Math.abs(fovDiff) > 0.01) {
+      camera.fov += fovDiff * Math.min(1, fovSmoothing * deltaTime);
       camera.updateProjectionMatrix();
     }
 
@@ -274,8 +286,9 @@ export function createCinematicCameraController(camera, controls, domElement) {
       .applyQuaternion(camera.quaternion)
       .multiplyScalar(dynamicBaseSpeed * speedMultiplier * keyMultiplier);
 
-    // Smooth movement
-    velocity.lerp(targetVelocity, 1 - Math.exp(-acceleration * deltaTime));
+    // Frame-rate independent smooth movement
+    const moveLerpFactor = Math.min(1, acceleration * deltaTime);
+    velocity.lerp(targetVelocity, moveLerpFactor);
     camera.position.addScaledVector(velocity, deltaTime);
   }
 
@@ -288,18 +301,22 @@ export function createCinematicCameraController(camera, controls, domElement) {
     const z = Math.sin(angle) * (shotParams.radius || 100);
     
     const targetCamPos = targetPos.clone().add(new THREE.Vector3(x, shotParams.height || 0, z));
-    camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
+    // Direct position for buttery smooth circular motion
+    camera.position.copy(targetCamPos);
   }
 
   function handleFlyBy(deltaTime) {
     if (!shotParams.curve) return;
-    const t = THREE.MathUtils.clamp(shotTime / (shotParams.duration || 10), 0, 1);
+    const rawT = THREE.MathUtils.clamp(shotTime / (shotParams.duration || 10), 0, 1);
+    // Smoothstep easing for buttery smooth fly-by
+    const t = rawT * rawT * (3 - 2 * rawT);
     const targetCamPos = shotParams.curve.getPoint(t);
-    camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
+    camera.position.copy(targetCamPos);
     
-    if (t >= 1) {
+    if (rawT >= 1) {
       // Fallback to target lock when finished
       mode = 'targetLock';
+      shotTime = 0;
     }
   }
 
@@ -309,13 +326,16 @@ export function createCinematicCameraController(camera, controls, domElement) {
     const fallbackOffset = new THREE.Vector3(0, targetBody.data.radius * 1.5, Math.max(targetBody.data.radius * 5, 0.5));
     const offset = shotParams.offset || fallbackOffset;
     const targetCamPos = targetPos.clone().add(offset.clone().applyQuaternion(targetBody.pivot.quaternion));
-    camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
+    // Smooth follow with slight lag for natural feel
+    camera.position.lerp(targetCamPos, 1 - Math.exp(-8 * deltaTime));
   }
 
   function handleDollyZoom(deltaTime) {
     if (!targetBody) return;
     const targetPos = targetBody.pivot.getWorldPosition(new THREE.Vector3());
-    const progress = THREE.MathUtils.clamp(shotTime / (shotParams.duration || 10), 0, 1);
+    const rawProgress = THREE.MathUtils.clamp(shotTime / (shotParams.duration || 10), 0, 1);
+    // Smoothstep for buttery dolly zoom transition
+    const progress = rawProgress * rawProgress * (3 - 2 * rawProgress);
     
     // Dolly Zoom: Zoom in while pulling back, keeping the subject the same size on screen
     const currentFrameFov = THREE.MathUtils.lerp(shotParams.startFov || 135, shotParams.endFov || 24, progress);
@@ -326,14 +346,15 @@ export function createCinematicCameraController(camera, controls, domElement) {
     const ratio = startDist * Math.tan(THREE.MathUtils.degToRad((shotParams.startFov || 135) / 2));
     const currentDist = ratio / Math.tan(THREE.MathUtils.degToRad(currentFrameFov / 2));
     
-    const dir = new THREE.Vector3().subVectors(camera.position, targetPos).normalize();
-    // Prevent division by zero or weird angles
-    if (dir.lengthSq() < 0.1) dir.set(0, 0, 1);
+    // Use stored initial direction for consistent movement
+    const dir = shotParams.startDir || new THREE.Vector3(0, 0, 1);
+    const targetCamPos = targetPos.clone().add(dir.clone().multiplyScalar(currentDist));
+    camera.position.copy(targetCamPos);
     
-    const targetCamPos = targetPos.clone().add(dir.multiplyScalar(currentDist));
-    camera.position.lerp(targetCamPos, 1 - Math.exp(-acceleration * deltaTime));
-    
-    if (progress >= 1) mode = 'targetLock';
+    if (rawProgress >= 1) {
+      mode = 'targetLock';
+      shotTime = 0;
+    }
   }
 
   function applyTransform(deltaTime) {
@@ -373,15 +394,18 @@ export function createCinematicCameraController(camera, controls, domElement) {
         targetQuat.multiply(rollQuat);
       }
       
-      camera.quaternion.slerp(targetQuat, 1 - Math.exp(-lookAtSmoothing * deltaTime));
+      // Frame-rate independent look-at smoothing
+      const lookLerpFactor = Math.min(1, lookAtSmoothing * deltaTime);
+      camera.quaternion.slerp(targetQuat, lookLerpFactor);
       
       rotation.setFromQuaternion(camera.quaternion);
       yaw = rotation.y;
       pitch = rotation.x;
     } else {
-      // Smooth rotation for free mode
+      // Smooth rotation for free mode — frame-rate independent
+      const rotLerpFactor = Math.min(1, rotationSmoothing * deltaTime);
       const targetQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, roll, 'YXZ'));
-      camera.quaternion.slerp(targetQuat, 1 - Math.exp(-rotationSmoothing * deltaTime));
+      camera.quaternion.slerp(targetQuat, rotLerpFactor);
     }
   }
 

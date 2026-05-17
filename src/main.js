@@ -93,30 +93,40 @@ async function bootstrap() {
     flyDuration = durationSec;
   }
 
-  // 3e. Auto Director Logic
+  // 3e. Auto Director Logic — only planets with high-quality surface visuals
+  const PLANET_HEROES = ['earth', 'saturn', 'jupiter', 'mars', 'venus'];
+  const PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant']);
+
+  function getCinematicPlanets() {
+    return Array.from(bodyById.values()).filter(b =>
+      b.data.type !== 'star' && !b.data.isMoon && b.data.type !== 'comet'
+    );
+  }
+
   function triggerRandomCinematicCut() {
     if (!cinematicCamera.isActive()) return;
-    
-    const allBodies = Array.from(bodyById.values());
-    if (allBodies.length === 0) return;
-    
-    // Pick a random body
-    let nextBody = allBodies[Math.floor(Math.random() * allBodies.length)];
-    
-    // 40% chance to pick a "hero" body
-    if (Math.random() < 0.4) {
-      const heroes = ['sun', 'earth', 'saturn', 'jupiter', 'mars', 'moon', 'europa'];
-      const heroId = heroes[Math.floor(Math.random() * heroes.length)];
-      if (bodyById.has(heroId)) nextBody = bodyById.get(heroId);
+
+    const planets = getCinematicPlanets();
+    if (planets.length === 0) return;
+
+    // 70% chance to pick a hero planet, 30% for any planet
+    let nextBody;
+    if (Math.random() < 0.7) {
+      const heroId = PLANET_HEROES[Math.floor(Math.random() * PLANET_HEROES.length)];
+      nextBody = bodyById.get(heroId);
+      if (!nextBody || nextBody.data.isMoon || nextBody.data.type === 'star' || nextBody.data.type === 'comet') {
+        nextBody = planets[Math.floor(Math.random() * planets.length)];
+      }
+    } else {
+      nextBody = planets[Math.floor(Math.random() * planets.length)];
     }
-    
+
     trackedBody = nextBody;
     cinematicCamera.setTarget(trackedBody);
-    
+
     // Teleport camera close to the new body to prevent dark screen flying
     const targetWorldPos = trackedBody.pivot.getWorldPosition(new THREE.Vector3());
     const startDist = trackedBody.data.radius * (Math.random() * 4 + 3); // 3x to 7x radius
-    // Random angle for teleportation
     const angle = Math.random() * Math.PI * 2;
     const height = (Math.random() - 0.5) * startDist;
     const offset = new THREE.Vector3(
@@ -125,16 +135,17 @@ async function bootstrap() {
       Math.sin(angle) * startDist
     );
     camera.position.copy(targetWorldPos).add(offset);
-    
-    // Notify UI
-    const allBtns = document.querySelectorAll('.planet-btn');
-    allBtns.forEach(b => b.classList.toggle('active', b.dataset.id === trackedBody.id));
-    
-    // Pick a random shot (including new Dolly Zoom)
-    const shots = ['orbit', 'flyBy', 'chase', 'dollyZoom'];
-    const weights = [0.35, 0.3, 0.2, 0.15];
+
+    // Pick a shot tailored to planet type
+    const isGasGiant = trackedBody.data.type === 'gas-giant' || trackedBody.data.type === 'ice-giant';
+    const shots = isGasGiant
+      ? ['orbit', 'flyBy', 'dollyZoom']
+      : ['orbit', 'flyBy', 'chase', 'dollyZoom'];
+    const weights = isGasGiant
+      ? [0.45, 0.35, 0.2]
+      : [0.3, 0.3, 0.25, 0.15];
     let randomVal = Math.random();
-    let selectedShot = 'orbit';
+    let selectedShot = shots[0];
     for (let i = 0; i < shots.length; i++) {
       if (randomVal < weights[i]) {
         selectedShot = shots[i];
@@ -142,60 +153,55 @@ async function bootstrap() {
       }
       randomVal -= weights[i];
     }
-    
-    // Pick a random lens
-    const lenses = [24, 35, 50, 85, 135];
+
+    // Pick lens based on planet type — wider for gas giants, tighter for terrestrials
+    const lenses = isGasGiant
+      ? [24, 35, 50]
+      : [35, 50, 85, 135];
     const selectedLens = lenses[Math.floor(Math.random() * lenses.length)];
-    
-    // Base configuration for all shots
+
+    // Base configuration
     const shotParams = {
-      handheld: Math.random() > 0.5, // 50% chance for subtle handheld shake
-      dutchAngle: (Math.random() - 0.5) * 0.2 // Slight roll offset (-11 to +11 degrees)
+      handheld: Math.random() < 0.4,
+      dutchAngle: (Math.random() - 0.5) * 0.15
     };
-    
-    // Rule of Thirds framing (20% chance to off-center the planet)
-    if (Math.random() < 0.2) {
+
+    // Rule of Thirds framing (30% chance)
+    if (Math.random() < 0.3) {
       shotParams.framingOffset = {
-        x: (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random()), 
-        y: (Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.5)
+        x: (Math.random() > 0.5 ? 1 : -1) * (0.3 + Math.random() * 0.4),
+        y: (Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.3)
       };
     }
 
-    // Shot specific logic
+    // Shot specific params
     if (selectedShot === 'flyBy') {
-      shotParams.duration = 10 + Math.random() * 8;
-      // Fly-bys look epic with stronger Dutch Angles
-      shotParams.dutchAngle = (Math.random() - 0.5) * 0.5; 
+      shotParams.duration = 12 + Math.random() * 8;
+      shotParams.dutchAngle = (Math.random() - 0.5) * 0.4;
     }
     if (selectedShot === 'chase') {
-      const chaseOffset = trackedBody.data.radius * (2 + Math.random() * 3);
+      const chaseOffset = trackedBody.data.radius * (2 + Math.random() * 2);
       shotParams.offset = new THREE.Vector3(chaseOffset * 0.3, chaseOffset * 0.2, chaseOffset);
     }
     if (selectedShot === 'orbit') {
-      shotParams.radius = trackedBody.data.radius * (3 + Math.random() * 5);
-      shotParams.speed = 0.05 + Math.random() * 0.1;
-      shotParams.height = (Math.random() - 0.5) * trackedBody.data.radius * 2;
+      shotParams.radius = isGasGiant
+        ? trackedBody.data.radius * (4 + Math.random() * 6)
+        : trackedBody.data.radius * (2.5 + Math.random() * 4);
+      shotParams.speed = 0.04 + Math.random() * 0.08;
+      shotParams.height = (Math.random() - 0.5) * trackedBody.data.radius * 1.5;
     }
     if (selectedShot === 'dollyZoom') {
-      shotParams.duration = 12 + Math.random() * 6;
-      shotParams.startFov = Math.random() > 0.5 ? 135 : 24; // Either zoom in or zoom out
-      shotParams.endFov = shotParams.startFov === 135 ? 24 : 135;
-      shotParams.startDist = trackedBody.data.radius * 5;
+      shotParams.duration = 14 + Math.random() * 6;
+      shotParams.startFov = Math.random() > 0.5 ? 120 : 24;
+      shotParams.endFov = shotParams.startFov === 120 ? 24 : 120;
+      shotParams.startDist = trackedBody.data.radius * 4;
     }
-    
+
     cinematicCamera.setShotPreset(selectedShot, shotParams);
     cinematicCamera.setLens(selectedLens);
-    
-    // Update UI
-    document.querySelectorAll('#cine-shot-group .cine-btn').forEach(b => 
-      b.classList.toggle('active', b.dataset.shot === selectedShot)
-    );
-    document.querySelectorAll('#cine-lens-group .cine-btn').forEach(b => 
-      b.classList.toggle('active', parseFloat(b.dataset.lens) === selectedLens)
-    );
-    
+
     // Reset timer
-    autoDirectorTimer = 8 + Math.random() * 8; // 8-16 seconds
+    autoDirectorTimer = 10 + Math.random() * 8; // 10-18 seconds
   }
 
   // 4. Kh?i t?o UI v?i callbacks (planetData ?? ???c populate)
@@ -356,8 +362,10 @@ async function bootstrap() {
       if (enabled) {
         cinematicCamera.setTarget(trackedBody);
         cinematicCamera.enable(trackedBody ? 'targetLock' : 'free');
+        setCinematicMode(true);
       } else {
         cinematicCamera.disable();
+        setCinematicMode(false);
       }
     },
     onCinematicShotChange: (shot) => {
@@ -371,32 +379,15 @@ async function bootstrap() {
       cinematicCamera.setLens(lens);
     },
     onCinematicCleanUIToggle: (isClean) => {
-      const topBar = document.getElementById('top-bar');
-      const planetSelector = document.getElementById('planet-selector');
-      const infoPanel = document.getElementById('info-panel');
-      const minimap = document.getElementById('minimap-container');
-      const zoomInd = document.getElementById('zoom-indicator');
-      
-      const displayStyle = isClean ? 'none' : '';
-      if (topBar) topBar.style.display = displayStyle;
-      if (planetSelector) planetSelector.style.display = displayStyle;
-      if (infoPanel && infoPanel.classList.contains('visible')) infoPanel.style.display = displayStyle;
-      if (minimap && !isClean && document.getElementById('toggle-hud')?.classList.contains('active')) minimap.style.display = 'block';
-      else if (minimap) minimap.style.display = 'none';
-      
-      if (zoomInd && !isClean && document.getElementById('toggle-hud')?.classList.contains('active')) zoomInd.style.display = 'flex';
-      else if (zoomInd) zoomInd.style.display = 'none';
-      
-      // Also hide labels and orbits
-      toggleLabels(!isClean && document.getElementById('btn-visuals-toggle').classList.contains('active'));
-      for (const orbit of orbits) {
-        orbit.visible = !isClean && document.getElementById('btn-visuals-toggle').classList.contains('active');
-      }
+      setCinematicMode(isClean);
     },
     onCinematicAutoDirectorToggle: (active) => {
       isAutoDirectorActive = active;
       if (active) {
         autoDirectorTimer = 0; // Trigger immediately
+        setCinematicMode(true);
+      } else {
+        setCinematicMode(false);
       }
     },
     onToggleFps: (enabled) => {
@@ -406,6 +397,103 @@ async function bootstrap() {
   });
 
   // Kh?i t?o tr?ng th?i ?n m?c ??nh cho c?c c?ng c? m?i (Phase 5 Optimization)
+  // ── Cinematic Mode: Complete UI hiding + FPS optimization ──
+  let isCinematicModeActive = false;
+  let savedUIStates = {};
+  let savedEffectStates = {};
+
+  function setCinematicMode(active) {
+    if (active === isCinematicModeActive) return;
+    isCinematicModeActive = active;
+
+    if (active) {
+      // Save and hide ALL UI elements (except the restore button)
+      const uiIds = [
+        'top-bar', 'planet-selector', 'info-panel',
+        'minimap-container', 'zoom-indicator', 'settings-panel',
+        'search-panel', 'cinematic-panel', 'saturn-camera-panel',
+        'discovery-notification', 'fps-counter',
+        'layer-tooltip', 'attribution'
+      ];
+      savedUIStates = {};
+      for (const id of uiIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          savedUIStates[id] = el.style.display;
+          el.style.display = 'none';
+        }
+      }
+
+      // Save effect toggle states
+      savedEffectStates = {
+        magnetic: isMagneticFieldEnabled,
+        aurora: isAuroraEnabled,
+        clouds: isCloudsEnabled
+      };
+
+      // Disable expensive shader effects immediately
+      if (isMagneticFieldEnabled) {
+        for (const body of bodies) {
+          if (body.magneticFieldGroup) body.magneticFieldGroup.visible = false;
+        }
+      }
+      if (isAuroraEnabled) {
+        for (const body of bodies) {
+          if (body.auroraGroup) body.auroraGroup.visible = false;
+        }
+      }
+      if (isCloudsEnabled) {
+        for (const body of bodies) {
+          if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = false;
+        }
+      }
+
+      // Hide labels (DOM-intensive) and orbits (shader updates)
+      toggleLabels(false);
+      for (const orbit of orbits) {
+        orbit.visible = false;
+      }
+
+      // Close info panel tooltip
+      updateLayerTooltip(false);
+
+      // Show restore button so user can always exit
+      const restoreBtn = document.getElementById('btn-restore-ui');
+      if (restoreBtn) restoreBtn.style.display = 'block';
+    } else {
+      // Restore ALL UI elements
+      for (const [id, display] of Object.entries(savedUIStates)) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = display || '';
+      }
+
+      // Restore expensive effects to previous state
+      if (savedEffectStates.magnetic) {
+        for (const body of bodies) {
+          if (body.magneticFieldGroup) body.magneticFieldGroup.visible = true;
+        }
+      }
+      if (savedEffectStates.aurora) {
+        for (const body of bodies) {
+          if (body.auroraGroup) body.auroraGroup.visible = true;
+        }
+      }
+      if (savedEffectStates.clouds) {
+        for (const body of bodies) {
+          if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = true;
+        }
+      }
+
+      // Restore labels and orbits based on current toggle
+      const visualsBtn = document.getElementById('toggle-visuals');
+      const visualsActive = visualsBtn && visualsBtn.classList.contains('active');
+      toggleLabels(!!visualsActive);
+      for (const orbit of orbits) {
+        orbit.visible = !!visualsActive;
+      }
+    }
+  }
+
   document.getElementById('minimap-container').style.display = 'none';
   document.getElementById('zoom-indicator').style.display = 'none';
 

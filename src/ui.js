@@ -50,6 +50,7 @@ export function initUI(callbacks) {
   // ═══ Top Bar ═══
   const topBar = document.createElement('div');
   topBar.className = 'glass-panel top-bar';
+  topBar.id = 'top-bar';
 
   const currentPresetKey = getCurrentPresetKey();
   const presetKeys = Object.keys(QUALITY_PRESETS);
@@ -165,6 +166,7 @@ export function initUI(callbacks) {
   // ═══ Planet Selector — Vẫn giữ nhưng sẽ mờ đi khi search ═══
   const selector = document.createElement('div');
   selector.className = 'glass-panel planet-selector';
+  selector.id = 'planet-selector';
   
   // Tách planets (non-moon) và moons
   const planets = planetData.filter(p => !p.isMoon);
@@ -604,19 +606,20 @@ export function initUI(callbacks) {
     isAutoDirector = !isAutoDirector;
     btnAutoDirector.classList.toggle('active', isAutoDirector);
     if (callbacks.onCinematicAutoDirectorToggle) callbacks.onCinematicAutoDirectorToggle(isAutoDirector);
-    
-    // Tự động bật Clean UI nếu đang kích hoạt Đạo diễn
-    if (isAutoDirector && !isCleanUI) {
-      btnCleanUI.click();
-    }
   });
 
   window.addEventListener('cinematic-disabled', () => {
     btnCinematicToggle.classList.remove('active');
     toggleCinematicPanel(false);
     
-    if (isAutoDirector) btnAutoDirector.click();
-    if (isCleanUI) setCleanUI(false);
+    if (isAutoDirector) {
+      isAutoDirector = false;
+      btnAutoDirector.classList.remove('active');
+      if (callbacks.onCinematicAutoDirectorToggle) callbacks.onCinematicAutoDirectorToggle(false);
+    }
+    if (isCleanUI) {
+      setCleanUI(false);
+    }
   });
 
   // Planet + Moon Selector Buttons
