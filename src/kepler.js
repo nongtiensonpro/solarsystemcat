@@ -81,3 +81,42 @@ export function computeOrbitalPosition(data, timeElapsed) {
 
   return { x, y, z };
 }
+
+/**
+ * Tính vận tốc 3D của thiên thể trên quỹ đạo Kepler tại thời điểm t
+ * Sử dụng đạo hàm giải tích của phương trình Kepler (chính xác hơn sai phân hữu hạn)
+ *
+ * Pipeline:
+ *   1. t → Mean Anomaly (M)
+ *   2. M → Eccentric Anomaly (E) via Newton-Raphson
+ *   3. E → Vận tốc (vx, vz) trên mặt phẳng quỹ đạo
+ *   4. Áp dụng ma trận xoay cho Inclination → (vx, vy, vz) trong World Space
+ *
+ * @param {Object} data - Dữ liệu hành tinh từ planetData.js
+ * @param {number} timeElapsed - Thời gian đã trôi qua (giây mô phỏng)
+ * @returns {{ vx: number, vy: number, vz: number }}
+ */
+export function computeOrbitalVelocity(data, timeElapsed) {
+  const orbitScale = data.orbitScale || 1;
+  const a = data.displayOrbitRadius ?? (data.semiMajorAxis * AU * orbitScale);
+  const e = data.eccentricity;
+  const inclinationRad = (data.inclination || 0) * Math.PI / 180;
+  const periodSeconds = data.orbitalPeriod * 86400;
+  const phase = (data.initialPhaseDeg || 0) * Math.PI / 180;
+
+  if (periodSeconds <= 0 || a <= 0) return { vx: 0, vy: 0, vz: 0 };
+
+  const M = (2 * Math.PI / periodSeconds) * timeElapsed + phase;
+  const E = solveKepler(M, e);
+  const n = 2 * Math.PI / periodSeconds;
+  const denom = 1 - e * Math.cos(E);
+
+  const vxLocal = -a * n * Math.sin(E) / denom;
+  const vzLocal = a * n * Math.sqrt(1 - e * e) * Math.cos(E) / denom;
+
+  return {
+    vx: vxLocal,
+    vy: vzLocal * Math.sin(inclinationRad),
+    vz: vzLocal * Math.cos(inclinationRad)
+  };
+}
