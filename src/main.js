@@ -11,6 +11,8 @@ import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './lab
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
 import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
+import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds } from './gravity.js';
+import { initSpacetimeGrid, setSpacetimeGridEnabled, updateSpacetimeGrid } from './spacetimeGrid.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
 import { createCinematicCameraController } from './cinematicCamera.js';
@@ -54,6 +56,7 @@ async function bootstrap() {
   let isMagneticFieldEnabled = false;
   let isAuroraEnabled = false;
   let isCloudsEnabled = false;
+  let newtonGravityActive = false;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
@@ -325,6 +328,42 @@ async function bootstrap() {
       visitedBodies.add(planetId);
       showNotification(`Khám phá mới: ${trackedBody.data.name.vi || trackedBody.data.name}`);
     }
+
+    // Focused Gravity: ch? mô ph?ng c?m thiên th? liên quan
+    if (newtonGravityActive) {
+      applyGravityFocus(planetId);
+    }
+  }
+
+  function applyGravityFocus(bodyId) {
+    setFocusedBodyId(bodyId);
+    const groupIds = getFocusedBodyIds();
+    if (!groupIds) return;
+
+    for (const body of bodies) {
+      const inGroup = groupIds.has(body.data.id);
+      body.mesh.visible = inGroup;
+      if (body.ringMesh) body.ringMesh.visible = inGroup;
+      if (body.atmosphereMeshes) {
+        body.atmosphereMeshes.forEach(m => m.visible = inGroup);
+      }
+      if (body.volumetricCloudMesh) {
+        body.volumetricCloudMesh.visible = inGroup && isCloudsEnabled;
+      }
+    }
+  }
+
+  function restoreAllMeshesVisibility() {
+    for (const body of bodies) {
+      body.mesh.visible = true;
+      if (body.ringMesh) body.ringMesh.visible = true;
+      if (body.atmosphereMeshes) {
+        body.atmosphereMeshes.forEach(m => m.visible = true);
+      }
+      if (body.volumetricCloudMesh) {
+        body.volumetricCloudMesh.visible = isCloudsEnabled;
+      }
+    }
   }
 
   initUI({
@@ -343,12 +382,20 @@ async function bootstrap() {
       if (cinematicCamera.isActive()) cinematicCamera.setMode('free');
       // Fly back to overview (Sun focused)
       startFlyTo(new THREE.Vector3(200, 100, 200), new THREE.Vector3(0, 0, 0));
+      // Focused Gravity: quay l?i mô ph?ng toàn h?
+      if (newtonGravityActive) {
+        setFocusedBodyId(null);
+        restoreAllMeshesVisibility();
+      }
     },
     onFollow: (planetId) => {
       cameraMode = 'follow';
       trackedBody = bodyById.get(planetId);
       cinematicCamera.setTarget(trackedBody);
       if (cinematicCamera.isActive() && trackedBody) cinematicCamera.setMode('targetLock');
+      if (newtonGravityActive) {
+        applyGravityFocus(planetId);
+      }
     },
     onToggleOrbits: (show) => {
       for (const orbit of orbits) {
@@ -404,6 +451,29 @@ async function bootstrap() {
           body.volumetricCloudMesh.visible = enabled;
         }
       }
+    },
+    onToggleNewtonGravity: (enabled) => {
+      if (enabled) {
+        initNewtonGravity(bodies, scene, simulationTime, bodyById);
+        for (const orbit of orbits) {
+          orbit.visible = false;
+        }
+        if (trackedBody) {
+          applyGravityFocus(trackedBody.data.id);
+        }
+      } else {
+        disableNewtonGravity(bodies, scene);
+        restoreAllMeshesVisibility();
+        const visualsBtn = document.getElementById('toggle-visuals');
+        const visualsActive = visualsBtn && visualsBtn.classList.contains('active');
+        for (const orbit of orbits) {
+          orbit.visible = !!visualsActive;
+        }
+      }
+      newtonGravityActive = enabled;
+    },
+    onToggleSpacetimeGrid: (enabled) => {
+      setSpacetimeGridEnabled(scene, enabled, bodies);
     },
     onToggleCinematic: (enabled) => {
       if (enabled) {
@@ -623,6 +693,9 @@ async function bootstrap() {
   const asteroidBelt = createAsteroidBelt(5000);
   scene.add(asteroidBelt.mesh);
 
+  // 5ab. Kh?i t?o l??i Không-Th?i Gian (Spacetime Grid)
+  initSpacetimeGrid(scene);
+
   // Phase 4.2: Light Direction Indicators — đường mờ từ hành tinh về Mặt Trời
   const sunlightPaths = [];
   function createSunlightPaths() {
@@ -802,13 +875,25 @@ async function bootstrap() {
     const solarWindStrength = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(simulationTime * 0.00003)) 
       * (0.6 + 0.4 * Math.sin(simulationTime * 0.00008 + 1.3));
 
+    // Newton Gravity N-body (thay thế Kepler)
+    if (newtonGravityActive && !isPaused) {
+      updateNewtonGravity(bodies, deltaTime * timeScale);
+    }
+
+    // Cập nhật lưới Không-Thời Gian (throttle mỗi 2 frame)
+    if (frameCount % 2 === 0) {
+      updateSpacetimeGrid(bodies);
+    }
+
     for (const body of bodies) {
-      // A. C?p nh?t v? tr? qu? ??o (Kepler) - B? qua M?t Tr?i
+      // A. C?p nh?t v? tr? qu? ??o (Kepler ho?c Gravity) - B? qua M?t Tr?i
       if (body.data.type !== 'star') {
         const hasOrbit = body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0;
         if (hasOrbit && !isPaused) {
-          const pos = computeOrbitalPosition(body.data, simulationTime);
-          body.pivot.position.set(pos.x, pos.y, pos.z);
+          if (!newtonGravityActive) {
+            const pos = computeOrbitalPosition(body.data, simulationTime);
+            body.pivot.position.set(pos.x, pos.y, pos.z);
+          }
           
           // E. C?p nh?t ?u?i sao ch?i
           if (body.tailMesh) {

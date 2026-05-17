@@ -138,6 +138,16 @@ export function initUI(callbacks) {
           <span class="toggle-label">Hiển thị FPS</span>
           <span class="toggle-switch" id="toggle-fps"></span>
         </label>
+        <label class="toggle-row" data-setting="newton">
+          <span class="toggle-icon">🌐</span>
+          <span class="toggle-label">Hấp dẫn Newton (N-body)</span>
+          <span class="toggle-switch" id="toggle-newton"></span>
+        </label>
+        <label class="toggle-row" data-setting="spacetime">
+          <span class="toggle-icon">🌀</span>
+          <span class="toggle-label">Lưới Không-Thời Gian</span>
+          <span class="toggle-switch" id="toggle-spacetime"></span>
+        </label>
       </div>
     </div>
   `;
@@ -533,6 +543,14 @@ export function initUI(callbacks) {
     fps: {
       on: () => { if (callbacks.onToggleFps) callbacks.onToggleFps(true); },
       off: () => { if (callbacks.onToggleFps) callbacks.onToggleFps(false); }
+    },
+    newton: {
+      on: () => { if (callbacks.onToggleNewtonGravity) callbacks.onToggleNewtonGravity(true); },
+      off: () => { if (callbacks.onToggleNewtonGravity) callbacks.onToggleNewtonGravity(false); }
+    },
+    spacetime: {
+      on: () => { if (callbacks.onToggleSpacetimeGrid) callbacks.onToggleSpacetimeGrid(true); },
+      off: () => { if (callbacks.onToggleSpacetimeGrid) callbacks.onToggleSpacetimeGrid(false); }
     }
   };
 
