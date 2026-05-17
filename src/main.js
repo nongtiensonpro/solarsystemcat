@@ -1065,14 +1065,12 @@ async function bootstrap() {
         body.enceladusPlume.update(deltaTime);
       }
 
-      // H. Update Saturn Ring Shadows (Phase 4)
-      if (body.data.id === 'saturn' && body.ringMesh && body.ringMesh.material.uniforms) {
-        const saturnPos = new THREE.Vector3();
-        body.pivot.getWorldPosition(saturnPos);
-        body.ringMesh.material.uniforms.uPlanetPosition.value.copy(saturnPos);
-        // Sun is at (0,0,0)
+      // H. Update Ring Shadows (Saturn + Uranus)
+      if ((body.data.id === 'saturn' || body.data.id === 'uranus') && body.ringMesh && body.ringMesh.material.uniforms) {
+        const planetPos = new THREE.Vector3();
+        body.pivot.getWorldPosition(planetPos);
+        body.ringMesh.material.uniforms.uPlanetPosition.value.copy(planetPos);
         body.ringMesh.material.uniforms.uSunPosition.value.set(0, 0, 0);
-        // Camera position for scattering (Phase 8)
         body.ringMesh.material.uniforms.uCameraPosition.value.copy(camera.position);
       }
       
@@ -1163,6 +1161,38 @@ async function bootstrap() {
           else { ringName = 'Vành A'; ringDesc = 'Vành đai ngoài cùng trong nhóm chính.'; }
         }
         else if (distKm > 140000 && distKm < 140400) { ringName = 'Vành F'; ringDesc = 'Vành đai hẹp, bện xoắn kỳ lạ nằm ngoài cùng.'; }
+
+        if (ringName) {
+          tooltipVisible = true;
+          updateLayerTooltip(true, mouseClientX, mouseClientY, ringName, ringDesc);
+        }
+      }
+    }
+
+    // -- Uranus Ring Tooltip --
+    if (trackedBody?.data?.id === 'uranus' && trackedBody.ringMesh) {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObject(trackedBody.ringMesh);
+      if (intersects.length > 0) {
+        const hitPoint = intersects[0].point;
+        const planetPos = new THREE.Vector3();
+        trackedBody.pivot.getWorldPosition(planetPos);
+        const distUnits = hitPoint.distanceTo(planetPos);
+
+        let ringName = '';
+        let ringDesc = '';
+
+        if (distUnits < 6.40) { ringName = 'Vành ζ (1986U2R)'; ringDesc = 'Vành bụi trong cùng, rất mờ, được phát hiện năm 1986.'; }
+        else if (distUnits < 6.65) { ringName = 'Vành 6'; ringDesc = 'Vành hẹp nhất trong hệ thống vành đai Uranus.'; }
+        else if (distUnits < 6.72) { ringName = 'Vành 5'; ringDesc = 'Vành hẹp, tối, cấu tạo từ băng nước và bụi.'; }
+        else if (distUnits < 6.96) { ringName = 'Vành 4'; ringDesc = 'Vành hẹp tương tự vành 5 và 6.'; }
+        else if (distUnits < 7.28) { ringName = 'Vành α (Alpha)'; ringDesc = 'Vành sáng nhất trong nhóm vành chính, rộng 7-12 km.'; }
+        else if (distUnits < 7.54) { ringName = 'Vành β (Beta)'; ringDesc = 'Vành sáng thứ hai, rộng 7-12 km.'; }
+        else if (distUnits < 7.75) { ringName = 'Vành η (Eta)'; ringDesc = 'Vành rất hẹp, chứa nhiều bụi, chỉ rộng 0-2 km.'; }
+        else if (distUnits < 7.88) { ringName = 'Vành γ (Gamma)'; ringDesc = 'Vành hẹp sắc nét, rộng 1-4 km.'; }
+        else if (distUnits < 8.15) { ringName = 'Vành δ (Delta)'; ringDesc = 'Vành hẹp, rộng 3-7 km.'; }
+        else if (distUnits < 8.48) { ringName = 'Vành λ (Lambda)'; ringDesc = 'Vành bụi mờ, cấu tạo từ hạt micrometre.'; }
+        else { ringName = 'Vành ε (Epsilon)'; ringDesc = 'Vành sáng nhất và rộng nhất (20-100 km), hơi elip.'; }
 
         if (ringName) {
           tooltipVisible = true;

@@ -321,12 +321,12 @@
         ]
       },
       "rings": {
-        "innerRadius": 1.5,
-        "outerRadius": 2.01,
+        "innerRadius": 1.48,
+        "outerRadius": 2.15,
         "hasRings": true
       },
       "info": {
-        "summaryVi": "Hành tinh băng khổng lồ quay nằm ngang trên mặt phẳng quỹ đạo.",
+        "summaryVi": "Hành tinh băng khổng lồ quay nằm ngang trên mặt phẳng quỹ đạo. Sở hữu hệ thống 13 vành đai mờ (ζ, 6, 5, 4, α, β, η, γ, δ, λ, ε), trong đó vành ε là sáng nhất và rộng nhất. Lưu ý: Vành đai Sao Thiên Vương trong thực tế rất khó quan sát do độ sáng cực thấp; mô phỏng này đã tăng cường hiển thị để người dùng có thể nhìn thấy và tương tác.",
         "compositionVi": "Hydro (83%), Heli (15%), Metan (2%), băng nước, amonia, metan"
       }
     },

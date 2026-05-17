@@ -867,6 +867,19 @@ export function initUI(callbacks) {
           </p>
         </div>
       `;
+    } else if (data.id === 'uranus') {
+      ringsInfoHtml = `
+        <div class="info-section-title">🪐 Hệ thống Vành đai</div>
+        <div class="info-layer" style="border-left-color: #6ec8ff; background: rgba(100, 180, 255, 0.05);">
+          <div class="info-row sub"><span class="label">Số lượng vành</span><span class="value">13 vành đã biết</span></div>
+          <div class="info-row sub"><span class="label">Phạm vi</span><span class="value">38,000 - 51,140 km</span></div>
+          <div class="info-row sub"><span class="label">Vành sáng nhất</span><span class="value">ε (Epsilon) — dạng elip</span></div>
+          <div class="info-row sub"><span class="label">Thành phần</span><span class="value">Băng nước, bụi silicat, chất hữu cơ</span></div>
+          <p style="font-size: 10px; color: #6688bb; margin-top: 6px; font-style: italic;">
+            ⚠ Ghi chú hiển thị: Vành đai Sao Thiên Vương thực tế cực kỳ mờ và khó quan sát. Trong mô phỏng này, độ sáng, phát xạ và tán xạ đã được nâng lên mức tối đa để người dùng có thể nhìn rõ cấu trúc và tương tác.
+          </p>
+        </div>
+      `;
     }
 
     // Phase 5.1: Hiển thị thông tin Ghost Moons cho Saturn
