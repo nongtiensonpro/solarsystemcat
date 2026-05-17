@@ -142,7 +142,11 @@ export function toggleCrossSection(body, isActive) {
   };
 
   applyClipping(body.mesh);
-  applyClipping(body.atmosphereMesh);
+  if (body.atmosphereMeshes?.length) {
+    for (const atmMesh of body.atmosphereMeshes) {
+      applyClipping(atmMesh);
+    }
+  }
   applyClipping(body.atmosphereTextureMesh);
   applyClipping(body.cloudMesh);
   applyClipping(body.coronaMesh);

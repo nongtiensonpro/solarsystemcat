@@ -136,12 +136,21 @@ function normalizeBody(raw) {
     // ─── Textures (giữ nguyên) ───
     textures: raw.textures || null,
 
-    // ─── Atmosphere (normalize color) ───
-    atmosphere: raw.atmosphere ? {
+    // ─── Atmosphere (normalize color + multi-layer support) ───
+    atmosphere: raw.atmosphere ? (raw.atmosphere.layers ? {
+      layers: raw.atmosphere.layers.map(l => ({
+        color: normalizeColor(l.color),
+        opacity: l.opacity,
+        power: l.power,
+        scale: l.scale,
+        side: l.side || 'back',
+        scatterStrength: l.scatterStrength ?? 0.4,
+      })),
+    } : {
       color: normalizeColor(raw.atmosphere.color),
       opacity: raw.atmosphere.opacity,
       power: raw.atmosphere.power,
-    } : null,
+    }) : null,
 
     // ─── Rings (giữ nguyên) ───
     rings: raw.rings || null,

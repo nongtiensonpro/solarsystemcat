@@ -474,11 +474,12 @@ async function bootstrap() {
 
     for (const body of bodies) {
       // Atmosphere opacity scale
-      if (body.atmosphereMesh && body.data.atmosphere) {
-        const baseOpacity = body.data.atmosphere.opacity;
-        body.atmosphereMesh.material.uniforms.uOpacity.value = 
-          baseOpacity * preset.atmosphereOpacityScale;
-        body.atmosphereMesh.visible = preset.atmosphereEnabled;
+      if (body.atmosphereMeshes?.length && body.data.atmosphere) {
+        for (const atmMesh of body.atmosphereMeshes) {
+          const baseOpacity = atmMesh.userData.baseOpacity ?? body.data.atmosphere?.opacity ?? 0.5;
+          atmMesh.material.uniforms.uOpacity.value = baseOpacity * preset.atmosphereOpacityScale;
+          atmMesh.visible = preset.atmosphereEnabled;
+        }
       }
 
       // Cloud opacity scale
@@ -492,14 +493,9 @@ async function bootstrap() {
         body.atmosphereTextureMesh.visible = preset.atmosphereEnabled;
       }
 
-      // Corona visibility — Mặt Trời luôn ở chất lượng thấp, không phụ thuộc preset
+      // Unified Corona visibility — luôn hiển thị
       if (body.coronaMesh) {
         body.coronaMesh.visible = true;
-      }
-
-      // Phase 5.2: Outer Glow visibility — luôn hiển thị
-      if (body.outerGlowMesh) {
-        body.outerGlowMesh.visible = true;
       }
 
       // Sun Glow Sprite — luôn hiển thị
@@ -660,14 +656,9 @@ async function bootstrap() {
         );
       }
 
-      // Phase 6: Multi-layer corona — animate mỗi layer với tốc độ khác nhau
-      if (body.coronaMesh && body.coronaMesh.isGroup) {
-        body.coronaMesh.children.forEach((layer, i) => {
-          if (layer.material?.userData?.isSunCoronaShader) {
-            layer.material.uniforms.uTime.value += deltaTime * (0.3 + i * 0.1);
-          }
-        });
-        body.coronaMesh.rotation.y += deltaTime * 0.02;
+      // Unified Corona — single shader update, zero onion rings
+      if (body.coronaMesh?.material?.userData?.isSunUnifiedCorona) {
+        body.coronaMesh.material.uniforms.uTime.value += deltaTime;
       }
 
       // D2. C?p nh?t s?c quy?n (chromosphere)
@@ -675,19 +666,38 @@ async function bootstrap() {
         body.chromosphereMesh.material.uniforms.uTime.value += deltaTime;
       }
 
-      // Phase 5.2: C?p nh?t outer glow
-      if (body.outerGlowMesh?.material.userData?.isSunOuterGlowShader) {
-        body.outerGlowMesh.material.uniforms.uTime.value += deltaTime;
-      }
-
-      // D3. C?p nh?t t? tr??ng
-      if (body.magneticFieldMesh?.material.userData?.isMagneticFieldShader) {
-        body.magneticFieldMesh.material.uniforms.uTime.value += deltaTime;
-      }
-
       // --- T?I ?U H?A (PHASE 5) ---
       const bodyWorldPos = new THREE.Vector3();
       body.pivot.getWorldPosition(bodyWorldPos);
+
+      // D3. C?p nh?t t? tr??ng (magnetosphere + field lines)
+      if (body.magneticFieldGroup?.userData?.isMagneticSystem) {
+        const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
+
+        body.magneticFieldGroup.traverse((child) => {
+          if (child.material?.uniforms?.uTime) {
+            child.material.uniforms.uTime.value += deltaTime;
+          }
+          if (child.material?.uniforms?.uSunDirection) {
+            child.material.uniforms.uSunDirection.value.copy(sunDir);
+          }
+        });
+
+        body.magneticFieldGroup.lookAt(0, 0, 0);
+      }
+
+      // D4. C?p nh?t khí quy?n (atmosphere layers + scattering)
+      if (body.atmosphereMeshes?.length) {
+        const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
+        for (const atmMesh of body.atmosphereMeshes) {
+          if (atmMesh.material.uniforms?.uTime) {
+            atmMesh.material.uniforms.uTime.value += deltaTime;
+          }
+          if (atmMesh.material.uniforms?.uSunDirection) {
+            atmMesh.material.uniforms.uSunDirection.value.copy(sunDir);
+          }
+        }
+      }
       const distToCamera = camera.position.distanceTo(bodyWorldPos);
       const isClose = distToCamera < body.data.radius * 30;
       const isSlicing = body.isCrossSectionActive;

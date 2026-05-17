@@ -1,7 +1,5 @@
-// Fresnel shader tạo hiệu ứng hào quang khí quyển bao quanh hành tinh
 import * as THREE from 'three';
 
-// Vertex Shader — truyền pháp tuyến và hướng nhìn sang fragment
 const atmosphereVertexShader = /* glsl */`
   varying vec3 vNormal;
   varying vec3 vViewDir;
@@ -14,55 +12,105 @@ const atmosphereVertexShader = /* glsl */`
   }
 `;
 
-// Fragment Shader — tính Fresnel intensity tại mỗi pixel
 const atmosphereFragmentShader = /* glsl */`
   uniform vec3 uColor;
   uniform float uOpacity;
   uniform float uPower;
+  uniform vec3 uSunDirection;
+  uniform float uTime;
+  uniform float uScatterStrength;
 
   varying vec3 vNormal;
   varying vec3 vViewDir;
 
   void main() {
-    // Fresnel: intensity tăng khi góc nhìn song song bề mặt (rìa hành tinh)
     float fresnel = 1.0 - max(dot(vViewDir, vNormal), 0.0);
     float intensity = pow(fresnel, uPower);
 
-    gl_FragColor = vec4(uColor, intensity * uOpacity);
+    vec3 sunDir = normalize(uSunDirection);
+
+    float scatterAngle = dot(vViewDir, sunDir);
+    float scatterBacklight = max(0.0, -scatterAngle);
+    float scatterIntensity = pow(scatterBacklight, 2.0);
+
+    vec3 scatterColor = mix(
+      vec3(0.3, 0.6, 1.0),
+      vec3(1.0, 0.6, 0.3),
+      scatterIntensity * 0.3
+    ) * scatterIntensity * uScatterStrength;
+
+    vec3 finalColor = mix(uColor, scatterColor, smoothstep(0.0, 0.5, scatterIntensity));
+    float pulse = 0.97 + 0.03 * sin(uTime * 0.3 + fresnel * 2.0);
+    float alpha = intensity * uOpacity * pulse;
+
+    gl_FragColor = vec4(finalColor, alpha);
   }
 `;
 
-/**
- * Tạo lớp vỏ khí quyển Fresnel bao quanh hành tinh
- * @param {number} planetRadius - Bán kính hành tinh (đã scale)
- * @param {Object} atmosphereConfig - { color, opacity, power }
- * @returns {THREE.Mesh} - Mesh khí quyển
- */
-export function createAtmosphere(planetRadius, atmosphereConfig) {
-  const { color, opacity, power } = atmosphereConfig;
+export function createAtmosphere(planetRadius, config) {
+  const { color, opacity, power } = config;
 
-  // Geometry lớn hơn hành tinh 3-5%
-  const atmosphereGeometry = new THREE.SphereGeometry(1, 64, 64);
-
-  const atmosphereMaterial = new THREE.ShaderMaterial({
+  const geometry = new THREE.SphereGeometry(1, 64, 64);
+  const material = new THREE.ShaderMaterial({
     vertexShader: atmosphereVertexShader,
     fragmentShader: atmosphereFragmentShader,
     uniforms: {
       uColor: { value: new THREE.Color(color) },
       uOpacity: { value: opacity },
       uPower: { value: power },
+      uSunDirection: { value: new THREE.Vector3(0, 0, 1) },
+      uTime: { value: 0 },
+      uScatterStrength: { value: 0.4 },
     },
-    side: THREE.BackSide,  // Render mặt trong để tạo hiệu ứng halo
+    side: THREE.BackSide,
     transparent: true,
-    depthWrite: false,      // Không ghi Z-buffer để không che các object khác
-    blending: THREE.AdditiveBlending, // Pha trộn cộng dồn cho hiệu ứng phát sáng
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
   });
 
-  const atmosphereMesh = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
-
-  // Scale lớn hơn hành tinh 5%
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'atmosphere';
   const scale = planetRadius * 1.05;
-  atmosphereMesh.scale.set(scale, scale, scale);
+  mesh.scale.set(scale, scale, scale);
+  mesh.userData.baseOpacity = opacity;
+  mesh.userData.isAtmosphere = true;
 
-  return atmosphereMesh;
+  return mesh;
+}
+
+export function createAtmosphereLayers(planetRadius, layers) {
+  const meshes = [];
+
+  for (let i = 0; i < layers.length; i++) {
+    const layer = layers[i];
+    const geometry = new THREE.SphereGeometry(1, 64, 64);
+    const material = new THREE.ShaderMaterial({
+      vertexShader: atmosphereVertexShader,
+      fragmentShader: atmosphereFragmentShader,
+      uniforms: {
+        uColor: { value: new THREE.Color(layer.color) },
+        uOpacity: { value: layer.opacity },
+        uPower: { value: layer.power },
+        uSunDirection: { value: new THREE.Vector3(0, 0, 1) },
+        uTime: { value: 0 },
+        uScatterStrength: { value: layer.scatterStrength ?? 0.4 },
+      },
+      side: layer.side === 'front' ? THREE.FrontSide : THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `atmosphere_layer_${i}`;
+    const s = planetRadius * layer.scale;
+    mesh.scale.set(s, s, s);
+    mesh.userData.baseOpacity = layer.opacity;
+    mesh.userData.isAtmosphere = true;
+    mesh.userData.layerIndex = i;
+
+    meshes.push(mesh);
+  }
+
+  return meshes;
 }

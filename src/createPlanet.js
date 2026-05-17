@@ -1,10 +1,10 @@
 // Factory function tạo thiên thể với hệ phân cấp Pivot → Tilt → Mesh
 import * as THREE from 'three';
 import { AU, BLOOM_LAYER } from './constants.js';
-import { createAtmosphere } from './atmosphere.js';
+import { createAtmosphere, createAtmosphereLayers } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
-import { createSunCorona, createSunSurfaceMaterial, createChromosphere, createSunOuterGlow } from './sun.js';
+import { createUnifiedCorona, createSunSurfaceMaterial, createChromosphere } from './sun.js';
 import { createCometTail, createCometComa } from './comets.js';
 import { createMagneticField } from './magneticField.js';
 import { createHeliumRain } from './heliumRain.js';
@@ -249,16 +249,13 @@ export function createPlanet(data) {
   let coronaMesh = null;
   let chromosphereMesh = null;
   let sunGlowSprite = null;
-  let outerGlowMesh = null;
   if (data.type === 'star') {
     // Gán Mặt Trời vào BLOOM_LAYER để selective bloom
     lod.layers.enable(BLOOM_LAYER);
 
-    // Phase 6: Multi-layer corona — Group chứa 3 layers
-    coronaMesh = createSunCorona(r, ob);
-    coronaMesh.traverse((child) => {
-      if (child.isMesh) child.layers.enable(BLOOM_LAYER);
-    });
+    // Unified Corona — single sphere, single alpha curve, zero onion rings
+    coronaMesh = createUnifiedCorona(r, ob);
+    coronaMesh.layers.enable(BLOOM_LAYER);
     tiltGroup.add(coronaMesh);
 
     // Lớp sắc quyển (chromosphere) — H-alpha đỏ-hồng giữa bề mặt và corona
@@ -266,12 +263,7 @@ export function createPlanet(data) {
     chromosphereMesh.layers.enable(BLOOM_LAYER);
     tiltGroup.add(chromosphereMesh);
 
-    // Phase 5.2: Outer Glow — lớp sáng rộng ngoài cùng (2.0x radius)
-    outerGlowMesh = createSunOuterGlow(r, ob);
-    outerGlowMesh.layers.enable(BLOOM_LAYER);
-    tiltGroup.add(outerGlowMesh);
-
-    // Phase 4.1: Sun Glow Sprite — luôn nhìn thấy dù ở khoảng cách nào
+    // Sun Glow Sprite — luôn nhìn thấy dù ở khoảng cách nào
     sunGlowSprite = createSunGlowSprite(r);
     tiltGroup.add(sunGlowSprite);
   }
@@ -284,11 +276,19 @@ export function createPlanet(data) {
   }
 
   // 4d. Khí quyển Fresnel (nếu hành tinh có atmosphere config)
-  let atmosphereMesh = null;
+  let atmosphereMeshes = [];
   if (data.atmosphere) {
-    atmosphereMesh = createAtmosphere(data.radius, data.atmosphere);
-    atmosphereMesh.name = `${data.id}_atmosphere`;
-    tiltGroup.add(atmosphereMesh);
+    if (data.atmosphere.layers) {
+      atmosphereMeshes = createAtmosphereLayers(data.radius, data.atmosphere.layers);
+    } else {
+      const mesh = createAtmosphere(data.radius, data.atmosphere);
+      mesh.name = `${data.id}_atmosphere`;
+      atmosphereMeshes = [mesh];
+    }
+    for (const mesh of atmosphereMeshes) {
+      mesh.name = mesh.name || `${data.id}_atmosphere`;
+      tiltGroup.add(mesh);
+    }
   }
 
   // Khí quyển đục đặc biệt của Titan (Haze layer)
@@ -339,9 +339,11 @@ export function createPlanet(data) {
   }
 
   // 4g. Từ trường (Magnetic Field)
-  let magneticFieldMesh = createMagneticField(r, data.id);
-  if (magneticFieldMesh) {
-    tiltGroup.add(magneticFieldMesh);
+  let magneticFieldGroup = null;
+  const magneticSystem = createMagneticField(r, data.id);
+  if (magneticSystem) {
+    magneticFieldGroup = magneticSystem;
+    tiltGroup.add(magneticFieldGroup);
   }
 
   // 4h. Mưa Heli (Jupiter, Saturn)
@@ -402,17 +404,16 @@ export function createPlanet(data) {
     tiltGroup,
     lod,
     mesh,
-    atmosphereMesh,
+    atmosphereMeshes,
     atmosphereTextureMesh,
     ringMesh,
     cloudMesh,
     coronaMesh,
     chromosphereMesh,
-    outerGlowMesh,
     sunGlowSprite,
     tailMesh,
     comaMesh,
-    magneticFieldMesh,
+    magneticFieldGroup,
     heliumRainMesh,
     diamondRainMesh,
     ironSnowMesh,

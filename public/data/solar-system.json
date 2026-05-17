@@ -143,9 +143,11 @@
         "clouds": "/textures/planets/earth/clouds.jpg"
       },
       "atmosphere": {
-        "color": "#3B5B89",
-        "opacity": 0.6,
-        "power": 4.0
+        "layers": [
+          { "color": "#4488CC", "opacity": 0.25, "power": 6.0, "scale": 1.02, "scatterStrength": 0.5 },
+          { "color": "#6699DD", "opacity": 0.35, "power": 4.0, "scale": 1.05, "scatterStrength": 0.4 },
+          { "color": "#4466AA", "opacity": 0.15, "power": 2.0, "scale": 1.10, "side": "front", "scatterStrength": 0.2 }
+        ]
       },
       "rings": null,
       "info": {
