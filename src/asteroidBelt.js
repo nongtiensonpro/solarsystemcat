@@ -78,16 +78,24 @@ export function createAsteroidBelt(maxCount = 5000) {
     const rotSpeedY = (random() - 0.5) * 5;
     const rotSpeedZ = (random() - 0.5) * 5;
 
+    // Eccentricity ng?u nhiên (0.0 - 0.25) ph?n ánh th?c t? vành ?ai
+    const eccentricity = random() * 0.25;
+
+    // Góc c?n ?i?m (argument of periapsis) ng?u nhiên
+    const argPeriapsis = random() * Math.PI * 2;
+
     asteroidData.push({
       a: r,
       period: periodSeconds,
       initialTheta: initialTheta,
       inclination: inclination,
+      eccentricity,
+      argPeriapsis,
       scale: scale,
       rotSpeedX,
       rotSpeedY,
       rotSpeedZ,
-      // Lưu trữ góc xoay hiện tại để cập nhật liên tục
+      // L?u tr? góc xoay hi?n t?i ?? c?p nh?t liên t?c
       rotX: random() * Math.PI,
       rotY: random() * Math.PI,
       rotZ: random() * Math.PI,
@@ -129,10 +137,17 @@ export function createAsteroidBelt(maxCount = 5000) {
         // M = 2π * (t / T) + ban đầu
         const meanAnomaly = (2 * Math.PI / data.period) * simulationTime + data.initialTheta;
         
-        // Giả sử eccentricity = 0 cho tiểu hành tinh để tối ưu hiệu năng
-        // x = a * cos(M), z = a * sin(M)
-        const xLocal = data.a * Math.cos(meanAnomaly);
-        const zLocal = data.a * Math.sin(meanAnomaly);
+        // Tính v? trí v?i eccentricity, dùng x?p x? E = M + e*sin(M) (?? cho e nh?)
+        const e = data.eccentricity;
+        const E = meanAnomaly + e * Math.sin(meanAnomaly);
+        const xOrbital = data.a * (Math.cos(E) - e);
+        const zOrbital = data.a * Math.sqrt(1 - e * e) * Math.sin(E);
+        
+        // Xoay theo argument of periapsis
+        const cosW = Math.cos(data.argPeriapsis);
+        const sinW = Math.sin(data.argPeriapsis);
+        const xLocal = xOrbital * cosW - zOrbital * sinW;
+        const zLocal = xOrbital * sinW + zOrbital * cosW;
         
         const x = xLocal;
         const y = zLocal * Math.sin(data.inclination);

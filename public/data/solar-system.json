@@ -603,6 +603,86 @@
         "compositionVi": "Băng và đá, bề mặt đầy hố thiên thạch, có thể có đại dương ngầm"
       }
     },
+    {
+      "id": "phobos",
+      "parentId": "mars",
+      "name": { "vi": "Phobos", "en": "Phobos" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.273,
+        "massKg": 1.066e16,
+        "density": 1.876,
+        "meanTemperatureC": -40
+      },
+      "orbit": {
+        "semiMajorAxis": 0.0000627,
+        "orbitalPeriod": 0.3189,
+        "eccentricity": 0.0151,
+        "inclination": 1.093
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 7.65,
+        "oblateness": 0.25
+      },
+      "render": {
+        "fallbackColor": "#8f8275",
+        "orbitScale": 1,
+        "displayOrbitRadius": 5.5,
+        "initialPhaseDeg": 45,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/phobos/albedo.png",
+        "bump": "/textures/planets/phobos/bump.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "⚠️ Đã phóng to 157× để nhìn rõ texture (thực tế: 11.1 km, bằng 0.00174× Mặt Trăng). Vệ tinh lớn hơn và gần Sao Hỏa nhất, có hố va chạm Stickney khổng lồ.",
+        "compositionVi": "Đá carbon (chondrite cacbon loại C-type), bụi regolith dày đặc"
+      }
+    },
+    {
+      "id": "deimos",
+      "parentId": "mars",
+      "name": { "vi": "Deimos", "en": "Deimos" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.273,
+        "massKg": 1.476e15,
+        "density": 1.471,
+        "meanTemperatureC": -40
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000157,
+        "orbitalPeriod": 1.262,
+        "eccentricity": 0.0002,
+        "inclination": 0.93
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 30.3,
+        "oblateness": 0.2
+      },
+      "render": {
+        "fallbackColor": "#9c8e80",
+        "orbitScale": 1,
+        "displayOrbitRadius": 8.5,
+        "initialPhaseDeg": 190,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/deimos/albedo.png",
+        "bump": "/textures/planets/deimos/bump.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "⚠️ Đã phóng to 281× để nhìn rõ texture (thực tế: 6.2 km, bằng 0.00097× Mặt Trăng). Vệ tinh nhỏ hơn và xa nhất của Sao Hỏa, có bề mặt rất trơn nhẵn do lớp bụi regolith che phủ.",
+        "compositionVi": "Đá giàu cacbon trộn lẫn với băng đá, regolith rất dày"
+      }
+    },
 
     {
       "id": "halley",

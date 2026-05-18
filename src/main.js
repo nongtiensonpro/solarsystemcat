@@ -708,6 +708,13 @@ async function bootstrap() {
     createLabel(data, body.pivot);
   }
 
+  // ??? Kh?i t?o tr?ng thái hi?n th? ?? kh?p v?i toggle "Qu? ?ạo & Nhãn tên"
+  // (toggle m?c ?nh active, c?n ??ng b? v?i actual state)
+  for (const orbit of orbits) {
+    orbit.visible = true;
+  }
+  toggleLabels(true);
+
   // 5a. T?o V?nh ?ai ti?u h?nh tinh (Asteroid Belt)
   const asteroidBelt = createAsteroidBelt(5000);
   scene.add(asteroidBelt.mesh);
@@ -913,8 +920,7 @@ async function bootstrap() {
       if (!body) continue;
 
       const qualityMultiplier = getCurrentPreset().orbitQuality ?? 1;
-      const numPoints = Math.min(256,
-        getSegmentCount(body.data.eccentricity || 0, body.data.isMoon, qualityMultiplier));
+      const numPoints = getSegmentCount(body.data.eccentricity || 0, body.data.isMoon, qualityMultiplier);
 
       const trajectory = predictTrajectory(bodyId, numPoints);
       if (trajectory.length < 3) continue;

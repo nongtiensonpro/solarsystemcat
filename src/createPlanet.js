@@ -125,7 +125,7 @@ export function createPlanet(data) {
     let pbrMetalness = 0.0;
     
     // Tùy chỉnh thông số bề mặt theo thiên thể
-    if (['mercury', 'mars', 'pluto', 'moon', 'callisto'].includes(data.id)) {
+    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos'].includes(data.id)) {
       pbrRoughness = 0.95; // Bề mặt đá khô, nhám
     } else if (data.id === 'earth') {
       pbrRoughness = 0.6;

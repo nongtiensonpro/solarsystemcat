@@ -481,17 +481,38 @@ export function disableNewtonGravity(bodies, scene) {
 // sau ?ó khôi ph?c l?i tr?ng thái g?c.
 
 const PREDICT_MAX_STEPS = 2000;
+const PREDICT_MAX_STEPS_LONG = 100000;
+
+/**
+* T?nh s? b??c tích phân c?n thi?t ?? d? ?oán ?úng 1 chu k? qu? ??o.
+* Dùng cho thiên th? có chu k? dài (Halley 75 n?m).
+*/
+function computePredictionSteps(bodyId) {
+  if (!bodyByIdRef) return PREDICT_MAX_STEPS;
+  const body = bodyByIdRef.get(bodyId);
+  if (!body?.data?.orbitalPeriod || body.data.orbitalPeriod <= 1000) {
+    return PREDICT_MAX_STEPS;
+  }
+  const periodSeconds = body.data.orbitalPeriod * 86400;
+  const estimatedStep = 1800;
+  const needed = Math.ceil(periodSeconds / estimatedStep);
+  return Math.min(PREDICT_MAX_STEPS_LONG, Math.max(PREDICT_MAX_STEPS, needed));
+}
 
 /**
 * Tích phân forward t? tr?ng thái hi?n t?i, ghi l?i qu? ??o c?a bodyId.
 * Không làm ?nh h??ng ??n tr?ng thái mô ph?ng th?c t?.
+* T? ??ng tính s? b??c n?u là qu? ??o dài (Halley).
 *
-* @param {string} bodyId - ID c?a thiên th? c?n d? ?oán
+* @param {string} bodyId - ID c?a thi?n th? c?n d? ?oán
 * @param {number} numPoints - S? ?i?m qu? ??o mong mu?n
-* @param {number} [maxSteps=PREDICT_MAX_STEPS] - S? b??c tích phân t?i ?a
+* @param {number} [maxSteps=null] - S? b??c tích phân t?i ?a (null = t? tính)
 * @returns {Array<{x:number,y:number,z:number}>} M?ng t?a ??
 */
-export function predictTrajectory(bodyId, numPoints, maxSteps = PREDICT_MAX_STEPS) {
+export function predictTrajectory(bodyId, numPoints, maxSteps = null) {
+  if (maxSteps === null) {
+    maxSteps = computePredictionSteps(bodyId);
+  }
   if (!state.has(bodyId) || maxSteps <= 0) return [];
 
   // L?u tr?ng thái hi?n t?i

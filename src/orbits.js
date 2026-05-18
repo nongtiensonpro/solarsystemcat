@@ -45,12 +45,18 @@ export function createOrbitLine(data) {
   const useCatmullRom = preset.orbitCatmullRom ?? true;
 
   // Adaptive segment count theo ?? l?ch tâm
-  const segments = getSegmentCount(e, data.isMoon, qualityMultiplier);
+  let segments = getSegmentCount(e, data.isMoon, qualityMultiplier);
+
+  // Multi-revolution cho qu? ??o ?? l?ch tâm cao (Halley e=0.967)
+  // Hi?n th? 3 vòng ?? th?y hình d?ng qu? ??o dài
+  const revolutions = (e >= 0.9 && !data.isMoon) ? 3 : 1;
+
   const rawPoints = [];
 
   // Sampling theo Mean Anomaly (M) — t? nhiên t?p trung ?i?m ? c?n ?i?m
-  for (let i = 0; i <= segments; i++) {
-    const M = (i / segments) * Math.PI * 2;
+  const totalSegs = segments * revolutions;
+  for (let i = 0; i <= totalSegs; i++) {
+    const M = (i / totalSegs) * Math.PI * 2 * revolutions;
     const E = solveKepler(M, e);
     const xLocal = a * (Math.cos(E) - e);
     const zLocal = a * Math.sqrt(1 - e * e) * Math.sin(E);
@@ -65,8 +71,8 @@ export function createOrbitLine(data) {
   // CatmullRom n?i suy ?? ???ng cong m??t h?n, gi?m hi?n t??ng "g?p khúc"
   let finalPoints = rawPoints;
   if (useCatmullRom) {
-    const curve = new THREE.CatmullRomCurve3(rawPoints, true);
-    finalPoints = curve.getPoints(segments * 2);
+    const curve = new THREE.CatmullRomCurve3(rawPoints, revolutions > 1);
+    finalPoints = curve.getPoints(totalSegs * 2);
   }
 
   const geometry = new THREE.BufferGeometry().setFromPoints(finalPoints);
@@ -203,6 +209,7 @@ export function createNbodyOrbitLine(data, numPoints = 256) {
     transparent: true,
     opacity: NBODY_ORBIT_OPACITY,
     depthWrite: false,
+    vertexColors: true,
   });
 
   const line = new THREE.Line(geometry, material);
@@ -224,6 +231,18 @@ export function updateOrbitLineGeometry(line, points) {
   const newGeometry = new THREE.BufferGeometry().setFromPoints(points);
   if (line.geometry) {
     line.geometry.dispose();
+  }
+  // Thêm vertex colors cho N-body lines: opacity gi?m d?n (gradient ?? tin c?y)
+  if (line.userData.isNbodyOrbit && !line.userData.isHeroNbodyOrbit) {
+    const colors = new Float32Array(points.length * 3);
+    for (let i = 0; i < points.length; i++) {
+      const t = i / (points.length - 1);
+      const alpha = 1.0 - t * 0.65; // 1.0 ? 0.35 (??u sáng, cu?i m?)
+      colors[i * 3] = alpha;
+      colors[i * 3 + 1] = alpha;
+      colors[i * 3 + 2] = alpha;
+    }
+    newGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   }
   // Gi? l?i index attribute cho hero moon shader (c?n cho hi?u ?ng dashed)
   if (line.userData.isHeroNbodyOrbit) {
