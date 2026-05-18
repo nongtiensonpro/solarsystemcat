@@ -2145,7 +2145,7 @@
       "render": {
         "fallbackColor": "#a0a0a0",
         "orbitScale": 1,
-        "displayOrbitRadius": 24.0,
+        "displayOrbitRadius": 34.0,
         "initialPhaseDeg": 220,
         "orbitPlane": "parentEquator"
       },
