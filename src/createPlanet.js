@@ -125,7 +125,7 @@ export function createPlanet(data) {
     let pbrMetalness = 0.0;
     
     // Tùy chỉnh thông số bề mặt theo thiên thể
-    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos', 'miranda', 'ariel', 'umbriel', 'titania', 'oberon', 'puck', 'caliban', 'sycorax', 'nereid', 'naiad', 'thalassa', 'despina', 'galatea', 'larissa', 'proteus', 'halimede', 'psamathe', 'neso'].includes(data.id)) {
+    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos', 'miranda', 'ariel', 'umbriel', 'titania', 'oberon', 'puck', 'caliban', 'sycorax', 'nereid', 'naiad', 'thalassa', 'despina', 'galatea', 'larissa', 'proteus', 'halimede', 'psamathe', 'neso', 'metis', 'adrastea', 'amalthea', 'thebe', 'himalia', 'elara', 'pasiphae', 'carme', 'ananke', 'sinope'].includes(data.id)) {
       pbrRoughness = 0.95; // Bề mặt đá khô, nhám
     } else if (data.id === 'earth') {
       pbrRoughness = 0.6;

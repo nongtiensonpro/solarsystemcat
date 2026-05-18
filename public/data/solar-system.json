@@ -444,6 +444,154 @@
       }
     },
     {
+      "id": "metis",
+      "parentId": "jupiter",
+      "name": { "vi": "Metis", "en": "Metis" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 3.6e16,
+        "density": 0.86,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000856,
+        "orbitalPeriod": 0.295,
+        "eccentricity": 0.0002,
+        "inclination": 0.06
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 7.08,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#8b8589",
+        "orbitScale": 4,
+        "displayOrbitRadius": 15.3,
+        "initialPhaseDeg": 45,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh trong cùng nhất của Sao Mộc, nằm trong vành đai mờ ngoài cùng và có chu kỳ quay cực ngắn.",
+        "compositionVi": "Băng nước xốp nhẹ xen lẫn bụi silicate tối màu."
+      }
+    },
+    {
+      "id": "adrastea",
+      "parentId": "jupiter",
+      "name": { "vi": "Adrastea", "en": "Adrastea" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.02,
+        "massKg": 2.0e15,
+        "density": 0.86,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000862,
+        "orbitalPeriod": 0.298,
+        "eccentricity": 0.0015,
+        "inclination": 0.03
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 7.15,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#9c9c9c",
+        "orbitScale": 4,
+        "displayOrbitRadius": 16.1,
+        "initialPhaseDeg": 135,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh nhỏ thứ hai quay ngay mép của vành đai chính, đóng vai trò chăn dắt và cung cấp bụi cho vành đai.",
+        "compositionVi": "Băng đá và bụi tối có albedo cực thấp."
+      }
+    },
+    {
+      "id": "amalthea",
+      "parentId": "jupiter",
+      "name": { "vi": "Amalthea", "en": "Amalthea" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.08,
+        "massKg": 2.08e18,
+        "density": 0.86,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00121,
+        "orbitalPeriod": 0.498,
+        "eccentricity": 0.003,
+        "inclination": 0.37
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 11.95,
+        "oblateness": 0.1
+      },
+      "render": {
+        "fallbackColor": "#c84c4c",
+        "orbitScale": 4,
+        "displayOrbitRadius": 17.0,
+        "initialPhaseDeg": 220,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình lớn thứ năm của Sao Mộc, nổi tiếng với sắc đỏ thẫm đặc trưng do nhiễm lưu huỳnh bay ra từ các núi lửa của Io.",
+        "compositionVi": "Băng nước xốp nhẹ với tỷ trọng rất thấp cùng với các hợp chất lưu huỳnh."
+      }
+    },
+    {
+      "id": "thebe",
+      "parentId": "jupiter",
+      "name": { "vi": "Thebe", "en": "Thebe" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.06,
+        "massKg": 4.3e17,
+        "density": 0.86,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.00148,
+        "orbitalPeriod": 0.675,
+        "eccentricity": 0.0175,
+        "inclination": 1.08
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 16.2,
+        "oblateness": 0.05
+      },
+      "render": {
+        "fallbackColor": "#a39589",
+        "orbitScale": 4,
+        "displayOrbitRadius": 18.0,
+        "initialPhaseDeg": 310,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh ngoài cùng của nhóm Amalthea, có bề mặt gồ ghề đầy hố va chạm và một thung lũng đứt gãy cực kỳ lớn.",
+        "compositionVi": "Hỗn hợp đá silicate và băng nước xốp có albedo thấp."
+      }
+    },
+    {
       "id": "io",
       "parentId": "jupiter",
       "name": { "vi": "Io", "en": "Io" },
@@ -468,7 +616,7 @@
       "render": {
         "fallbackColor": "#E8C84A",
         "orbitScale": 4,
-        "displayOrbitRadius": 18,
+        "displayOrbitRadius": 22.0,
         "initialPhaseDeg": 20,
         "orbitPlane": "parentEquator"
       },
@@ -508,7 +656,7 @@
       "render": {
         "fallbackColor": "#C8B896",
         "orbitScale": 4,
-        "displayOrbitRadius": 24,
+        "displayOrbitRadius": 27.0,
         "initialPhaseDeg": 115,
         "orbitPlane": "parentEquator"
       },
@@ -548,7 +696,7 @@
       "render": {
         "fallbackColor": "#8C8478",
         "orbitScale": 4,
-        "displayOrbitRadius": 31,
+        "displayOrbitRadius": 33.0,
         "initialPhaseDeg": 225,
         "orbitPlane": "parentEquator"
       },
@@ -588,7 +736,7 @@
       "render": {
         "fallbackColor": "#6B6050",
         "orbitScale": 4,
-        "displayOrbitRadius": 41,
+        "displayOrbitRadius": 42.0,
         "initialPhaseDeg": 310,
         "orbitPlane": "parentEquator"
       },
@@ -601,6 +749,228 @@
       "info": {
         "summaryVi": "Vệ tinh lớn thứ hai của Sao Mộc, bề mặt cổ nhất trong hệ mặt trời.",
         "compositionVi": "Băng và đá, bề mặt đầy hố thiên thạch, có thể có đại dương ngầm"
+      }
+    },
+    {
+      "id": "himalia",
+      "parentId": "jupiter",
+      "name": { "vi": "Himalia", "en": "Himalia" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.13,
+        "massKg": 4.2e18,
+        "density": 2.6,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.0767,
+        "orbitalPeriod": 250.56,
+        "eccentricity": 0.1623,
+        "inclination": 27.5
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 7.78,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#8b8c8d",
+        "orbitScale": 4,
+        "displayOrbitRadius": 52.0,
+        "initialPhaseDeg": 60,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình thuận hành lớn nhất của Sao Mộc, thủ lĩnh của nhóm Himalia nằm ở khoảng cách rất xa.",
+        "compositionVi": "Đá silicate cacbon tối màu loại C-type phong hóa."
+      }
+    },
+    {
+      "id": "elara",
+      "parentId": "jupiter",
+      "name": { "vi": "Elara", "en": "Elara" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.06,
+        "massKg": 8.7e17,
+        "density": 2.6,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.0782,
+        "orbitalPeriod": 259.64,
+        "eccentricity": 0.2072,
+        "inclination": 26.6
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 12.0,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#9c9a96",
+        "orbitScale": 4,
+        "displayOrbitRadius": 59.0,
+        "initialPhaseDeg": 150,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh lớn thứ hai trong nhóm Himalia, được phát hiện năm 1905 chuyển động trên quỹ đạo nghiêng đáng kể.",
+        "compositionVi": "Silicate và vật liệu carbonaceous tối nhám."
+      }
+    },
+    {
+      "id": "pasiphae",
+      "parentId": "jupiter",
+      "name": { "vi": "Pasiphae", "en": "Pasiphae" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.05,
+        "massKg": 3.0e17,
+        "density": 2.6,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.157,
+        "orbitalPeriod": -722.3,
+        "eccentricity": 0.329,
+        "inclination": 145.2
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 18.0,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#7e7870",
+        "orbitScale": 4,
+        "displayOrbitRadius": 66.0,
+        "initialPhaseDeg": 240,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình nghịch hành lớn nằm ở quỹ đạo xa xôi, chịu nhiễu loạn hấp dẫn rất mạnh từ Mặt Trời.",
+        "compositionVi": "Đá tối màu giàu carbon loại C-type phong hóa nặng nề."
+      }
+    },
+    {
+      "id": "carme",
+      "parentId": "jupiter",
+      "name": { "vi": "Carme", "en": "Carme" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.04,
+        "massKg": 1.3e17,
+        "density": 2.6,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.154,
+        "orbitalPeriod": -702.3,
+        "eccentricity": 0.234,
+        "inclination": 164.9
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 15.0,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#6c6660",
+        "orbitScale": 4,
+        "displayOrbitRadius": 73.0,
+        "initialPhaseDeg": 330,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh thủ lĩnh của nhóm Carme, chuyển động nghịch hành trên quỹ đạo cực kỳ lệch tâm và nghiêng góc lớn.",
+        "compositionVi": "Hỗn hợp đá carbonaceous tối màu phong hóa."
+      }
+    },
+    {
+      "id": "ananke",
+      "parentId": "jupiter",
+      "name": { "vi": "Ananke", "en": "Ananke" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 3.0e16,
+        "density": 2.6,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.142,
+        "orbitalPeriod": -613.5,
+        "eccentricity": 0.244,
+        "inclination": 149.5
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 8.0,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#5e5b56",
+        "orbitScale": 4,
+        "displayOrbitRadius": 80.0,
+        "initialPhaseDeg": 100,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh đại diện cho nhóm Ananke, chuyển động nghịch hành, được tin là một tiểu hành tinh bị bắt giữ từ vành đai chính.",
+        "compositionVi": "Silicate và các hợp chất hữu cơ tholin đỏ sẫm mờ."
+      }
+    },
+    {
+      "id": "sinope",
+      "parentId": "jupiter",
+      "name": { "vi": "Sinope", "en": "Sinope" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 7.5e16,
+        "density": 2.6,
+        "meanTemperatureC": -143
+      },
+      "orbit": {
+        "semiMajorAxis": 0.158,
+        "orbitalPeriod": -728.0,
+        "eccentricity": 0.249,
+        "inclination": 158.1
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 13.5,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#4e4944",
+        "orbitScale": 4,
+        "displayOrbitRadius": 87.0,
+        "initialPhaseDeg": 190,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Một trong những vệ tinh nghịch hành ngoài cùng nhất của Sao Mộc, chịu ảnh hưởng mạnh bởi cộng hưởng hấp dẫn của Mặt Trời.",
+        "compositionVi": "Đá silicate phong hóa cacbon tối màu."
       }
     },
     {
