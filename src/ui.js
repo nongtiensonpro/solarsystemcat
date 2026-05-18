@@ -173,12 +173,11 @@ export function initUI(callbacks) {
   `;
   container.appendChild(searchPanel);
 
-  // ═══ Planet Selector — Vẫn giữ nhưng sẽ mờ đi khi search ═══
+  // ═══ Planet Selector — Compact horizontal bar ═══
   const selector = document.createElement('div');
   selector.className = 'glass-panel planet-selector';
   selector.id = 'planet-selector';
   
-  // Tách planets (non-moon) và moons
   const planets = planetData.filter(p => !p.isMoon);
   const moonsByParent = new Map();
   for (const body of planetData) {
@@ -190,35 +189,124 @@ export function initUI(callbacks) {
     }
   }
   
+  const selectorBody = document.createElement('div');
+  selectorBody.className = 'selector-body';
+  selectorBody.id = 'selector-body';
+  
+  const simToggle = document.createElement('label');
+  simToggle.className = 'sim-toggle';
+  simToggle.title = 'Hiện vệ tinh mô phỏng';
+  simToggle.innerHTML = `
+    <input type="checkbox" id="show-all-moons-checkbox">
+    <span class="sim-toggle-icon">SIM</span>
+  `;
+  selectorBody.appendChild(simToggle);
+  
+  const moonPopup = document.createElement('div');
+  moonPopup.className = 'moon-popup glass-panel';
+  moonPopup.id = 'moon-popup';
+  moonPopup.style.display = 'none';
+  
   for (const planet of planets) {
-    // Planet button
-    const btn = document.createElement('button');
-    btn.className = 'planet-btn';
-    btn.dataset.id = planet.id;
+    const planetBtn = document.createElement('button');
+    planetBtn.className = 'planet-group-btn';
+    planetBtn.dataset.id = planet.id;
     const dotColor = colorToHex(planet.fallbackColor || 0xaaaaaa);
-    btn.innerHTML = `
-      <span class="planet-dot" style="background: ${dotColor}"></span>
-      ${planet.name}
-    `;
-    selector.appendChild(btn);
-
-    // Moon buttons (grouped under parent)
     const moons = moonsByParent.get(planet.id);
-    if (moons && moons.length > 0) {
-      for (const moon of moons) {
-        const moonBtn = document.createElement('button');
-        moonBtn.className = 'planet-btn moon-btn';
-        moonBtn.dataset.id = moon.id;
-        const moonDotColor = colorToHex(moon.fallbackColor || 0x888888);
-        moonBtn.innerHTML = `
-          <span class="planet-dot moon-dot" style="background: ${moonDotColor}"></span>
-          ${moon.name}
-        `;
-        selector.appendChild(moonBtn);
-      }
-    }
+    const hasMoons = moons && moons.length > 0;
+    
+    planetBtn.innerHTML = `
+      <span class="planet-dot" style="background: ${dotColor}"></span>
+      <span class="planet-group-name">${planet.name}</span>
+      ${hasMoons ? `<span class="moon-count-badge">${moons.length}</span>` : ''}
+    `;
+    selectorBody.appendChild(planetBtn);
+    
+    planetBtn.addEventListener('click', () => {
+      selectBody(planet.id);
+      if (hasMoons) showMoonPopup(planet.id, planetBtn);
+    });
   }
+  
+  selector.appendChild(selectorBody);
+  selector.appendChild(moonPopup);
   container.appendChild(selector);
+  
+  const showAllCheckbox = document.getElementById('show-all-moons-checkbox');
+  showAllCheckbox.addEventListener('change', () => {
+    const checked = showAllCheckbox.checked;
+    selector.classList.toggle('showing-all', checked);
+    if (moonPopup.style.display !== 'none') {
+      const activeBtn = selector.querySelector('.planet-group-btn.active');
+      if (activeBtn) showMoonPopup(activeBtn.dataset.id, activeBtn);
+    }
+  });
+  
+  // Backdrop cho moon popup (mobile)
+  const moonBackdrop = document.createElement('div');
+  moonBackdrop.className = 'moon-backdrop';
+  moonBackdrop.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:25;display:none;background:transparent;';
+  document.body.appendChild(moonBackdrop);
+  moonBackdrop.addEventListener('click', () => {
+    moonPopup.style.display = 'none';
+    moonBackdrop.style.display = 'none';
+  });
+  moonBackdrop.addEventListener('touchstart', () => {
+    moonPopup.style.display = 'none';
+    moonBackdrop.style.display = 'none';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.moon-popup') && !e.target.closest('.planet-group-btn') && !e.target.closest('.sim-toggle')) {
+      moonPopup.style.display = 'none';
+      moonBackdrop.style.display = 'none';
+    }
+  });
+  
+  function showMoonPopup(planetId, anchorBtn) {
+    const moons = moonsByParent.get(planetId);
+    if (!moons) return;
+    
+    const showAll = document.getElementById('show-all-moons-checkbox')?.checked || false;
+    
+    let html = '';
+    moons.forEach(m => {
+      const isLq = !m.hasHighQualityImage;
+      if (isLq && !showAll) return;
+      const mDot = colorToHex(m.fallbackColor || 0x888888);
+      html += '<button class="moon-btn' + (isLq ? ' low-quality-moon' : '') + '" data-id="' + m.id + '">' +
+        '<span class="planet-dot moon-dot" style="background:' + mDot + '"></span>' +
+        '<span class="moon-name">' + m.name + '</span>' +
+        (isLq ? '<span class="sim-badge">SIM</span>' : '') +
+        '</button>';
+    });
+    
+    moonPopup.innerHTML = html;
+    
+    moonPopup.querySelectorAll('.moon-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectBody(btn.dataset.id);
+        moonPopup.style.display = 'none';
+      });
+    });
+    
+    const rect = anchorBtn.getBoundingClientRect();
+    const selectorRect = selector.getBoundingClientRect();
+    
+    if (window.innerWidth < 720) {
+      moonPopup.style.bottom = '';
+      moonPopup.style.left = '8px';
+      moonPopup.style.right = '8px';
+      moonPopup.style.top = '';
+    } else {
+      moonPopup.style.bottom = (selectorRect.bottom - rect.top + 8) + 'px';
+      moonPopup.style.left = Math.max(4, rect.left - selectorRect.left) + 'px';
+      moonPopup.style.right = '';
+      moonPopup.style.top = '';
+    }
+    moonPopup.style.display = 'flex';
+    moonBackdrop.style.display = window.innerWidth < 720 ? 'block' : 'none';
+  }
 
   // ═══ Info Panel ═══
   const infoPanel = document.createElement('div');
@@ -383,7 +471,7 @@ export function initUI(callbacks) {
     if (callbacks.onOverview) callbacks.onOverview();
     // Khi về home thì ẩn luôn info panel và các active planet btn
     infoPanel.classList.remove('visible');
-    allBtns.forEach(b => b.classList.remove('active'));
+    selector.querySelectorAll('.planet-group-btn, .moon-btn').forEach(b => b.classList.remove('active'));
   });
   btnCloseSearch.addEventListener('click', toggleSearch);
 
@@ -415,14 +503,15 @@ export function initUI(callbacks) {
 
     filtered.forEach(body => {
       const el = document.createElement('div');
-      el.className = 'search-item';
+      el.className = `search-item${body.isMoon && !body.hasHighQualityImage ? ' low-quality-item' : ''}`;
       
       let typeText = body.type === 'star' ? 'Ngôi sao' : body.isMoon ? 'Vệ tinh' : body.type === 'comet' ? 'Sao chổi' : 'Hành tinh';
+      const qualityBadge = body.isMoon && !body.hasHighQualityImage ? '<span class="search-quality-badge" title="Mô phỏng vật lý cơ bản">SIM</span>' : '';
       
       el.innerHTML = `
         <div class="search-item-dot" style="background: ${colorToHex(body.fallbackColor)}"></div>
         <div class="search-item-info">
-          <div class="search-item-name">${body.name}</div>
+          <div class="search-item-name">${body.name}${qualityBadge}</div>
           <div class="search-item-type">${typeText}${body.parentId ? ` của ${getParentName(body.parentId)}` : ''}</div>
         </div>
       `;
@@ -682,18 +771,10 @@ export function initUI(callbacks) {
     }
   });
 
-  // Planet + Moon Selector Buttons
-  const allBtns = selector.querySelectorAll('.planet-btn');
-  allBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      selectBody(btn.dataset.id);
-    });
-  });
-
   // Share logic for selecting a body
   function selectBody(bodyId) {
     // Update active state in bottom selector
-    allBtns.forEach(b => {
+    selector.querySelectorAll('.planet-group-btn, .moon-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.id === bodyId);
     });
 
@@ -801,7 +882,7 @@ export function initUI(callbacks) {
   btnFollow.addEventListener('click', () => {
     btnFollow.classList.add('active');
     btnOverview.classList.remove('active');
-    const activeBtn = Array.from(allBtns).find(b => b.classList.contains('active'));
+    const activeBtn = Array.from(selector.querySelectorAll('.planet-group-btn, .moon-btn')).find(b => b.classList.contains('active'));
     if (activeBtn && callbacks.onFollow) {
       callbacks.onFollow(activeBtn.dataset.id);
     }

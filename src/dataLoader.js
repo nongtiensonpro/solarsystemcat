@@ -165,6 +165,9 @@ function normalizeBody(raw) {
     // ─── Derived flags ───
     isMoon: raw.type === 'moon',
 
+    // ─── Image quality flag ───
+    hasHighQualityImage: !!(raw.textures?.albedo) || raw.saturnMoon?.lodTier === 'hero',
+
     // ─── Info (giữ nguyên cho info panel) ───
     info: raw.info || null,
 

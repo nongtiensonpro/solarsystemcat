@@ -56,14 +56,14 @@ body {
    ═══════════════════════════════════════════ */
 .top-bar {
   position: absolute;
-  top: 16px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 24px;
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding: 6px 16px;
+  padding-top: max(6px, env(safe-area-inset-top));
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   z-index: 20;
 }
 
@@ -451,6 +451,22 @@ body {
   color: #aaa;
 }
 
+.search-item.low-quality-item {
+  opacity: 0.7;
+}
+
+.search-quality-badge {
+  font-size: 9px;
+  padding: 1px 4px;
+  margin-left: 6px;
+  background: rgba(255, 180, 50, 0.15);
+  border: 1px solid rgba(255, 180, 50, 0.3);
+  border-radius: 3px;
+  color: #ffb432;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
 .no-results {
   text-align: center;
   color: #aaa;
@@ -527,44 +543,204 @@ body {
 }
 
 /* ═══════════════════════════════════════════
-   Planet Selector — Bottom Bar
+   Planet Selector — Bottom Bar (Optimized)
    ═══════════════════════════════════════════ */
 .planet-selector {
   position: absolute;
-  bottom: 20px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 10px 16px;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding: 4px 8px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
   display: flex;
-  gap: 8px;
+  flex-direction: column;
   z-index: 20;
-  max-width: 85vw;
+  max-width: 92vw;
+  overflow: visible;
+}
+
+.selector-body {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   scrollbar-width: thin;
-  scrollbar-color: rgba(110, 198, 255, 0.4) rgba(0, 0, 0, 0);
+  scrollbar-color: rgba(110, 198, 255, 0.3) transparent;
+  padding: 2px 0;
+  -webkit-overflow-scrolling: touch;
 }
 
-.planet-selector::-webkit-scrollbar {
-  height: 6px;
-  display: block;
+.selector-body::-webkit-scrollbar {
+  height: 2px;
 }
 
-.planet-selector::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 10px;
-}
-
-.planet-selector::-webkit-scrollbar-thumb {
+.selector-body::-webkit-scrollbar-thumb {
   background: rgba(110, 198, 255, 0.3);
+  border-radius: 1px;
+}
+
+.sim-toggle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin-right: 6px;
+  user-select: none;
+}
+
+.sim-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.sim-toggle-icon {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 5px;
+  background: rgba(100, 140, 255, 0.1);
+  border: 1px solid rgba(100, 140, 255, 0.2);
+  border-radius: 4px;
+  color: #5a7a9a;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+.sim-toggle input:checked + .sim-toggle-icon {
+  background: rgba(110, 198, 255, 0.2);
+  border-color: #6ec6ff;
+  color: #6ec6ff;
+}
+
+.planet-group-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8899bb;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.planet-group-btn:hover {
+  background: rgba(100, 140, 255, 0.1);
+  color: #e0e8ff;
+}
+
+.planet-group-btn.active {
+  background: rgba(110, 198, 255, 0.18);
+  color: #6ec6ff;
+}
+
+.planet-group-name {
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.moon-count-badge {
+  font-size: 8px;
+  padding: 1px 5px;
+  background: rgba(100, 140, 255, 0.12);
+  border-radius: 8px;
+  color: #8ab4f8;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.moon-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  max-width: 320px;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 30;
+  margin-bottom: 6px;
+  background: rgba(8, 12, 26, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 10px;
+  border: 1px solid rgba(100, 140, 255, 0.2);
+  animation: fadeIn 0.15s ease;
 }
 
-.planet-selector::-webkit-scrollbar-thumb:hover {
-  background: rgba(110, 198, 255, 0.5);
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
+.moon-popup::-webkit-scrollbar {
+  width: 3px;
+}
+
+.moon-popup::-webkit-scrollbar-thumb {
+  background: rgba(110, 198, 255, 0.3);
+  border-radius: 2px;
+}
+
+.moon-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #aab5c5;
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.moon-btn:hover {
+  background: rgba(100, 140, 255, 0.12);
+  color: #e0e8ff;
+}
+
+.moon-btn.active {
+  background: rgba(110, 198, 255, 0.2);
+  color: #6ec6ff;
+}
+
+.moon-btn.low-quality-moon {
+  border: 1px dashed rgba(100, 140, 255, 0.12);
+}
+
+.moon-name {
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sim-badge {
+  font-size: 7px;
+  padding: 1px 3px;
+  background: rgba(255, 180, 50, 0.15);
+  border: 1px solid rgba(255, 180, 50, 0.3);
+  border-radius: 2px;
+  color: #ffb432;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ═══════════════════════════════════════════
+   Legacy Planet Button Styles (kept for compatibility)
+   ═══════════════════════════════════════════ */
 .planet-btn {
   flex-shrink: 0;
   display: flex;
@@ -604,16 +780,16 @@ body {
 }
 
 /* ═══════════════════════════════════════════
-   Moon Buttons — Smaller variant
+   Moon Buttons — Smaller variant (legacy)
    ═══════════════════════════════════════════ */
-.moon-btn {
+.moon-btn-legacy {
   min-width: 40px;
   padding: 4px 6px;
   font-size: 9px;
   opacity: 0.8;
 }
 
-.moon-btn:hover {
+.moon-btn-legacy:hover {
   opacity: 1;
 }
 
@@ -1098,10 +1274,6 @@ body {
     border-radius: 12px;
   }
 
-  .planet-selector::-webkit-scrollbar {
-    display: none;
-  }
-
   .top-bar h1 {
     display: none;
   }
@@ -1124,50 +1296,50 @@ body {
   }
 
   .planet-selector {
-    display: flex !important;
     left: 0;
     right: 0;
     bottom: 0;
     transform: none;
     max-width: 100vw;
-    padding: 6px 16px;
-    padding-bottom: max(6px, env(safe-area-inset-bottom));
-    border-radius: 16px 16px 0 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
+    padding: 4px 0;
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    border-radius: 14px 14px 0 0;
+    overscroll-behavior: contain;
+  }
+
+  .planet-selector.showing-all {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .moon-popup {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    max-height: 160px;
+    bottom: calc(100% + 4px);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+  }
+
+  .selector-body {
     gap: 2px;
-    justify-content: flex-start;
-    /* Fade edges để hint có thể cuộn */
-    mask-image: linear-gradient(
-      to right, transparent 0%, black 4%, black 96%, transparent 100%
-    );
-    -webkit-mask-image: linear-gradient(
-      to right, transparent 0%, black 4%, black 96%, transparent 100%
-    );
+    padding: 2px 4px;
+    overscroll-behavior: contain;
   }
 
-  .planet-selector::-webkit-scrollbar {
+  .selector-body::-webkit-scrollbar {
     display: none;
   }
 
-  .planet-btn {
-    scroll-snap-align: center;
-    min-width: 56px;
-    padding: 8px 6px;
+  .planet-group-btn {
     flex: 0 0 auto;
-    font-size: 10px;
+    padding: 6px 8px;
+    min-height: 40px;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  .planet-dot {
-    width: 14px;
-    height: 14px;
-  }
-
-  /* Ẩn moon buttons trên bottom bar — dùng search thay thế */
-  .moon-btn {
-    display: none;
+  .planet-group-name {
+    font-size: 9px;
+    max-width: 50px;
   }
 
   #attribution {
@@ -1183,6 +1355,18 @@ body {
     font-size: 10px;
   }
 
+  .settings-panel {
+    top: 70px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+  }
+
+  .saturn-camera-panel {
+    bottom: 60px;
+  }
+
   /* ═══ Info Panel → Bottom Sheet ═══ */
   .info-panel {
     position: fixed;
@@ -1191,7 +1375,7 @@ body {
     left: 0;
     right: 0;
     width: 100%;
-    max-height: 55vh;
+    max-height: calc(55vh - 10px);
     border-radius: 20px 20px 0 0;
     padding: 8px 16px 16px;
     padding-bottom: max(16px, env(safe-area-inset-bottom));
@@ -1200,6 +1384,7 @@ body {
     z-index: 30;
     overflow-y: auto;
     overscroll-behavior: contain;
+    margin-bottom: 48px;
   }
 
   .info-panel.visible {
@@ -1316,7 +1501,7 @@ body {
   }
 
   /* Visual feedback khi chạm (active state) */
-  .planet-btn:active,
+  .planet-group-btn:active,
   .btn-icon:active,
   .btn-action:active,
   .search-item:active,
@@ -1348,12 +1533,50 @@ body {
 
     .planet-selector {
       bottom: 0;
-      padding: 4px 12px;
-      max-width: calc(100vw - 320px); /* Để chỗ cho info panel bên phải */
+      padding: 2px 8px;
+      max-width: calc(100vw - 320px);
     }
 
-    .planet-btn {
+    .planet-group-btn {
       padding: 4px 6px;
+      font-size: 9px;
+    }
+
+    .info-panel {
+      margin-bottom: 0;
+      max-height: 70vh;
+    }
+  }
+
+  @media (max-width: 374px) {
+    .top-bar {
+      padding: 4px 6px;
+      gap: 4px;
+      border-radius: 10px;
+    }
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      font-size: 14px;
+    }
+    .time-select {
+      font-size: 10px;
+      padding: 4px 6px;
+    }
+    .planet-group-btn {
+      padding: 4px 6px;
+    }
+    .planet-group-name {
+      font-size: 8px;
+      max-width: 36px;
+    }
+    .moon-count-badge {
+      font-size: 7px;
+      padding: 0 4px;
+    }
+    .sim-toggle-icon {
+      font-size: 8px;
+      padding: 2px 4px;
     }
   }
 }
