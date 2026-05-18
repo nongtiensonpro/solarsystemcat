@@ -945,6 +945,13 @@ async function bootstrap() {
     }
   }
 
+  // Vector pool — cấp phát một lần, tái sử dụng trong hot path, tránh GC pressure
+  const _v = new THREE.Vector3();
+  const _v2 = new THREE.Vector3();
+  const _v3 = new THREE.Vector3();
+  const _sunDir = new THREE.Vector3();
+  let _cachedTime = 0;
+
   function animate() {
     requestAnimationFrame(animate);
 
@@ -953,8 +960,12 @@ async function bootstrap() {
       simulationTime += deltaTime * timeScale;
     }
 
-    const solarWindStrength = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(simulationTime * 0.00003)) 
-      * (0.6 + 0.4 * Math.sin(simulationTime * 0.00008 + 1.3));
+    // Solar wind — throttle m?i 3 frame (giá tr? thay ??i ch?m, không ?nh h??ng th? giác)
+    if (frameCount % 3 === 0) {
+      _cachedTime = simulationTime;
+    }
+    const solarWindStrength = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(_cachedTime * 0.00003)) 
+      * (0.6 + 0.4 * Math.sin(_cachedTime * 0.00008 + 1.3));
 
     // Newton Gravity N-body (thay thế Kepler)
     if (newtonGravityActive && !isPaused) {
@@ -983,7 +994,7 @@ async function bootstrap() {
           
           // E. C?p nh?t sao ch?i (??u?i, qu?ng, ?? s?ng)
           if (body.tailMesh) {
-            const awayPos = body.pivot.position.clone().multiplyScalar(2);
+            const awayPos = _v2.copy(body.pivot.position).multiplyScalar(2);
             body.tailMesh.lookAt(awayPos);
 
             // ?? s?ng sao ch?i: I = 1/r^2.5 (brightness curve th?c t?)
@@ -1071,20 +1082,21 @@ async function bootstrap() {
         body.chromosphereMesh.material.uniforms.uTime.value += deltaTime;
       }
 
-      // --- T?I ?U H?A (PHASE 5) ---
-      const bodyWorldPos = new THREE.Vector3();
-      body.pivot.getWorldPosition(bodyWorldPos);
+      // --- T?I ?U H?A (PHASE 5) — dùng vector pool, compute sunDir 1 l?n ---
+      body.pivot.getWorldPosition(_v);
+      _sunDir.copy(_v).negate().normalize();
 
-      // D3. C?p nh?t t? tr??ng (magnetosphere + field lines)
-      if (isMagneticFieldEnabled && body.magneticFieldGroup?.userData?.isMagneticSystem) {
-        const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
+      const distToCamera = camera.position.distanceTo(_v);
+      const cullDist = body.data.radius * 50;
 
+      // D3. C?p nh?t t? tr??ng (magnetosphere + field lines) — ch? khi ? g?n
+      if (isMagneticFieldEnabled && body.magneticFieldGroup?.userData?.isMagneticSystem && distToCamera < cullDist) {
         body.magneticFieldGroup.traverse((child) => {
           if (child.material?.uniforms?.uTime) {
             child.material.uniforms.uTime.value += deltaTime;
           }
           if (child.material?.uniforms?.uSunDirection) {
-            child.material.uniforms.uSunDirection.value.copy(sunDir);
+            child.material.uniforms.uSunDirection.value.copy(_sunDir);
           }
           if (child.material?.uniforms?.uSolarWind) {
             child.material.uniforms.uSolarWind.value = solarWindStrength;
@@ -1094,15 +1106,14 @@ async function bootstrap() {
         body.magneticFieldGroup.lookAt(0, 0, 0);
       }
 
-      // D4. C?p nh?t khí quy?n (atmosphere layers + scattering)
-      if (body.atmosphereMeshes?.length) {
-        const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
+      // D4. C?p nh?t khí quy?n (atmosphere layers + scattering) — b? qua khi r?t xa
+      if (body.atmosphereMeshes?.length && distToCamera < cullDist * 1.6) {
         for (const atmMesh of body.atmosphereMeshes) {
           if (atmMesh.material.uniforms?.uTime) {
             atmMesh.material.uniforms.uTime.value += deltaTime;
           }
           if (atmMesh.material.uniforms?.uSunDirection) {
-            atmMesh.material.uniforms.uSunDirection.value.copy(sunDir);
+            atmMesh.material.uniforms.uSunDirection.value.copy(_sunDir);
           }
           if (atmMesh.material.uniforms?.uSolarWind) {
             atmMesh.material.uniforms.uSolarWind.value = solarWindStrength;
@@ -1112,8 +1123,6 @@ async function bootstrap() {
           }
         }
       }
-
-      const distToCamera = camera.position.distanceTo(bodyWorldPos);
 
       // D5. C?p nh?t c?c quang (aurora)
       if (isAuroraEnabled && body.auroraGroup) {
@@ -1131,14 +1140,13 @@ async function bootstrap() {
         }
       }
 
-      // D6. C?p nh?t mây th? tích (volumetric clouds)
-      if (isCloudsEnabled && body.volumetricCloudMesh) {
-        const sunDir = new THREE.Vector3(0, 0, 0).sub(bodyWorldPos).normalize();
+      // D6. C?p nh?t mây th? tích (volumetric clouds) — ch? khi ? g?n
+      if (isCloudsEnabled && body.volumetricCloudMesh && distToCamera < cullDist) {
         if (body.volumetricCloudMesh.material.uniforms?.uTime) {
           body.volumetricCloudMesh.material.uniforms.uTime.value += deltaTime;
         }
         if (body.volumetricCloudMesh.material.uniforms?.uSunDirection) {
-          body.volumetricCloudMesh.material.uniforms.uSunDirection.value.copy(sunDir);
+          body.volumetricCloudMesh.material.uniforms.uSunDirection.value.copy(_sunDir);
         }
       }
 
@@ -1180,31 +1188,32 @@ async function bootstrap() {
 
       // H. Update Ring Shadows (Saturn + Uranus)
       if ((body.data.id === 'saturn' || body.data.id === 'uranus') && body.ringMesh && body.ringMesh.material.uniforms) {
-        const planetPos = new THREE.Vector3();
-        body.pivot.getWorldPosition(planetPos);
-        body.ringMesh.material.uniforms.uPlanetPosition.value.copy(planetPos);
+        body.ringMesh.material.uniforms.uPlanetPosition.value.copy(_v);
         body.ringMesh.material.uniforms.uSunPosition.value.set(0, 0, 0);
         body.ringMesh.material.uniforms.uCameraPosition.value.copy(camera.position);
       }
       
-      // Phase 6: Pulse Hero Moons
+      // Phase 6: Pulse Hero Moons — dùng simulationTime thay Date.now()
       if (body.data.saturnMoon?.lodTier === 'hero' && body.mesh.levels) {
         const mat = body.mesh.levels[0].object.material;
         if (mat) {
-          mat.emissiveIntensity = 0.1 + 0.2 * Math.sin(Date.now() * 0.003);
+          mat.emissiveIntensity = 0.1 + 0.2 * Math.sin(simulationTime * 0.003);
         }
       }
     } // Kết thúc vòng lặp bodies
 
-    for (const orbit of orbits) {
-      if (orbit.visible && orbit.material.uniforms?.uTime) {
-        orbit.material.uniforms.uTime.value += deltaTime;
+    // Throttle orbit shader uTime updates — m?i 2 frame (không ?nh h??ng th? giác)
+    if (frameCount % 2 === 0) {
+      const dt2 = deltaTime * 2;
+      for (const orbit of orbits) {
+        if (orbit.visible && orbit.material.uniforms?.uTime) {
+          orbit.material.uniforms.uTime.value += dt2;
+        }
       }
-    }
-    // C?p nh?t uTime cho N-body hero moon orbit lines
-    for (const [, line] of nbodyOrbitLines) {
-      if (line.visible && line.material.uniforms?.uTime) {
-        line.material.uniforms.uTime.value += deltaTime;
+      for (const [, line] of nbodyOrbitLines) {
+        if (line.visible && line.material.uniforms?.uTime) {
+          line.material.uniforms.uTime.value += dt2;
+        }
       }
     }
 
@@ -1235,20 +1244,15 @@ async function bootstrap() {
       }
 
       if (cameraMode === 'follow' && trackedBody) {
-        const targetPos = new THREE.Vector3();
-        trackedBody.pivot.getWorldPosition(targetPos);
+        trackedBody.pivot.getWorldPosition(_v2);
+        _v3.subVectors(camera.position, controls.target);
         
-        // T?nh vector kho?ng c?ch hi?n t?i t? camera ??n target c?
-        const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+        controls.target.copy(_v2);
+        camera.position.copy(_v2).add(_v3);
         
-        // Di chuy?n c? target v? camera theo targetPos m?i
-        controls.target.copy(targetPos);
-        camera.position.copy(targetPos).add(offset);
-        
-        // T? ??ng C?t d?a h?u d?a tr?n kho?ng c?ch camera (n?u b?t)
         if (isAutoSliceEnabled) {
-          const distance = camera.position.distanceTo(targetPos);
-          updateAutoCrossSection(trackedBody, distance, targetPos);
+          const distance = camera.position.distanceTo(_v2);
+          updateAutoCrossSection(trackedBody, distance, _v2);
         }
       }
     }
@@ -1262,9 +1266,8 @@ async function bootstrap() {
       const intersects = raycaster.intersectObject(trackedBody.ringMesh);
       if (intersects.length > 0) {
         const hitPoint = intersects[0].point;
-        const planetPos = new THREE.Vector3();
-        trackedBody.pivot.getWorldPosition(planetPos);
-        const distUnits = hitPoint.distanceTo(planetPos);
+        trackedBody.pivot.getWorldPosition(_v2);
+        const distUnits = hitPoint.distanceTo(_v2);
         const scaleFactor = 9.45 / 58232;
         const distKm = distUnits / scaleFactor;
 
@@ -1294,9 +1297,8 @@ async function bootstrap() {
       const intersects = raycaster.intersectObject(trackedBody.ringMesh);
       if (intersects.length > 0) {
         const hitPoint = intersects[0].point;
-        const planetPos = new THREE.Vector3();
-        trackedBody.pivot.getWorldPosition(planetPos);
-        const distUnits = hitPoint.distanceTo(planetPos);
+        trackedBody.pivot.getWorldPosition(_v2);
+        const distUnits = hitPoint.distanceTo(_v2);
 
         let ringName = '';
         let ringDesc = '';
@@ -1340,10 +1342,9 @@ async function bootstrap() {
 
     // C?p nh?t Ghost Moon System
     if (saturnGhostSystem && trackedBody?.data?.id === 'saturn') {
-      const saturnWorldPos = new THREE.Vector3();
-      trackedBody.pivot.getWorldPosition(saturnWorldPos);
-      const distToCamera = camera.position.distanceTo(saturnWorldPos);
-      saturnGhostSystem.update(deltaTime, timeScale, distToCamera);
+      trackedBody.pivot.getWorldPosition(_v2);
+      const ghostDist = camera.position.distanceTo(_v2);
+      saturnGhostSystem.update(deltaTime, timeScale, ghostDist);
     }
 
     // -- Raycasting cho Interior Tooltip --
@@ -1374,16 +1375,15 @@ async function bootstrap() {
     frameCount++;
 
     // Phase 4.2: Update sunlight path positions
-    if (frameCount % 3 === 0) { // Throttle: update mỗi 3 frame
+    if (frameCount % 3 === 0) {
       for (const sp of sunlightPaths) {
         if (!sp.line.visible) continue;
-        const worldPos = new THREE.Vector3();
-        sp.body.pivot.getWorldPosition(worldPos);
+        sp.body.pivot.getWorldPosition(_v2);
         const positions = sp.line.geometry.attributes.position.array;
-        positions[0] = worldPos.x;
-        positions[1] = worldPos.y;
-        positions[2] = worldPos.z;
-        positions[3] = 0; // Sun at origin
+        positions[0] = _v2.x;
+        positions[1] = _v2.y;
+        positions[2] = _v2.z;
+        positions[3] = 0;
         positions[4] = 0;
         positions[5] = 0;
         sp.line.geometry.attributes.position.needsUpdate = true;
@@ -1420,6 +1420,9 @@ async function bootstrap() {
   let fpsLastTime = Date.now();
 
   function updateMinimap() {
+    const minimapContainer = document.getElementById('minimap-container');
+    if (!minimapContainer || minimapContainer.style.display === 'none') return;
+
     const minimapCanvas = document.getElementById('minimap-canvas');
     const minimapCtx = minimapCanvas.getContext('2d');
     if (!minimapCtx) return;
@@ -1429,8 +1432,6 @@ async function bootstrap() {
     const center = w / 2;
     
     minimapCtx.clearRect(0, 0, w, h);
-    
-    // Scale factor: AU is very large
     const scale = center / (40 * AU); 
 
     // Draw Sun
@@ -1439,20 +1440,18 @@ async function bootstrap() {
     minimapCtx.arc(center, center, 3, 0, Math.PI * 2);
     minimapCtx.fill();
 
-    bodies.forEach(body => {
-      if (body.data.isMoon || body.data.id === 'sun') return;
+    for (const body of bodies) {
+      if (body.data.isMoon || body.data.id === 'sun') continue;
       
-      const pos = new THREE.Vector3();
-      body.pivot.getWorldPosition(pos);
-      
-      const mx = center + pos.x * scale;
-      const my = center + pos.z * scale;
+      body.pivot.getWorldPosition(_v);
+      const mx = center + _v.x * scale;
+      const my = center + _v.z * scale;
       
       minimapCtx.fillStyle = body === trackedBody ? '#ffffff' : 'rgba(110, 198, 255, 0.5)';
       minimapCtx.beginPath();
       minimapCtx.arc(mx, my, 1.5, 0, Math.PI * 2);
       minimapCtx.fill();
-    });
+    }
 
     // Draw Camera
     const cx = center + camera.position.x * scale;
@@ -1475,9 +1474,8 @@ async function bootstrap() {
       return;
     }
 
-    const targetPos = new THREE.Vector3();
-    trackedBody.pivot.getWorldPosition(targetPos);
-    const dist = camera.position.distanceTo(targetPos);
+    trackedBody.pivot.getWorldPosition(_v2);
+    const dist = camera.position.distanceTo(_v2);
     const radius = trackedBody.mesh.scale.x;
 
     let activeLevel = 'overview';

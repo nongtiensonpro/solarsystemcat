@@ -116,54 +116,47 @@ export function createAsteroidBelt(maxCount = 5000) {
   instancedMesh.instanceMatrix.needsUpdate = true;
   instancedMesh.instanceColor.needsUpdate = true;
 
+  let _orbitFrame = 0;
+  const ORBIT_INTERVAL = 3; // tính qu? ??o m?i 3 frame, rotation v?n m?i frame
+
   return {
     mesh: instancedMesh,
-    /**
-     * Thay đổi số lượng tiểu hành tinh đang hiển thị
-     * @param {number} count 
-     */
     setCount: (count) => {
       instancedMesh.count = Math.min(count, maxCount);
     },
-    /**
-     * Cập nhật vị trí trên quỹ đạo
-     * @param {number} simulationTime 
-     * @param {number} deltaTime Real time delta cho việc tự xoay
-     */
     update: (simulationTime, deltaTime) => {
+      const doOrbit = (_orbitFrame++ % ORBIT_INTERVAL) === 0;
+
       for (let i = 0; i < instancedMesh.count; i++) {
         const data = asteroidData[i];
-        
-        // M = 2π * (t / T) + ban đầu
-        const meanAnomaly = (2 * Math.PI / data.period) * simulationTime + data.initialTheta;
-        
-        // Tính v? trí v?i eccentricity, dùng x?p x? E = M + e*sin(M) (?? cho e nh?)
-        const e = data.eccentricity;
-        const E = meanAnomaly + e * Math.sin(meanAnomaly);
-        const xOrbital = data.a * (Math.cos(E) - e);
-        const zOrbital = data.a * Math.sqrt(1 - e * e) * Math.sin(E);
-        
-        // Xoay theo argument of periapsis
-        const cosW = Math.cos(data.argPeriapsis);
-        const sinW = Math.sin(data.argPeriapsis);
-        const xLocal = xOrbital * cosW - zOrbital * sinW;
-        const zLocal = xOrbital * sinW + zOrbital * cosW;
-        
-        const x = xLocal;
-        const y = zLocal * Math.sin(data.inclination);
-        const z = zLocal * Math.cos(data.inclination);
-        
-        dummy.position.set(x, y, z);
-        
-        // Cập nhật góc xoay (dùng deltaTime thực tế để xoay mượt mà, độc lập tốc độ mô phỏng)
+
+        if (doOrbit) {
+          const meanAnomaly = (2 * Math.PI / data.period) * simulationTime + data.initialTheta;
+          const e = data.eccentricity;
+          const E = meanAnomaly + e * Math.sin(meanAnomaly);
+          const xOrbital = data.a * (Math.cos(E) - e);
+          const zOrbital = data.a * Math.sqrt(1 - e * e) * Math.sin(E);
+
+          const cosW = Math.cos(data.argPeriapsis);
+          const sinW = Math.sin(data.argPeriapsis);
+          const xLocal = xOrbital * cosW - zOrbital * sinW;
+          const zLocal = xOrbital * sinW + zOrbital * cosW;
+
+          const x = xLocal;
+          const y = zLocal * Math.sin(data.inclination);
+          const z = zLocal * Math.cos(data.inclination);
+
+          dummy.position.set(x, y, z);
+        }
+
         data.rotX += data.rotSpeedX * deltaTime;
         data.rotY += data.rotSpeedY * deltaTime;
         data.rotZ += data.rotSpeedZ * deltaTime;
         dummy.rotation.set(data.rotX, data.rotY, data.rotZ);
-        
+
         dummy.scale.set(data.scale, data.scale, data.scale);
         dummy.updateMatrix();
-        
+
         instancedMesh.setMatrixAt(i, dummy.matrix);
       }
       instancedMesh.instanceMatrix.needsUpdate = true;

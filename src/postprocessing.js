@@ -97,6 +97,10 @@ class SelectiveBloomPass {
 
     // Resolution
     this.resolution = new THREE.Vector2(window.innerWidth, window.innerHeight);
+    this.bloomResolution = new THREE.Vector2(
+      Math.max(1, Math.floor(this.resolution.x / 2)),
+      Math.max(1, Math.floor(this.resolution.y / 2))
+    );
 
     // Bloom params
     this.strength = options.strength ?? 1.5;
@@ -104,10 +108,11 @@ class SelectiveBloomPass {
     this.threshold = options.threshold ?? 0.85;
     this.bloomIntensity = options.bloomIntensity ?? 1.0;
 
-    // ── Internal render target cho bloom layer
+    // ── Internal render target cho bloom layer (half resolution — bloom là hi?u ?ng m?,
+    // quarter s? pixel không ?nh h??ng ch?t l??ng th? giác, ti?t ki?m GPU ?áng k?)
     this.bloomRenderTarget = new THREE.WebGLRenderTarget(
-      this.resolution.x,
-      this.resolution.y,
+      this.bloomResolution.x,
+      this.bloomResolution.y,
       { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat }
     );
 
@@ -117,7 +122,7 @@ class SelectiveBloomPass {
     this.bloomComposer.addPass(this.bloomRenderPass);
 
     this.bloomPass = new UnrealBloomPass(
-      this.resolution,
+      this.bloomResolution,
       this.strength,
       this.radius,
       this.threshold
@@ -198,9 +203,13 @@ class SelectiveBloomPass {
 
   setSize(width, height) {
     this.resolution.set(width, height);
-    this.bloomRenderTarget.setSize(width, height);
+    this.bloomResolution.set(
+      Math.max(1, Math.floor(width / 2)),
+      Math.max(1, Math.floor(height / 2))
+    );
+    this.bloomRenderTarget.setSize(this.bloomResolution.x, this.bloomResolution.y);
     this.bloomComposer.setSize(width, height);
-    this.bloomPass.setSize(width, height);
+    this.bloomPass.setSize(this.bloomResolution.x, this.bloomResolution.y);
     this.bloomCamera.aspect = width / height;
     this.bloomCamera.updateProjectionMatrix();
   }
