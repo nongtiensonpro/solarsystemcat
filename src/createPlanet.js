@@ -5,7 +5,7 @@ import { createAtmosphere, createAtmosphereLayers } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
 import { createUnifiedCorona, createSunSurfaceMaterial, createChromosphere } from './sun.js';
-import { createCometTail, createCometComa } from './comets.js';
+import { createCometTail, createCometDustTail, createCometComa } from './comets.js';
 import { createMagneticField } from './magneticField.js';
 import { createAurora } from './aurora.js';
 import { createVolumetricClouds } from './cloudsVolumetric.js';
@@ -169,8 +169,8 @@ export function createPlanet(data) {
       emissiveColor = new THREE.Color(0x112244);
       emissiveInt = 2.5;
     } else if (data.type === 'comet') {
-      emissiveColor = new THREE.Color(0x88ccff); 
-      emissiveInt = 2.5;
+      emissiveColor = new THREE.Color(0x445566);
+      emissiveInt = 0.8;
     } else if (data.saturnMoon?.lodTier === 'hero') {
       emissiveColor = new THREE.Color(data.render?.fallbackColor || 0xffffff);
       emissiveInt = 0.35; 
@@ -201,8 +201,12 @@ export function createPlanet(data) {
       bScale = 0.15; // Hố va chạm và vách đá đứt gãy gồ ghề
     }
 
+    let baseColor = textures.albedo ? 0xffffff : getFallbackColor(data);
+    if (data.type === 'comet') {
+      baseColor = 0x2a3040;
+    }
     material = new THREE.MeshStandardMaterial({
-      color: textures.albedo ? 0xffffff : getFallbackColor(data),
+      color: baseColor,
       map: textures.albedo || null,
       normalMap: textures.normal || null,
       normalScale: nScale,
@@ -412,12 +416,16 @@ export function createPlanet(data) {
 
   // 4g. Đuôi sao chổi
   let tailMesh = null;
+  let dustTailMesh = null;
   let comaMesh = null;
   if (data.type === 'comet') {
     tailMesh = createCometTail();
-    // Gắn vào pivot thay vì tiltGroup để dễ dàng lookAt ra xa Mặt Trời
     pivot.add(tailMesh);
-    
+
+    dustTailMesh = createCometDustTail();
+    dustTailMesh.rotation.z = 0.15;
+    pivot.add(dustTailMesh);
+
     comaMesh = createCometComa(data.physical.radius);
     tiltGroup.add(comaMesh);
   }
@@ -435,6 +443,7 @@ export function createPlanet(data) {
     chromosphereMesh,
     sunGlowSprite,
     tailMesh,
+    dustTailMesh,
     comaMesh,
     magneticFieldGroup,
     auroraGroup,

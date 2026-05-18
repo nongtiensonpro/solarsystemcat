@@ -103,9 +103,14 @@ async function bootstrap() {
   const PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant']);
 
   function getCinematicPlanets() {
-    return Array.from(bodyById.values()).filter(b =>
-      b.data.type !== 'star' && !b.data.isMoon && b.data.type !== 'comet'
-    );
+    return Array.from(bodyById.values()).filter(b => {
+      if (b.data.type === 'star' || b.data.isMoon) return false;
+      if (b.data.type === 'comet') {
+        const distAU = b.pivot.position.length() / AU;
+        return distAU < 5;
+      }
+      return true;
+    });
   }
 
   function triggerRandomCinematicCut() {
@@ -119,7 +124,7 @@ async function bootstrap() {
     if (Math.random() < 0.7) {
       const heroId = PLANET_HEROES[Math.floor(Math.random() * PLANET_HEROES.length)];
       nextBody = bodyById.get(heroId);
-      if (!nextBody || nextBody.data.isMoon || nextBody.data.type === 'star' || nextBody.data.type === 'comet') {
+      if (!nextBody || nextBody.data.isMoon || nextBody.data.type === 'star') {
         nextBody = planets[Math.floor(Math.random() * planets.length)];
       }
     } else {
@@ -976,25 +981,52 @@ async function bootstrap() {
             body.pivot.position.set(pos.x, pos.y, pos.z);
           }
           
-          // E. C?p nh?t ?u?i sao ch?i
+          // E. C?p nh?t sao ch?i (??u?i, qu?ng, ?? s?ng)
           if (body.tailMesh) {
-            // M?i nh?n ? 0,0,0 c?a pivot. H??ng +Z c?a mesh h??ng v? target.
-            // ?? ?u?i (+Z) ch? ra xa M?t Tr?i, ta lookAt ?i?m ra xa ti?p t? v? tr? hi?n t?i.
             const awayPos = body.pivot.position.clone().multiplyScalar(2);
             body.tailMesh.lookAt(awayPos);
-            
-            // L?m m? ?u?i khi ? xa M?t Tr?i
+
+            // ?? s?ng sao ch?i: I = 1/r^2.5 (brightness curve th?c t?)
             const distAU = body.pivot.position.length() / AU;
-            const maxTailDist = 10.0; // ?u?i m? d?n v? bi?n m?t khi > 10 AU
+            const r = Math.max(distAU, 0.5);
+            const brightnessFactor = Math.pow(r, -2.5);
+            const maxTailDist = 10.0;
             let tailOpacity = 1.0 - (distAU / maxTailDist);
             tailOpacity = Math.max(0, Math.min(1, tailOpacity));
-            
+            const brightness = Math.min(1, brightnessFactor / 0.1);
+
+            // C?p nh?t ??u?i ion
             body.tailMesh.material.uniforms.uOpacity.value = tailOpacity;
+            body.tailMesh.material.uniforms.uBrightness.value = brightness;
             body.tailMesh.visible = tailOpacity > 0.05;
 
+            // ?? d?i ??u?i ??ng: 5 ? 25 AU
+            const tailScale = 5 + 20 * tailOpacity;
+            body.tailMesh.scale.z = tailScale / 15;
+
+            // C?p nh?t ??u?i b?i
+            if (body.dustTailMesh) {
+              body.dustTailMesh.lookAt(awayPos);
+              body.dustTailMesh.material.uniforms.uOpacity.value = tailOpacity * 0.5;
+              body.dustTailMesh.material.uniforms.uBrightness.value = brightness * 0.7;
+              body.dustTailMesh.visible = tailOpacity > 0.05;
+              const dustScale = 3 + 9 * tailOpacity;
+              body.dustTailMesh.scale.z = dustScale / 12;
+            }
+
+            // C?p nh?t qu?ng (coma) ??ng
             if (body.comaMesh) {
               body.comaMesh.material.uniforms.uOpacity.value = tailOpacity * 0.8;
+              body.comaMesh.material.uniforms.uBrightness.value = brightness;
               body.comaMesh.visible = tailOpacity > 0.05;
+              const baseScale = body.data.physical.radius * 3.0;
+              const comaFactor = 1 + 1.5 * tailOpacity;
+              body.comaMesh.scale.setScalar(baseScale * comaFactor);
+            }
+
+            // C?p nh?t ?? s?ng l?i (outgassing)
+            if (body.mesh && body.mesh.material) {
+              body.mesh.material.emissiveIntensity = 0.3 + 2.0 * tailOpacity;
             }
           }
         }

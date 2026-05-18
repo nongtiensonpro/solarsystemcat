@@ -934,6 +934,22 @@ export function initUI(callbacks) {
       `;
     }
 
+    // Phase Comet: Chi tiết sao chổi
+    let cometInfoHtml = '';
+    if (data.type === 'comet') {
+      const orbitalPeriodYears = (data.orbitalPeriod / 365.25).toFixed(1);
+      cometInfoHtml = `
+        <div class="info-section-title">☄️ Cấu trúc Sao chổi</div>
+        <div class="info-layer" style="border-left-color: #88ccff; background: rgba(136, 204, 255, 0.05);">
+          <div class="info-row sub"><span class="label">Lõi</span><span class="value">Đá, bụi, băng (CO, H₂O, NH₃)</span></div>
+          <div class="info-row sub"><span class="label">Đuôi ion</span><span class="value">Xanh lam, hướng xa Mặt Trời</span></div>
+          <div class="info-row sub"><span class="label">Đuôi bụi</span><span class="value">Trắng kem, cong, rộng</span></div>
+          <div class="info-row sub"><span class="label">Quầng (Coma)</span><span class="value">Khí và bụi bao quanh lõi</span></div>
+          <div class="info-row sub"><span class="label">Chu kỳ quỹ đạo</span><span class="value">${orbitalPeriodYears} năm</span></div>
+        </div>
+      `;
+    }
+
     // Phase 7: Chi tiết hệ thống vành đai cho Saturn
     let ringsInfoHtml = '';
     if (data.id === 'saturn') {
@@ -979,7 +995,7 @@ export function initUI(callbacks) {
     rows.push(
       ['Bán kính', data.type === 'star' ? '696,340 km' : `${(data.radius * 6371).toFixed(0)} km`],
       ['Khoảng cách', data.semiMajorAxis > 0 ? (data.isMoon ? `${(data.semiMajorAxis * 149597870.7).toFixed(0)} km` : `${data.semiMajorAxis} AU`) : 'Tâm hệ'],
-      ['Chu kỳ QĐ', data.semiMajorAxis > 0 ? `${data.orbitalPeriod.toFixed(1)} ngày` : '—'],
+      ['Chu kỳ QĐ', data.semiMajorAxis > 0 ? (data.type === 'comet' ? `${(data.orbitalPeriod / 365.25).toFixed(1)} năm` : `${data.orbitalPeriod.toFixed(1)} ngày`) : '—'],
       ['Độ lệch tâm', data.eccentricity > 0 ? data.eccentricity.toFixed(4) : '—'],
       ['Tự quay', `${Math.abs(data.rotationPeriod).toFixed(1)} giờ`],
       ['Hướng quay', data.rotationPeriod < 0 ? 'Ngược chiều ↺' : 'Thuận chiều ↻'],
@@ -1094,7 +1110,7 @@ export function initUI(callbacks) {
 
     content.innerHTML = rows.map(([label, value]) =>
       `<div class="info-row"><span class="label">${label}</span><span class="value">${value}</span></div>`
-    ).join('') + moonListHtml + ringsInfoHtml + ghostMoonsHtml + interiorHtml + summaryHtml;
+    ).join('') + moonListHtml + cometInfoHtml + ringsInfoHtml + ghostMoonsHtml + interiorHtml + summaryHtml;
 
     // Listeners cho moon chips (Phase 5)
     content.querySelectorAll('.moon-chip').forEach(btn => {

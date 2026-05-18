@@ -49,12 +49,15 @@ export function createOrbitLine(data) {
 
   // Multi-revolution cho qu? ??o ?? l?ch tâm cao (Halley e=0.967)
   // Hi?n th? 3 vòng ?? th?y hình d?ng qu? ??o dài
-  const revolutions = (e >= 0.9 && !data.isMoon) ? 3 : 1;
+  // V?i e > 0.98 (Hale-Bopp, NEOWISE) ch? dùng 1 vòng ?? tránh nhi?u CatmullRom
+  const revolutions = (e >= 0.9 && !data.isMoon) ? (e > 0.98 ? 1 : 3) : 1;
 
   const rawPoints = [];
 
   // Sampling theo Mean Anomaly (M) — t? nhiên t?p trung ?i?m ? c?n ?i?m
-  const totalSegs = segments * revolutions;
+  // V?i e r?t cao (>0.95), t?ng s? ?i?m ?? ???ng cong m??t h?n
+  const effectiveSegs = e > 0.95 ? Math.max(segments, 512) : segments;
+  const totalSegs = effectiveSegs * revolutions;
   for (let i = 0; i <= totalSegs; i++) {
     const M = (i / totalSegs) * Math.PI * 2 * revolutions;
     const E = solveKepler(M, e);
@@ -69,8 +72,9 @@ export function createOrbitLine(data) {
   }
 
   // CatmullRom n?i suy ?? ???ng cong m??t h?n, gi?m hi?n t??ng "g?p khúc"
+  // V?i e > 0.98, b? qua CatmullRom vì qu? ??o quá d?t g?y nhi?u n?i suy
   let finalPoints = rawPoints;
-  if (useCatmullRom) {
+  if (useCatmullRom && e <= 0.98) {
     const curve = new THREE.CatmullRomCurve3(rawPoints, revolutions > 1);
     finalPoints = curve.getPoints(totalSegs * 2);
   }

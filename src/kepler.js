@@ -16,12 +16,22 @@ export function solveKepler(M, e, tolerance = 1e-10, maxIter = 100) {
   M = M % (2 * Math.PI);
   if (M < 0) M += 2 * Math.PI;
 
-  // Giá trị khởi tạo: E₀ = M (đủ tốt cho e thấp)
-  let E = M;
+  // Giá trị khởi tạo tốt hơn cho độ lệch tâm cao
+  // Dùng xấp xỉ bậc nhất E₀ ≈ M + e·sin(M) / (1 - e·cos(M))
+  // để tránh divergence khi e → 1
+  let E;
+  if (e > 0.8) {
+    if (M < Math.PI) {
+      E = M + 0.85 * e;
+    } else {
+      E = M - 0.85 * e;
+    }
+    E = Math.max(0, Math.min(2 * Math.PI, E));
+  } else {
+    E = M;
+  }
 
   for (let i = 0; i < maxIter; i++) {
-    // f(E) = E - e·sin(E) - M
-    // f'(E) = 1 - e·cos(E)
     const f = E - e * Math.sin(E) - M;
     const df = 1 - e * Math.cos(E);
     const delta = f / df;
@@ -31,9 +41,14 @@ export function solveKepler(M, e, tolerance = 1e-10, maxIter = 100) {
     if (Math.abs(delta) < tolerance) {
       return E;
     }
+
+    // Ổn định: giữ E trong [0, 2π] để tránh trôi
+    if (E < 0 || E > 2 * Math.PI) {
+      E = Math.max(0, Math.min(2 * Math.PI, E));
+    }
   }
 
-  return E; // Trả về giá trị gần đúng nhất
+  return E;
 }
 
 /**

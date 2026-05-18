@@ -1728,6 +1728,138 @@
       }
     },
     {
+      "id": "hale-bopp",
+      "parentId": "sun",
+      "name": { "vi": "Sao chổi Hale-Bopp", "en": "Hale-Bopp" },
+      "type": "comet",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 1.3e15,
+        "density": 0.6,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 186,
+        "orbitalPeriod": 101647,
+        "eccentricity": 0.995,
+        "inclination": 89.4
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 48,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#CCCCFF"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Sao chổi vĩ đại nhất thế kỷ 20, có thể nhìn thấy bằng mắt thường suốt 18 tháng (1996-1997).",
+        "compositionVi": "Băng nước, bụi silicat, CO, CO₂, HCN"
+      }
+    },
+    {
+      "id": "neowise",
+      "parentId": "sun",
+      "name": { "vi": "Sao chổi NEOWISE", "en": "NEOWISE" },
+      "type": "comet",
+      "physical": {
+        "radius": 0.025,
+        "massKg": 7.0e14,
+        "density": 0.6,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 28,
+        "orbitalPeriod": 4500,
+        "eccentricity": 0.999,
+        "inclination": 128.9
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 45,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#BBDDFF"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Sao chổi sáng nhất năm 2020 với hai đuôi ion và bụi rõ nét, chỉ có thể quan sát ở Bắc bán cầu.",
+        "compositionVi": "Băng nước, CO₂, bụi silicat, hợp chất hữu cơ"
+      }
+    },
+    {
+      "id": "67p",
+      "parentId": "sun",
+      "name": { "vi": "67P/Churyumov-Gerasimenko", "en": "67P/C-G" },
+      "type": "comet",
+      "physical": {
+        "radius": 0.02,
+        "massKg": 9.98e12,
+        "density": 0.53,
+        "meanTemperatureC": -230
+      },
+      "orbit": {
+        "semiMajorAxis": 3.46,
+        "orbitalPeriod": 2512,
+        "eccentricity": 0.641,
+        "inclination": 7.04
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 12.4,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#556677"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Sao chổi hình con vịt nổi tiếng, được tàu Rosetta của ESA nghiên cứu từ năm 2014-2016.",
+        "compositionVi": "Băng nước, CO₂, amonia, bụi hữu cơ, muối khoáng"
+      }
+    },
+    {
+      "id": "tempel-1",
+      "parentId": "sun",
+      "name": { "vi": "9P/Tempel 1", "en": "Tempel 1" },
+      "type": "comet",
+      "physical": {
+        "radius": 0.025,
+        "massKg": 7.5e13,
+        "density": 0.62,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 3.15,
+        "orbitalPeriod": 2060,
+        "eccentricity": 0.510,
+        "inclination": 10.5
+      },
+      "rotation": {
+        "axialTilt": 0,
+        "rotationPeriod": 40,
+        "oblateness": 0
+      },
+      "render": {
+        "fallbackColor": "#6688AA"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Sao chổi được tàu Deep Impact của NASA bắn phá năm 2005 để nghiên cứu cấu trúc lõi.",
+        "compositionVi": "Băng nước, silicat, hợp chất hữu cơ, CO₂"
+      }
+    },
+    {
       "id": "naiad",
       "parentId": "neptune",
       "name": { "vi": "Naiad", "en": "Naiad" },

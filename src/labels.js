@@ -59,13 +59,13 @@ export function updateLabels(camera, renderer) {
     // Auto-hide logic theo distance
     let opacity = 1.0;
     if (label.data.isMoon || label.data.type === 'comet') {
-      // Ẩn vệ tinh và sao chổi khi ở xa (ví dụ: xa hơn 80 units)
-      if (distToCam > 120) {
+      let hideDist = label.data.type === 'comet' ? 200 : 120;
+      let fadeStart = label.data.type === 'comet' ? 140 : 80;
+      if (distToCam > hideDist) {
         label.el.style.display = 'none';
         continue;
-      } else if (distToCam > 80) {
-        // Fade out
-        opacity = 1.0 - ((distToCam - 80) / 40);
+      } else if (distToCam > fadeStart) {
+        opacity = 1.0 - ((distToCam - fadeStart) / (hideDist - fadeStart));
       }
     } else {
       // Ẩn các hành tinh nhỏ nếu cực xa (VD: > 400)
