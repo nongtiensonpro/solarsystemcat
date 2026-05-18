@@ -683,7 +683,647 @@
         "compositionVi": "Đá giàu cacbon trộn lẫn với băng đá, regolith rất dày"
       }
     },
-
+    {
+      "id": "cordelia",
+      "parentId": "uranus",
+      "name": { "vi": "Cordelia", "en": "Cordelia" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.02,
+        "massKg": 4.4e16,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000332,
+        "orbitalPeriod": 0.335,
+        "eccentricity": 0.00026,
+        "inclination": 0.08
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 8.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#8595a5",
+        "orbitScale": 1,
+        "displayOrbitRadius": 8.5,
+        "initialPhaseDeg": 15,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh chăn dắt phía trong (inner shepherd moon) giúp giữ ổn định cấu trúc của vành đai Epsilon (ε) mờ tối của Sao Thiên Vương.",
+        "compositionVi": "Băng nước trộn lẫn vật liệu carbon tối màu"
+      }
+    },
+    {
+      "id": "ophelia",
+      "parentId": "uranus",
+      "name": { "vi": "Ophelia", "en": "Ophelia" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.02,
+        "massKg": 5.3e16,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000359,
+        "orbitalPeriod": 0.376,
+        "eccentricity": 0.0099,
+        "inclination": 0.1
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 9.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#90a0b0",
+        "orbitScale": 1,
+        "displayOrbitRadius": 8.9,
+        "initialPhaseDeg": 140,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh chăn dắt phía ngoài (outer shepherd moon) của vành đai Epsilon (ε), phối hợp cùng Cordelia để giới hạn rìa vành đai.",
+        "compositionVi": "Băng đá và bụi tối có albedo rất thấp"
+      }
+    },
+    {
+      "id": "bianca",
+      "parentId": "uranus",
+      "name": { "vi": "Bianca", "en": "Bianca" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 9.2e16,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000395,
+        "orbitalPeriod": 0.435,
+        "eccentricity": 0.0009,
+        "inclination": 0.19
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 10.4,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#9baab5",
+        "orbitScale": 1,
+        "displayOrbitRadius": 9.3,
+        "initialPhaseDeg": 260,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Một vệ tinh nhỏ thuộc nhóm trong của Sao Thiên Vương, được phát hiện bởi tàu Voyager 2 năm 1986.",
+        "compositionVi": "Băng nước và chất hữu cơ tối màu"
+      }
+    },
+    {
+      "id": "cressida",
+      "parentId": "uranus",
+      "name": { "vi": "Cressida", "en": "Cressida" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 3.4e17,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000414,
+        "orbitalPeriod": 0.464,
+        "eccentricity": 0.0004,
+        "inclination": 0.006
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 11.1,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#a5b5c0",
+        "orbitScale": 1,
+        "displayOrbitRadius": 9.7,
+        "initialPhaseDeg": 35,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh thuộc nhóm Portia. Quỹ đạo của nó có khả năng sẽ va chạm với Desdemona trong vòng vài triệu năm tới do nhiễu loạn hấp dẫn.",
+        "compositionVi": "Hỗn hợp đá băng cacbon"
+      }
+    },
+    {
+      "id": "desdemona",
+      "parentId": "uranus",
+      "name": { "vi": "Desdemona", "en": "Desdemona" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 1.8e17,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000417,
+        "orbitalPeriod": 0.474,
+        "eccentricity": 0.0001,
+        "inclination": 0.11
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 11.4,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#b0c0cb",
+        "orbitScale": 1,
+        "displayOrbitRadius": 10.1,
+        "initialPhaseDeg": 110,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Nằm rất sát quỹ đạo Cressida, chịu lực hấp dẫn hỗn loạn có thể dẫn tới va chạm thiên thể trong tương lai xa.",
+        "compositionVi": "Băng nước và hợp chất cacbon phong hóa"
+      }
+    },
+    {
+      "id": "juliet",
+      "parentId": "uranus",
+      "name": { "vi": "Juliet", "en": "Juliet" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 5.6e17,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000430,
+        "orbitalPeriod": 0.493,
+        "eccentricity": 0.0007,
+        "inclination": 0.06
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 11.8,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#b5c5d0",
+        "orbitScale": 1,
+        "displayOrbitRadius": 10.5,
+        "initialPhaseDeg": 200,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh lớn thứ tư trong số các vệ tinh vòng trong của Sao Thiên Vương, có dạng thuôn dài đặc trưng.",
+        "compositionVi": "Băng nước, silicat, vết hợp chất hữu cơ sẫm màu"
+      }
+    },
+    {
+      "id": "portia",
+      "parentId": "uranus",
+      "name": { "vi": "Portia", "en": "Portia" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.04,
+        "massKg": 1.7e18,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000442,
+        "orbitalPeriod": 0.513,
+        "eccentricity": 0.0001,
+        "inclination": 0.05
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 12.3,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#c0c0d5",
+        "orbitScale": 1,
+        "displayOrbitRadius": 10.9,
+        "initialPhaseDeg": 290,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh lớn thứ hai trong số các vệ tinh vòng trong. Tên của nó được dùng để gọi tên cho nhóm vệ tinh Portia.",
+        "compositionVi": "Băng nước và bụi silicat phong hóa"
+      }
+    },
+    {
+      "id": "rosalind",
+      "parentId": "uranus",
+      "name": { "vi": "Rosalind", "en": "Rosalind" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 2.5e17,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000467,
+        "orbitalPeriod": 0.558,
+        "eccentricity": 0.0001,
+        "inclination": 0.28
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 13.4,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#c5ccd8",
+        "orbitScale": 1,
+        "displayOrbitRadius": 11.3,
+        "initialPhaseDeg": 60,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh hình cầu hơi dẹt nằm ngay ngoài quỹ đạo của Portia, sở hữu bề mặt tối xám phản xạ rất ít ánh sáng.",
+        "compositionVi": "Đá và băng nước cacbon"
+      }
+    },
+    {
+      "id": "belinda",
+      "parentId": "uranus",
+      "name": { "vi": "Belinda", "en": "Belinda" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.03,
+        "massKg": 3.6e17,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000508,
+        "orbitalPeriod": 0.624,
+        "eccentricity": 0.0001,
+        "inclination": 0.03
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 15.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#ccd5e0",
+        "orbitScale": 1,
+        "displayOrbitRadius": 11.7,
+        "initialPhaseDeg": 165,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh kéo dài thuôn dẹt nằm trong nhóm Portia, được quan sát lần đầu bởi tàu thăm dò Voyager 2 năm 1986.",
+        "compositionVi": "Đá cacbon tối màu trộn lẫn bụi băng đá"
+      }
+    },
+    {
+      "id": "puck",
+      "parentId": "uranus",
+      "name": { "vi": "Puck", "en": "Puck" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.06,
+        "massKg": 2.9e18,
+        "density": 1.3,
+        "meanTemperatureC": -209
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000575,
+        "orbitalPeriod": 0.762,
+        "eccentricity": 0.0001,
+        "inclination": 0.31
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 18.3,
+        "oblateness": 0.1
+      },
+      "render": {
+        "fallbackColor": "#707880",
+        "orbitScale": 1,
+        "displayOrbitRadius": 12.3,
+        "initialPhaseDeg": 280,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh vòng trong lớn nhất và nổi bật nhất của Sao Thiên Vương. Nó có dạng quả bóng hơi dẹt và có bề mặt tối xám đầy hố va chạm tròn trịa.",
+        "compositionVi": "Băng nước, hợp chất hữu cơ tối màu sẫm do bức xạ vũ trụ"
+      }
+    },
+    {
+      "id": "miranda",
+      "parentId": "uranus",
+      "name": { "vi": "Miranda", "en": "Miranda" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.08,
+        "massKg": 6.59e19,
+        "density": 1.2,
+        "meanTemperatureC": -187
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000865,
+        "orbitalPeriod": 1.413,
+        "eccentricity": 0.0013,
+        "inclination": 4.23
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 33.9,
+        "oblateness": 0.05
+      },
+      "render": {
+        "fallbackColor": "#d5dbe2",
+        "orbitScale": 1,
+        "displayOrbitRadius": 13.5,
+        "initialPhaseDeg": 45,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/miranda/albedo.png",
+        "bump": "/textures/planets/miranda/albedo.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "⚡ Vệ tinh kỳ dị nhất Hệ Mặt Trời (Wow-level High Fidelity). Có địa hình hỗn độn cực độ như thể từng bị vỡ vụn rồi tự bồi tụ lại: Hẻm vực sâu gấp 12 lần Grand Canyon, vách đá Verona Rupes cao nhất hệ mặt trời (20km), các khối ô chữ nhật địa chất khổng lồ (Inverness/Arden Coronae) độc nhất vô nhị.",
+        "compositionVi": "Băng nước silicat nhám đá, bụi regolith dày đặc phản quang mạnh"
+      }
+    },
+    {
+      "id": "ariel",
+      "parentId": "uranus",
+      "name": { "vi": "Ariel", "en": "Ariel" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.12,
+        "massKg": 1.25e21,
+        "density": 1.66,
+        "meanTemperatureC": -186
+      },
+      "orbit": {
+        "semiMajorAxis": 0.001277,
+        "orbitalPeriod": 2.520,
+        "eccentricity": 0.0012,
+        "inclination": 0.26
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 60.5,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#eef3f8",
+        "orbitScale": 1,
+        "displayOrbitRadius": 16.0,
+        "initialPhaseDeg": 120,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/ariel/albedo.png",
+        "bump": "/textures/planets/ariel/albedo.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "✨ Vệ tinh sáng nhất và trẻ nhất về mặt địa chất của Sao Thiên Vương. Sở hữu hệ thống thung lũng đứt gãy chằng chịt và bằng chứng của dòng chảy phun trào băng (cryovolcanism) bằng hỗn hợp nước-ammonia làm mịn các thung lũng sâu.",
+        "compositionVi": "Băng nước (50%), đá silicat (50%), chứa carbon dioxide đóng băng"
+      }
+    },
+    {
+      "id": "umbriel",
+      "parentId": "uranus",
+      "name": { "vi": "Umbriel", "en": "Umbriel" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.12,
+        "massKg": 1.2e21,
+        "density": 1.39,
+        "meanTemperatureC": -188
+      },
+      "orbit": {
+        "semiMajorAxis": 0.001778,
+        "orbitalPeriod": 4.144,
+        "eccentricity": 0.0039,
+        "inclination": 0.2
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 99.5,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#4a5058",
+        "orbitScale": 1,
+        "displayOrbitRadius": 19.0,
+        "initialPhaseDeg": 210,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh tối nhất và cổ xưa nhất trong các vệ tinh lớn của Sao Thiên Vương, hầu như không có hoạt động tái tạo bề mặt nào ngoài các hố va chạm chồng chéo. Nổi bật là Wunda crater - một hố va chạm với vành đai bụi sáng chói ở cực nam.",
+        "compositionVi": "Băng nước silicat xen kẽ hợp chất cacbon hữu cơ tối sẫm màu"
+      }
+    },
+    {
+      "id": "titania",
+      "parentId": "uranus",
+      "name": { "vi": "Titania", "en": "Titania" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.16,
+        "massKg": 3.4e21,
+        "density": 1.71,
+        "meanTemperatureC": -184
+      },
+      "orbit": {
+        "semiMajorAxis": 0.002914,
+        "orbitalPeriod": 8.706,
+        "eccentricity": 0.0011,
+        "inclination": 0.34
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 208.9,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#b8c0c8",
+        "orbitScale": 1,
+        "displayOrbitRadius": 23.0,
+        "initialPhaseDeg": 300,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/titania/albedo.png",
+        "bump": "/textures/planets/titania/albedo.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "👑 Vệ tinh lớn nhất của Sao Thiên Vương, lớn thứ 8 trong Hệ Mặt Trời. Nổi tiếng với hệ thống đứt gãy sụt lún khổng lồ Messina Chasma dài hơn 1500 km và vách đá sừng sững cắt ngang qua xích đạo cùng bề mặt lốm đốm hố thiên thạch cổ.",
+        "compositionVi": "Băng nước (50%), đá silicat nén chặt, có khả năng có lớp nước mỏng lỏng ở ranh giới đá-băng"
+      }
+    },
+    {
+      "id": "oberon",
+      "parentId": "uranus",
+      "name": { "vi": "Oberon", "en": "Oberon" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.15,
+        "massKg": 3.01e21,
+        "density": 1.63,
+        "meanTemperatureC": -185
+      },
+      "orbit": {
+        "semiMajorAxis": 0.003897,
+        "orbitalPeriod": 13.463,
+        "eccentricity": 0.0014,
+        "inclination": 0.05
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 323.1,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#a09c95",
+        "orbitScale": 1,
+        "displayOrbitRadius": 28.0,
+        "initialPhaseDeg": 15,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/oberon/albedo.png",
+        "bump": "/textures/planets/oberon/albedo.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "☄️ Vệ tinh lớn thứ hai và xa nhất trong 5 vệ tinh chính của Sao Thiên Vương. Bề mặt sẫm màu với sắc đỏ đặc trưng, đầy hố va chạm và chứa nhiều trầm tích vật liệu tối màu huyền bí nằm ở lòng các hố va chạm lớn (như Hamlet crater).",
+        "compositionVi": "Lõi đá silicat lớn chiếm 60% thể tích, bao phủ bởi manti băng nước cực dày"
+      }
+    },
+    {
+      "id": "caliban",
+      "parentId": "uranus",
+      "name": { "vi": "Caliban", "en": "Caliban" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.04,
+        "massKg": 2.5e17,
+        "density": 1.5,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.048,
+        "orbitalPeriod": -579.7,
+        "eccentricity": 0.158,
+        "inclination": 140.9
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 2.7,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#5e5045",
+        "orbitScale": 1,
+        "displayOrbitRadius": 36.0,
+        "initialPhaseDeg": 85,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình lớn thứ hai của Sao Thiên Vương. Quỹ đạo của nó nghịch hành, rất lệch tâm và nghiêng cực lớn, đặc trưng cho một tiểu hành tinh bị bắt giữ.",
+        "compositionVi": "Đá tối màu giàu carbon sẫm và băng cacbon hữu cơ"
+      }
+    },
+    {
+      "id": "sycorax",
+      "parentId": "uranus",
+      "name": { "vi": "Sycorax", "en": "Sycorax" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.05,
+        "massKg": 2.3e18,
+        "density": 1.5,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.081,
+        "orbitalPeriod": -1288.3,
+        "eccentricity": 0.522,
+        "inclination": 159.4
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 3.6,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#4e4035",
+        "orbitScale": 1,
+        "displayOrbitRadius": 45.0,
+        "initialPhaseDeg": 220,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình lớn nhất của Sao Thiên Vương, nằm ở vùng rìa xa xôi. Nó chuyển động trên một quỹ đạo nghịch hành cực kỳ méo mó và dẹt, củng cố giả thuyết nó là vật thể vành đai Kuiper cổ bị lực hấp dẫn bắt giữ.",
+        "compositionVi": "Đá và các hợp chất hữu cơ tholin màu đỏ sẫm mờ nhạt"
+      }
+    },
     {
       "id": "halley",
       "parentId": "sun",

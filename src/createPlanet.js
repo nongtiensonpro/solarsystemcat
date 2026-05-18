@@ -125,7 +125,7 @@ export function createPlanet(data) {
     let pbrMetalness = 0.0;
     
     // Tùy chỉnh thông số bề mặt theo thiên thể
-    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos'].includes(data.id)) {
+    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos', 'miranda', 'ariel', 'umbriel', 'titania', 'oberon', 'puck', 'caliban', 'sycorax'].includes(data.id)) {
       pbrRoughness = 0.95; // Bề mặt đá khô, nhám
     } else if (data.id === 'earth') {
       pbrRoughness = 0.6;
@@ -187,12 +187,18 @@ export function createPlanet(data) {
       emissiveInt = 0.15;
     }
 
-    // Tùy chỉnh bump / normal scale (đặc biệt cho Mimas - Herschel crater)
+    // Tùy chỉnh bump / normal scale (đặc biệt cho Mimas - Herschel crater, và các vệ tinh chính của Uranus)
     let bScale = 0.05;
     let nScale = new THREE.Vector2(1, 1);
     if (data.id === 'mimas') {
       bScale = 0.5;
       nScale.set(3.0, 3.0);
+    } else if (data.id === 'miranda') {
+      bScale = 0.25; // Hẻm vực và đứt gãy cực kỳ sâu
+    } else if (data.id === 'ariel') {
+      bScale = 0.18; // Hệ thống graben thung lũng sâu
+    } else if (['titania', 'oberon'].includes(data.id)) {
+      bScale = 0.15; // Hố va chạm và vách đá đứt gãy gồ ghề
     }
 
     material = new THREE.MeshStandardMaterial({
