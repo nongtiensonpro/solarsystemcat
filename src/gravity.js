@@ -166,6 +166,28 @@ export function updateNewtonGravity(bodies, deltaTime) {
   }
 }
 
+export function syncGravityBodyState(bodyId, position, options = {}) {
+  const s = state.get(bodyId);
+  if (!s || !position) return false;
+
+  s.px = position.x;
+  s.py = position.y;
+  s.pz = position.z;
+
+  if (options.velocity) {
+    s.vx = options.velocity.x;
+    s.vy = options.velocity.y;
+    s.vz = options.velocity.z;
+  } else if (options.dampenVelocity) {
+    const damping = options.velocityDamping ?? 0.25;
+    s.vx *= damping;
+    s.vy *= damping;
+    s.vz *= damping;
+  }
+
+  return true;
+}
+
 function getRelevantEntries() {
   if (focusedBodyId && bodyByIdRef) {
     const group = getFocusedGroupSet(focusedBodyId);

@@ -11,12 +11,13 @@ import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './lab
 import { getCurrentPreset, onPresetChange } from './renderConfig.js';
 import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
-import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds, predictTrajectory } from './gravity.js';
+import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds, predictTrajectory, syncGravityBodyState } from './gravity.js';
 import { initSpacetimeGrid, setSpacetimeGridEnabled, updateSpacetimeGrid } from './spacetimeGrid.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
 import { createCinematicCameraController } from './cinematicCamera.js';
 import { GhostMoonSystem } from './ghostMoonSystem.js';
+import { applyOrbitSafety } from './orbitSafety.js';
 
 // ??? Bootstrap ? T?i d? li?u tr??c khi kh?i t?o ???
 async function bootstrap() {
@@ -1201,6 +1202,12 @@ async function bootstrap() {
         }
       }
     } // Kết thúc vòng lặp bodies
+
+    applyOrbitSafety(bodies, bodyById, simulationTime, {
+      scene,
+      newtonGravityActive,
+      syncGravityBodyState,
+    });
 
     // Throttle orbit shader uTime updates — m?i 2 frame (không ?nh h??ng th? giác)
     if (frameCount % 2 === 0) {

@@ -1,6 +1,6 @@
 // Factory function tạo thiên thể với hệ phân cấp Pivot → Tilt → Mesh
 import * as THREE from 'three';
-import { AU, BLOOM_LAYER } from './constants.js';
+import { BLOOM_LAYER } from './constants.js';
 import { createAtmosphere, createAtmosphereLayers } from './atmosphere.js';
 import { createRings } from './rings.js';
 import { loadPlanetTextures } from './textureLoader.js';
@@ -13,6 +13,7 @@ import { createHeliumRain } from './heliumRain.js';
 import { createDiamondRain } from './diamondRain.js';
 import { createIronSnow } from './ironSnow.js';
 import { createEnceladusPlume } from './enceladusPlume.js';
+import { getDisplayOrbitRadius } from './orbitMath.js';
 
 // Lấy fallback color từ data (đã normalize bởi dataLoader.js)
 function getFallbackColor(data) {
@@ -409,7 +410,7 @@ export function createPlanet(data) {
   pivot.add(tiltGroup);
 
   // Đặt vị trí ban đầu trên trục X theo bán kính
-  const orbitRadius = data.displayOrbitRadius ?? (data.semiMajorAxis * AU * (data.orbitScale || 1));
+  const orbitRadius = getDisplayOrbitRadius(data);
   if (orbitRadius > 0) {
     pivot.position.x = orbitRadius;
   }

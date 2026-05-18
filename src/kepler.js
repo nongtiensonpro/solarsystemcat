@@ -16,7 +16,7 @@
  * ╚══════════════════════════════════════════════════════════════════════╝
  */
 
-import { AU } from './constants.js';
+import { getDisplayOrbitRadius } from './orbitMath.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hằng số nội bộ
@@ -263,7 +263,7 @@ function getOrCreateCache(data) {
   const r21 = -sinΩ * sinω + cosΩ * cosω * cosi;
 
   const e    = data.eccentricity || 0;
-  const a    = data.semiMajorAxis * AU * (data.orbitScale || 1);
+  const a    = getDisplayOrbitRadius(data);
   const periodS = data.orbitalPeriod * SECONDS_PER_DAY;
   const n    = periodS > 0 ? TWO_PI / periodS : 0;
 

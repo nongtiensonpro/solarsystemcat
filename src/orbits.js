@@ -1,8 +1,8 @@
 // T?o ???ng qu? ??o elip cho c?c thi?n th? (h?nh tinh + v? tinh)
 import * as THREE from 'three';
-import { AU } from './constants.js';
 import { solveKepler } from './kepler.js';
 import { getCurrentPreset } from './renderConfig.js';
+import { getDisplayOrbitRadius } from './orbitMath.js';
 
 /**
 * Xác ??nh s? segment d?a trên ?? l?ch tâm (eccentricity) và preset ch?t l??ng.
@@ -32,8 +32,7 @@ export function getSegmentCount(eccentricity, isMoon, qualityMultiplier = 1) {
 * @returns {THREE.Line|null}
 */
 export function createOrbitLine(data) {
-  const orbitScale = data.orbitScale || 1;
-  const a = data.displayOrbitRadius ?? (data.semiMajorAxis * AU * orbitScale);
+  const a = getDisplayOrbitRadius(data);
 
   if (a <= 0) return null;
   const e = data.eccentricity || 0;

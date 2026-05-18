@@ -1,6 +1,6 @@
 // Data Loader — Tải và xác thực dữ liệu thiên thể từ JSON
 // Thay thế dữ liệu hardcode trong planetData.js
-import { AU } from './constants.js';
+import { getDisplayPericenter } from './orbitMath.js';
 
 /**
  * Kiểm tra khoảng cách an toàn của vệ tinh so với hành tinh mẹ (Phòng chống lỗi Phase 6).
@@ -17,8 +17,7 @@ function validateMoonDistances(bodies) {
       if (!parent) continue;
 
       // Tính bán kính hiển thị thực tế
-      const a = body.displayOrbitRadius ?? (body.semiMajorAxis * AU * body.orbitScale);
-      const pericenter = a * (1 - body.eccentricity);
+      const pericenter = getDisplayPericenter(body);
       const minSafeDistance = parent.radius + safetyMargin;
 
       if (pericenter <= minSafeDistance) {
