@@ -104,7 +104,7 @@ export function computeOrbitalVelocity(data, timeElapsed) {
   const periodSeconds = data.orbitalPeriod * 86400;
   const phase = (data.initialPhaseDeg || 0) * Math.PI / 180;
 
-  if (periodSeconds <= 0 || a <= 0) return { vx: 0, vy: 0, vz: 0 };
+  if (periodSeconds === 0 || a <= 0) return { vx: 0, vy: 0, vz: 0 };
 
   const M = (2 * Math.PI / periodSeconds) * timeElapsed + phase;
   const E = solveKepler(M, e);

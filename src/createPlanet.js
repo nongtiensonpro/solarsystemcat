@@ -125,14 +125,14 @@ export function createPlanet(data) {
     let pbrMetalness = 0.0;
     
     // Tùy chỉnh thông số bề mặt theo thiên thể
-    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos', 'miranda', 'ariel', 'umbriel', 'titania', 'oberon', 'puck', 'caliban', 'sycorax'].includes(data.id)) {
+    if (['mercury', 'mars', 'pluto', 'moon', 'callisto', 'phobos', 'deimos', 'miranda', 'ariel', 'umbriel', 'titania', 'oberon', 'puck', 'caliban', 'sycorax', 'nereid', 'naiad', 'thalassa', 'despina', 'galatea', 'larissa', 'proteus', 'halimede', 'psamathe', 'neso'].includes(data.id)) {
       pbrRoughness = 0.95; // Bề mặt đá khô, nhám
     } else if (data.id === 'earth') {
       pbrRoughness = 0.6;
       pbrMetalness = 0.1;
     } else if (data.id === 'venus' || data.id === 'io') {
       pbrRoughness = 0.7; // Bề mặt mây hoặc lưu huỳnh
-    } else if (data.id === 'europa') {
+    } else if (data.id === 'europa' || data.id === 'triton') {
       pbrRoughness = 0.25; // Bề mặt băng phản quang tốt
       pbrMetalness = 0.05;
     } else if (data.id === 'ganymede') {

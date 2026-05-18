@@ -1356,6 +1356,417 @@
         "summaryVi": "Sao chổi chu kỳ ngắn nổi tiếng nhất, có thể nhìn thấy bằng mắt thường mỗi 75-76 năm.",
         "compositionVi": "Băng nước, carbon monoxide, metan, amonia và bụi"
       }
+    },
+    {
+      "id": "naiad",
+      "parentId": "neptune",
+      "name": { "vi": "Naiad", "en": "Naiad" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.005,
+        "massKg": 1.9e17,
+        "density": 1.3,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000322,
+        "orbitalPeriod": 0.294,
+        "eccentricity": 0.0047,
+        "inclination": 4.74
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 7.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#85909a",
+        "orbitScale": 1,
+        "displayOrbitRadius": 8.2,
+        "initialPhaseDeg": 25,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh trong cùng của Sao Hải Vương, chuyển động rất nhanh và có quỹ đạo nghiêng đáng kể so với mặt phẳng xích đạo của hành tinh mẹ.",
+        "compositionVi": "Băng nước trộn lẫn bụi silicat và chất hữu cơ tối màu."
+      }
+    },
+    {
+      "id": "thalassa",
+      "parentId": "neptune",
+      "name": { "vi": "Thalassa", "en": "Thalassa" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.006,
+        "massKg": 3.5e17,
+        "density": 1.3,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000335,
+        "orbitalPeriod": 0.311,
+        "eccentricity": 0.0002,
+        "inclination": 0.21
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 7.5,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#909ba5",
+        "orbitScale": 1,
+        "displayOrbitRadius": 8.6,
+        "initialPhaseDeg": 110,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình nhỏ thứ hai từ trong ra. Nó chuyển động trong một quỹ đạo cộng hưởng quỹ đạo độc đáo dạng tránh va chạm với Naiad.",
+        "compositionVi": "Băng đá và bụi giàu carbon có albedo rất thấp."
+      }
+    },
+    {
+      "id": "despina",
+      "parentId": "neptune",
+      "name": { "vi": "Despina", "en": "Despina" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.012,
+        "massKg": 2.1e18,
+        "density": 1.3,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000351,
+        "orbitalPeriod": 0.335,
+        "eccentricity": 0.0002,
+        "inclination": 0.06
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 8.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#9baab5",
+        "orbitScale": 1,
+        "displayOrbitRadius": 9.0,
+        "initialPhaseDeg": 215,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh chăn dắt nằm ngay sát rìa trong của vành đai Le Verrier của Sao Hải Vương, giúp duy trì cấu trúc của vành đai.",
+        "compositionVi": "Hỗn hợp băng nước và đá sẫm màu."
+      }
+    },
+    {
+      "id": "galatea",
+      "parentId": "neptune",
+      "name": { "vi": "Galatea", "en": "Galatea" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.014,
+        "massKg": 2.12e18,
+        "density": 1.3,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000414,
+        "orbitalPeriod": 0.429,
+        "eccentricity": 0.00004,
+        "inclination": 0.06
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 10.3,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#a5b5c0",
+        "orbitScale": 1,
+        "displayOrbitRadius": 9.4,
+        "initialPhaseDeg": 305,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh chăn dắt chịu trách nhiệm chính cho cấu trúc uốn khúc và các cung vành đai (ring arcs) độc đáo của vành đai Adams ngoài cùng.",
+        "compositionVi": "Băng nước silicat nhám đá, bụi tối mờ."
+      }
+    },
+    {
+      "id": "larissa",
+      "parentId": "neptune",
+      "name": { "vi": "Larissa", "en": "Larissa" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.015,
+        "massKg": 4.9e18,
+        "density": 1.3,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000492,
+        "orbitalPeriod": 0.555,
+        "eccentricity": 0.0014,
+        "inclination": 0.25
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 13.3,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#b0c0cb",
+        "orbitScale": 1,
+        "displayOrbitRadius": 10.0,
+        "initialPhaseDeg": 45,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình lớn thứ tư của Sao Hải Vương. Nó có bề mặt đầy hố va chạm và quỹ đạo đang co dần lại do ma sát thủy triều.",
+        "compositionVi": "Đá cacbon giàu carbon trộn lẫn với băng đá tối màu."
+      }
+    },
+    {
+      "id": "proteus",
+      "parentId": "neptune",
+      "name": { "vi": "Proteus", "en": "Proteus" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.033,
+        "massKg": 4.4e19,
+        "density": 1.3,
+        "meanTemperatureC": -220
+      },
+      "orbit": {
+        "semiMajorAxis": 0.000786,
+        "orbitalPeriod": 1.122,
+        "eccentricity": 0.0005,
+        "inclination": 0.075
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 26.9,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#707880",
+        "orbitScale": 1,
+        "displayOrbitRadius": 11.0,
+        "initialPhaseDeg": 160,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh lớn thứ hai của Sao Hải Vương. Nó có hình dạng đa diện góc cạnh kỳ lạ, là giới hạn vật lý lớn nhất mà một thiên thể có thể đạt được mà không bị trọng lực nén thành hình cầu.",
+        "compositionVi": "Băng nước nhám bụi silicat sẫm màu phong hóa nặng nề."
+      }
+    },
+    {
+      "id": "triton",
+      "parentId": "neptune",
+      "name": { "vi": "Triton", "en": "Triton" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.212,
+        "massKg": 2.14e22,
+        "density": 2.061,
+        "meanTemperatureC": -235
+      },
+      "orbit": {
+        "semiMajorAxis": 0.002371,
+        "orbitalPeriod": -5.877,
+        "eccentricity": 0.000016,
+        "inclination": 156.8
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": -141.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#ffcccc",
+        "orbitScale": 1,
+        "displayOrbitRadius": 13.5,
+        "initialPhaseDeg": 80,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/triton/albedo.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "⚡ Vệ tinh nghịch hành khổng lồ độc nhất vô nhị (Wow-level High Fidelity). Triton là vệ tinh lớn duy nhất trong Hệ Mặt Trời quay ngược chiều tự quay của hành tinh mẹ, chứng minh nó từng là một hành tinh lùn thuộc vành đai Kuiper bị Sao Hải Vương bắt giữ. Bề mặt cực lạnh của nó phủ băng nitơ phản xạ mạnh, có các mạch phun trào (geysers) nitơ lỏng cao đến 8km và địa hình 'vỏ dưa lưới' (cantaloupe terrain) nứt nẻ ngoạn mục.",
+        "compositionVi": "Bề mặt phủ 55% băng nitơ, băng nước (35%), băng carbon dioxide và methane; lõi đá silicat lớn chiếm 70% khối lượng."
+      }
+    },
+    {
+      "id": "nereid",
+      "parentId": "neptune",
+      "name": { "vi": "Nereid", "en": "Nereid" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.027,
+        "massKg": 3.1e19,
+        "density": 1.5,
+        "meanTemperatureC": -225
+      },
+      "orbit": {
+        "semiMajorAxis": 0.036858,
+        "orbitalPeriod": 360.13,
+        "eccentricity": 0.7512,
+        "inclination": 7.23
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 11.5,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#a0a0a0",
+        "orbitScale": 1,
+        "displayOrbitRadius": 24.0,
+        "initialPhaseDeg": 220,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": {
+        "albedo": "/textures/planets/nereid/albedo.png"
+      },
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "☄️ Vệ tinh có quỹ đạo lệch tâm cực đoan nhất (Wow-level High Fidelity). Nereid sở hữu quỹ đạo dẹt đến mức kỳ lạ (độ lệch tâm 0.75), di chuyển từ khoảng cách cực gần (1.43 triệu km) đến cực xa (9.66 triệu km) so với Sao Hải Vương. Quỹ đạo bất thường này cho thấy Nereid là một vật thể ngoài rìa bị nhiễu loạn hấp dẫn cực mạnh khi Triton bị bắt giữ.",
+        "compositionVi": "Băng nước lẫn đá silicat xám, bề mặt thô ráp nhiều hố va chạm."
+      }
+    },
+    {
+      "id": "halimede",
+      "parentId": "neptune",
+      "name": { "vi": "Halimede", "en": "Halimede" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.005,
+        "massKg": 9.0e16,
+        "density": 1.5,
+        "meanTemperatureC": -225
+      },
+      "orbit": {
+        "semiMajorAxis": 0.111038,
+        "orbitalPeriod": -1879.7,
+        "eccentricity": 0.5711,
+        "inclination": 112.7
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 22.4,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#5e554d",
+        "orbitScale": 1,
+        "displayOrbitRadius": 32.0,
+        "initialPhaseDeg": 15,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh dị hình nghịch hành ở rất xa, có albedo trung bình xám tương tự Nereid, giả thuyết cho rằng nó có thể là một mảnh vỡ từ một va chạm cổ đại của Nereid.",
+        "compositionVi": "Hỗn hợp đá và băng nước tối màu."
+      }
+    },
+    {
+      "id": "psamathe",
+      "parentId": "neptune",
+      "name": { "vi": "Psamathe", "en": "Psamathe" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.003,
+        "massKg": 1.5e16,
+        "density": 1.5,
+        "meanTemperatureC": -225
+      },
+      "orbit": {
+        "semiMajorAxis": 0.321502,
+        "orbitalPeriod": -9074.3,
+        "eccentricity": 0.4496,
+        "inclination": 137.4
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 18.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#4d555e",
+        "orbitScale": 1,
+        "displayOrbitRadius": 40.0,
+        "initialPhaseDeg": 145,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Một trong những vệ tinh xa nhất trong Hệ Mặt Trời, chuyển động trên quỹ đạo nghịch hành khổng lồ mất gần 25 năm Trái Đất để hoàn thành một vòng quay quanh Sao Hải Vương.",
+        "compositionVi": "Đá sẫm màu carbonaceous và băng đá."
+      }
+    },
+    {
+      "id": "neso",
+      "parentId": "neptune",
+      "name": { "vi": "Neso", "en": "Neso" },
+      "type": "moon",
+      "physical": {
+        "radius": 0.005,
+        "massKg": 1.7e16,
+        "density": 1.5,
+        "meanTemperatureC": -225
+      },
+      "orbit": {
+        "semiMajorAxis": 0.329452,
+        "orbitalPeriod": -9740.7,
+        "eccentricity": 0.4945,
+        "inclination": 132.6
+      },
+      "rotation": {
+        "axialTilt": 0.0,
+        "rotationPeriod": 20.0,
+        "oblateness": 0.0
+      },
+      "render": {
+        "fallbackColor": "#3d454e",
+        "orbitScale": 1,
+        "displayOrbitRadius": 48.0,
+        "initialPhaseDeg": 290,
+        "orbitPlane": "parentEquator"
+      },
+      "textures": null,
+      "atmosphere": null,
+      "rings": null,
+      "info": {
+        "summaryVi": "Vệ tinh xa nhất được biết đến của Sao Hải Vương, di chuyển ở khoảng cách cực đại hơn 72 triệu km (lớn hơn khoảng cách từ Sao Thủy đến Mặt Trời), mất hơn 26 năm để đi hết một vòng quỹ đạo.",
+        "compositionVi": "Đá carbon tối và băng lạnh."
+      }
     }
   ]
 }
