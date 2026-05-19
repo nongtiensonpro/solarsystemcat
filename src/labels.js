@@ -7,6 +7,10 @@ labelContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height
 document.body.appendChild(labelContainer);
 
 const labels = [];
+const worldPos = new THREE.Vector3();
+const projectedPos = new THREE.Vector3();
+const projectionMatrix = new THREE.Matrix4();
+const frustum = new THREE.Frustum();
 
 /**
  * Tạo nhãn tên cho một thiên thể
@@ -48,10 +52,16 @@ export function updateLabels(camera, renderer) {
   const canvas = renderer.domElement;
   const halfW = canvas.clientWidth / 2;
   const halfH = canvas.clientHeight / 2;
+  projectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  frustum.setFromProjectionMatrix(projectionMatrix);
 
   for (const label of labels) {
-    const worldPos = new THREE.Vector3();
     label.pivot.getWorldPosition(worldPos);
+
+    if (!frustum.containsPoint(worldPos)) {
+      label.el.style.display = 'none';
+      continue;
+    }
 
     // Tính khoảng cách tới camera
     const distToCam = camera.position.distanceTo(worldPos);
@@ -76,20 +86,19 @@ export function updateLabels(camera, renderer) {
     }
 
     // Project 3D → 2D screen coordinates
-    const projected = worldPos.clone().project(camera);
+    projectedPos.copy(worldPos).project(camera);
 
     // Kiểm tra nằm trước camera
-    if (projected.z > 1) {
+    if (projectedPos.z > 1) {
       label.el.style.display = 'none';
       continue;
     }
 
-    const x = (projected.x * halfW) + halfW;
-    const y = -(projected.y * halfH) + halfH;
+    const x = (projectedPos.x * halfW) + halfW;
+    const y = -(projectedPos.y * halfH) + halfH + label.data.radius * 2 + 14;
 
     // Cập nhật vị trí và opacity
-    label.el.style.left = `${x}px`;
-    label.el.style.top = `${y + label.data.radius * 2 + 14}px`;
+    label.el.style.transform = `translate3d(${x}px, ${y}px, 0) translateX(-50%)`;
     label.el.style.opacity = opacity.toFixed(2);
     label.el.style.display = 'block';
   }

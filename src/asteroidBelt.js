@@ -66,6 +66,7 @@ export function createAsteroidBelt(maxCount = 5000) {
     const aAU = r / AU;
     const periodYears = Math.pow(aAU, 1.5);
     const periodSeconds = periodYears * 365.25 * 86400; // Giây
+    const meanMotion = (Math.PI * 2) / periodSeconds;
 
     // Inclination (độ nghiêng) ngẫu nhiên nhỏ (±10 độ = ±0.17 rad)
     const inclination = (random() - 0.5) * 0.34;
@@ -80,17 +81,26 @@ export function createAsteroidBelt(maxCount = 5000) {
 
     // Eccentricity ng?u nhiên (0.0 - 0.25) ph?n ánh th?c t? vành ?ai
     const eccentricity = random() * 0.25;
+    const sqrtOneMinusE2 = Math.sqrt(1 - eccentricity * eccentricity);
 
     // Góc c?n ?i?m (argument of periapsis) ng?u nhiên
     const argPeriapsis = random() * Math.PI * 2;
+    const cosW = Math.cos(argPeriapsis);
+    const sinW = Math.sin(argPeriapsis);
+    const sinInclination = Math.sin(inclination);
+    const cosInclination = Math.cos(inclination);
 
     asteroidData.push({
       a: r,
-      period: periodSeconds,
+      meanMotion,
       initialTheta: initialTheta,
       inclination: inclination,
       eccentricity,
-      argPeriapsis,
+      sqrtOneMinusE2,
+      cosW,
+      sinW,
+      sinInclination,
+      cosInclination,
       scale: scale,
       rotSpeedX,
       rotSpeedY,
@@ -105,6 +115,9 @@ export function createAsteroidBelt(maxCount = 5000) {
     const x = r * Math.cos(initialTheta);
     const y = r * Math.sin(initialTheta) * Math.sin(inclination);
     const z = r * Math.sin(initialTheta) * Math.cos(inclination);
+    asteroidData[i].x = x;
+    asteroidData[i].y = y;
+    asteroidData[i].z = z;
     
     dummy.position.set(x, y, z);
     dummy.rotation.set(asteroidData[i].rotX, asteroidData[i].rotY, asteroidData[i].rotZ);
@@ -117,37 +130,37 @@ export function createAsteroidBelt(maxCount = 5000) {
   instancedMesh.instanceColor.needsUpdate = true;
 
   let _orbitFrame = 0;
-  const ORBIT_INTERVAL = 3; // tính qu? ??o m?i 3 frame, rotation v?n m?i frame
+  let orbitInterval = 3; // tính qu? ??o m?i 3 frame, rotation v?n m?i frame
 
   return {
     mesh: instancedMesh,
     setCount: (count) => {
       instancedMesh.count = Math.min(count, maxCount);
     },
+    setOrbitInterval: (interval) => {
+      orbitInterval = Math.max(1, Math.floor(interval || 1));
+    },
     update: (simulationTime, deltaTime) => {
-      const doOrbit = (_orbitFrame++ % ORBIT_INTERVAL) === 0;
+      const doOrbit = (_orbitFrame++ % orbitInterval) === 0;
 
       for (let i = 0; i < instancedMesh.count; i++) {
         const data = asteroidData[i];
 
         if (doOrbit) {
-          const meanAnomaly = (2 * Math.PI / data.period) * simulationTime + data.initialTheta;
+          const meanAnomaly = data.meanMotion * simulationTime + data.initialTheta;
           const e = data.eccentricity;
           const E = meanAnomaly + e * Math.sin(meanAnomaly);
           const xOrbital = data.a * (Math.cos(E) - e);
-          const zOrbital = data.a * Math.sqrt(1 - e * e) * Math.sin(E);
+          const zOrbital = data.a * data.sqrtOneMinusE2 * Math.sin(E);
 
-          const cosW = Math.cos(data.argPeriapsis);
-          const sinW = Math.sin(data.argPeriapsis);
-          const xLocal = xOrbital * cosW - zOrbital * sinW;
-          const zLocal = xOrbital * sinW + zOrbital * cosW;
+          const xLocal = xOrbital * data.cosW - zOrbital * data.sinW;
+          const zLocal = xOrbital * data.sinW + zOrbital * data.cosW;
 
-          const x = xLocal;
-          const y = zLocal * Math.sin(data.inclination);
-          const z = zLocal * Math.cos(data.inclination);
-
-          dummy.position.set(x, y, z);
+          data.x = xLocal;
+          data.y = zLocal * data.sinInclination;
+          data.z = zLocal * data.cosInclination;
         }
+        dummy.position.set(data.x, data.y, data.z);
 
         data.rotX += data.rotSpeedX * deltaTime;
         data.rotY += data.rotSpeedY * deltaTime;

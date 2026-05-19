@@ -37,7 +37,7 @@ export function initScene(canvas) {
   renderer.localClippingEnabled = true; // Kích hoạt mặt cắt
   
   // Shadows (Phase 4)
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = preset.shadowsEnabled !== false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   // 4. Controls
@@ -61,9 +61,10 @@ export function initScene(canvas) {
   sunLightPrimary.decay = 2; // Mặc định Three.js (inverse-square)
 
   // Shadow config cho Sun
-  sunLightPrimary.castShadow = true;
-  sunLightPrimary.shadow.mapSize.width = 2048;
-  sunLightPrimary.shadow.mapSize.height = 2048;
+  const shadowMapSize = preset.shadowMapSize ?? 2048;
+  sunLightPrimary.castShadow = preset.shadowsEnabled !== false;
+  sunLightPrimary.shadow.mapSize.width = shadowMapSize;
+  sunLightPrimary.shadow.mapSize.height = shadowMapSize;
   sunLightPrimary.shadow.camera.near = 0.5;
   sunLightPrimary.shadow.camera.far = 100000;
   sunLightPrimary.shadow.bias = -0.0001;
@@ -90,6 +91,19 @@ export function initScene(canvas) {
   onPresetChange((newPreset) => {
     // Cập nhật pixel ratio
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, newPreset.maxPixelRatio));
+    renderer.shadowMap.enabled = newPreset.shadowsEnabled !== false;
+    sunLightPrimary.castShadow = newPreset.shadowsEnabled !== false;
+    const newShadowMapSize = newPreset.shadowMapSize ?? 1024;
+    if (
+      sunLightPrimary.shadow.mapSize.width !== newShadowMapSize ||
+      sunLightPrimary.shadow.mapSize.height !== newShadowMapSize
+    ) {
+      sunLightPrimary.shadow.mapSize.set(newShadowMapSize, newShadowMapSize);
+      if (sunLightPrimary.shadow.map) {
+        sunLightPrimary.shadow.map.dispose();
+        sunLightPrimary.shadow.map = null;
+      }
+    }
 
     // Tạo lại starfield với số sao mới
     scene.remove(starMesh);

@@ -14,6 +14,7 @@ import { createDiamondRain } from './diamondRain.js';
 import { createIronSnow } from './ironSnow.js';
 import { createEnceladusPlume } from './enceladusPlume.js';
 import { getDisplayOrbitRadius } from './orbitMath.js';
+import { getCurrentPreset } from './renderConfig.js';
 
 // Lấy fallback color từ data (đã normalize bởi dataLoader.js)
 function getFallbackColor(data) {
@@ -94,7 +95,9 @@ function createSunGlowSprite(radius) {
 export function createPlanet(data) {
   // 1. Geometry — Quả cầu chuẩn hóa (Áp dụng LOD để tối ưu hiệu năng)
   const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-  const segmentScale = isMobile ? 0.6 : 1.0; // Giảm segments trên mobile
+  const preset = getCurrentPreset();
+  const presetSegmentScale = preset.geometryScale ?? 1.0;
+  const segmentScale = Math.min(isMobile ? 0.6 : 1.0, presetSegmentScale); // Giảm segments trên mobile/preset thấp
 
   let segments = Math.round(64 * segmentScale); // Mặc định cao cho Mặt Trời và Khí Khổng Lồ
   if (data.type === 'comet' || data.radius < 0.1) {
@@ -104,14 +107,18 @@ export function createPlanet(data) {
   } else if (data.radius <= 2.0) {
     segments = Math.round(48 * segmentScale);  // 1. Tạo Geometries theo cấp độ (LOD)
   }
+  segments = Math.max(8, segments);
 
   // High: 64 segments (Dành cho góc nhìn gần)
   // Medium: 32 segments
   // Low: 16 segments (Dành cho góc nhìn xa/Overview)
+  const highSegments = segments;
+  const medSegments = Math.max(8, Math.round(segments * 0.5));
+  const lowSegments = Math.max(8, Math.round(segments * 0.25));
   const geometries = {
-    high: new THREE.SphereGeometry(1, 64, 64),
-    med: new THREE.SphereGeometry(1, 32, 32),
-    low: new THREE.SphereGeometry(1, 16, 16)
+    high: new THREE.SphereGeometry(1, highSegments, highSegments),
+    med: new THREE.SphereGeometry(1, medSegments, medSegments),
+    low: new THREE.SphereGeometry(1, lowSegments, lowSegments)
   };
 
   // 2. Vật liệu (Material) - Dùng chung cho các cấp độ LOD
@@ -239,7 +246,8 @@ export function createPlanet(data) {
   lod.addLevel(meshMed, data.radius * 30);
 
   // Cấp độ Thấp (Xa)
-  const meshLow = new THREE.Mesh(geometries.low, data.radius * 100);
+  const meshLow = new THREE.Mesh(geometries.low, material);
+  meshLow.receiveShadow = false;
   lod.addLevel(meshLow, data.radius * 100);
 
   // Áp dụng kích thước (radius) và độ dẹt (oblateness)

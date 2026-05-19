@@ -314,7 +314,7 @@ function computeMeanAnomaly(c, t) {
  * @param {number} timeElapsed - giây
  * @returns {{ x, y, z }}
  */
-export function computeOrbitalPosition(data, timeElapsed) {
+export function computeOrbitalPositionInto(data, timeElapsed, out) {
   const c  = getOrCreateCache(data);
   const M  = computeMeanAnomaly(c, timeElapsed);
   const E  = c.isHyperbolic
@@ -332,11 +332,21 @@ export function computeOrbitalPosition(data, timeElapsed) {
     yp = c.a_sqrt1me2 * Math.sin(E);
   }
 
-  return {
-    x: c.r00 * xp + c.r01 * yp,
-    y: c.r10 * xp + c.r11 * yp,
-    z: c.r20 * xp + c.r21 * yp,
-  };
+  const x = c.r00 * xp + c.r01 * yp;
+  const y = c.r10 * xp + c.r11 * yp;
+  const z = c.r20 * xp + c.r21 * yp;
+  if (typeof out.set === 'function') {
+    out.set(x, y, z);
+  } else {
+    out.x = x;
+    out.y = y;
+    out.z = z;
+  }
+  return out;
+}
+
+export function computeOrbitalPosition(data, timeElapsed) {
+  return computeOrbitalPositionInto(data, timeElapsed, { x: 0, y: 0, z: 0 });
 }
 
 /**

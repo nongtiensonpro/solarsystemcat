@@ -82,6 +82,7 @@ const FilmGrainShader = {
  */
 class SelectiveBloomPass {
   constructor(scene, camera, renderer, options = {}) {
+    this.enabled = true;
     this.scene = scene;
     this.camera = camera;
     this.renderer = renderer;
@@ -96,10 +97,11 @@ class SelectiveBloomPass {
     this.bloomCamera.layers.set(BLOOM_LAYER);
 
     // Resolution
+    this.resolutionScale = options.resolutionScale ?? 0.5;
     this.resolution = new THREE.Vector2(window.innerWidth, window.innerHeight);
     this.bloomResolution = new THREE.Vector2(
-      Math.max(1, Math.floor(this.resolution.x / 2)),
-      Math.max(1, Math.floor(this.resolution.y / 2))
+      Math.max(1, Math.floor(this.resolution.x * this.resolutionScale)),
+      Math.max(1, Math.floor(this.resolution.y * this.resolutionScale))
     );
 
     // Bloom params
@@ -130,7 +132,38 @@ class SelectiveBloomPass {
     this.bloomComposer.addPass(this.bloomPass);
 
     // ── Blend vào output
-    // Dùng copyPass để copy bloom result, rồi custom blend trong render()
+    // Dùng quad tái sử dụng để tránh allocation trong hot path render().
+    this._blendMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        tScene: { value: null },
+        tBloom: { value: this.bloomComposer.readBuffer.texture },
+        uIntensity: { value: this.bloomIntensity }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tScene;
+        uniform sampler2D tBloom;
+        uniform float uIntensity;
+        varying vec2 vUv;
+        void main() {
+          vec4 scene = texture2D(tScene, vUv);
+          vec4 bloom = texture2D(tBloom, vUv);
+          gl_FragColor = vec4(scene.rgb + bloom.rgb * uIntensity, 1.0);
+        }
+      `,
+      depthTest: false,
+      depthWrite: false
+    });
+    this._quadScene = new THREE.Scene();
+    this._quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this._quadMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this._blendMaterial);
+    this._quadScene.add(this._quadMesh);
   }
 
   syncBloomCamera() {
@@ -152,36 +185,6 @@ class SelectiveBloomPass {
     // Copy scene từ readBuffer, cộng thêm bloom
     const bloomTexture = this.bloomComposer.readBuffer.texture;
 
-    if (!this._blendMaterial) {
-      this._blendMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          tScene: { value: null },
-          tBloom: { value: bloomTexture },
-          uIntensity: { value: this.bloomIntensity }
-        },
-        vertexShader: `
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          uniform sampler2D tScene;
-          uniform sampler2D tBloom;
-          uniform float uIntensity;
-          varying vec2 vUv;
-          void main() {
-            vec4 scene = texture2D(tScene, vUv);
-            vec4 bloom = texture2D(tBloom, vUv);
-            gl_FragColor = vec4(scene.rgb + bloom.rgb * uIntensity, 1.0);
-          }
-        `,
-        depthTest: false,
-        depthWrite: false
-      });
-    }
-
     this._blendMaterial.uniforms.tBloom.value = bloomTexture;
     this._blendMaterial.uniforms.uIntensity.value = this.bloomIntensity;
 
@@ -193,22 +196,17 @@ class SelectiveBloomPass {
       this._blendMaterial.uniforms.tScene.value = readBuffer.texture;
     }
 
-    const quadScene = this._quadScene || (this._quadScene = new THREE.Scene());
-    const quadCamera = this._quadCamera || (this._quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1));
-    quadScene.children = [];
-    quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this._blendMaterial));
-
-    renderer.render(quadScene, quadCamera);
+    renderer.render(this._quadScene, this._quadCamera);
   }
 
   setSize(width, height) {
     this.resolution.set(width, height);
     this.bloomResolution.set(
-      Math.max(1, Math.floor(width / 2)),
-      Math.max(1, Math.floor(height / 2))
+      Math.max(1, Math.floor(width * this.resolutionScale)),
+      Math.max(1, Math.floor(height * this.resolutionScale))
     );
     this.bloomRenderTarget.setSize(this.bloomResolution.x, this.bloomResolution.y);
-    this.bloomComposer.setSize(width, height);
+    this.bloomComposer.setSize(this.bloomResolution.x, this.bloomResolution.y);
     this.bloomPass.setSize(this.bloomResolution.x, this.bloomResolution.y);
     this.bloomCamera.aspect = width / height;
     this.bloomCamera.updateProjectionMatrix();
@@ -217,6 +215,8 @@ class SelectiveBloomPass {
   dispose() {
     this.bloomRenderTarget.dispose();
     this.bloomComposer.dispose();
+    this._quadMesh.geometry.dispose();
+    this._blendMaterial.dispose();
   }
 }
 
@@ -239,18 +239,13 @@ export function initPostProcessing(renderer, scene, camera) {
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
 
-  // 2. Selective Bloom Pass — Mặt Trời luôn dùng params chất lượng thấp
-  // Hardcoded: strength 0.4, radius 0.3, threshold 1.0
-  // Không phụ thuộc preset nào
-  const SUN_BLOOM_STRENGTH = 0.4;
-  const SUN_BLOOM_RADIUS = 0.3;
-  const SUN_BLOOM_THRESHOLD = 1.0;
-
   const selectiveBloom = new SelectiveBloomPass(scene, camera, renderer, {
-    strength: SUN_BLOOM_STRENGTH,
-    radius: SUN_BLOOM_RADIUS,
-    threshold: SUN_BLOOM_THRESHOLD
+    strength: preset.bloomStrength ?? 0.4,
+    radius: preset.bloomRadius ?? 0.3,
+    threshold: preset.bloomThreshold ?? 1.0,
+    resolutionScale: preset.bloomResolutionScale ?? 0.5
   });
+  selectiveBloom.enabled = preset.bloomEnabled !== false;
   composer.addPass(selectiveBloom);
 
   // 3. BokehPass (Depth of Field) - Tắt mặc định
@@ -294,6 +289,15 @@ export function initPostProcessing(renderer, scene, camera) {
       bokehPass.uniforms.focus.value = config.focusDistance || 100;
       bokehPass.uniforms.aperture.value = config.aperture || 0.00005;
     }
+  });
+
+  onPresetChange((newPreset) => {
+    selectiveBloom.enabled = newPreset.bloomEnabled !== false;
+    selectiveBloom.resolutionScale = newPreset.bloomResolutionScale ?? 0.5;
+    selectiveBloom.bloomPass.strength = newPreset.bloomStrength ?? selectiveBloom.bloomPass.strength;
+    selectiveBloom.bloomPass.radius = newPreset.bloomRadius ?? selectiveBloom.bloomPass.radius;
+    selectiveBloom.bloomPass.threshold = newPreset.bloomThreshold ?? selectiveBloom.bloomPass.threshold;
+    selectiveBloom.setSize(window.innerWidth, window.innerHeight);
   });
 
   // Update loop for time-based uniforms

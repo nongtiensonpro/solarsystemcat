@@ -3,7 +3,7 @@ import { initScene } from './scene.js';
 import { loadSolarSystemData, loadSaturnGhostConfig } from './dataLoader.js';
 import { setPlanetData, planetData } from './planetData.js';
 import { createPlanet } from './createPlanet.js';
-import { computeOrbitalPosition } from './kepler.js';
+import { computeAllPositions } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
 import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName } from './ui.js';
 import { createOrbitLine, createNbodyOrbitLine, updateOrbitLineGeometry, getSegmentCount } from './orbits.js';
@@ -58,6 +58,7 @@ async function bootstrap() {
   let isAuroraEnabled = false;
   let isCloudsEnabled = false;
   let newtonGravityActive = false;
+  let orbitSafetyInterval = getCurrentPreset().orbitSafetyInterval ?? 12;
   const nbodyOrbitLines = new Map();
   const NBODY_PREDICTION_INTERVAL = 45;
 
@@ -721,6 +722,13 @@ async function bootstrap() {
   }
   toggleLabels(true);
 
+  const keplerBodies = bodies.filter(body => (
+    body.data.type !== 'star' &&
+    (body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0)
+  ));
+  const keplerBodyData = keplerBodies.map(body => body.data);
+  let keplerPositionBuffer = new Float64Array(keplerBodies.length * 3);
+
   // 5a. T?o V?nh ?ai ti?u h?nh tinh (Asteroid Belt)
   const asteroidBelt = createAsteroidBelt(5000);
   scene.add(asteroidBelt.mesh);
@@ -762,6 +770,7 @@ async function bootstrap() {
     if (preset.asteroidCount) {
       asteroidBelt.setCount(preset.asteroidCount);
     }
+    asteroidBelt.setOrbitInterval(preset.asteroidOrbitInterval ?? 3);
 
     for (const body of bodies) {
       // Atmosphere opacity scale
@@ -797,7 +806,11 @@ async function bootstrap() {
 
       // Unified Corona visibility — luôn hiển thị
       if (body.coronaMesh) {
-        body.coronaMesh.visible = true;
+        body.coronaMesh.visible = preset.coronaEnabled !== false;
+      }
+
+      if (body.chromosphereMesh) {
+        body.chromosphereMesh.visible = preset.coronaEnabled !== false;
       }
 
       // Sun Glow Sprite — luôn hiển thị
@@ -824,6 +837,7 @@ async function bootstrap() {
 
   // L?ng nghe thay ??i preset
   onPresetChange((newPreset) => {
+    orbitSafetyInterval = newPreset.orbitSafetyInterval ?? 12;
     applyPresetToEffects(newPreset);
   });
 
@@ -973,6 +987,18 @@ async function bootstrap() {
       updateNewtonGravity(bodies, deltaTime * timeScale);
     }
 
+    if (!newtonGravityActive && !isPaused && keplerBodies.length) {
+      keplerPositionBuffer = computeAllPositions(keplerBodyData, simulationTime, keplerPositionBuffer);
+      for (let i = 0; i < keplerBodies.length; i++) {
+        const base = i * 3;
+        keplerBodies[i].pivot.position.set(
+          keplerPositionBuffer[base],
+          keplerPositionBuffer[base + 1],
+          keplerPositionBuffer[base + 2]
+        );
+      }
+    }
+
     // D? ?oán qu? ??o N-body (throttle m?i NBODY_PREDICTION_INTERVAL frame)
     if (newtonGravityActive && frameCount % NBODY_PREDICTION_INTERVAL === 0) {
       updateNbodyPredictions();
@@ -988,11 +1014,6 @@ async function bootstrap() {
       if (body.data.type !== 'star') {
         const hasOrbit = body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0;
         if (hasOrbit && !isPaused) {
-          if (!newtonGravityActive) {
-            const pos = computeOrbitalPosition(body.data, simulationTime);
-            body.pivot.position.set(pos.x, pos.y, pos.z);
-          }
-          
           // E. C?p nh?t sao ch?i (??u?i, qu?ng, ?? s?ng)
           if (body.tailMesh) {
             const awayPos = _v2.copy(body.pivot.position).multiplyScalar(2);
@@ -1183,8 +1204,12 @@ async function bootstrap() {
         }
       }
       // G. Update Enceladus Plume
-      if (body.enceladusPlume && !isPaused) {
-        body.enceladusPlume.update(deltaTime);
+      if (body.enceladusPlume) {
+        const plumeVisible = distToCamera < Math.max(body.data.radius * 80, 15);
+        body.enceladusPlume.mesh.visible = plumeVisible;
+        if (plumeVisible && !isPaused) {
+          body.enceladusPlume.update(deltaTime);
+        }
       }
 
       // H. Update Ring Shadows (Saturn + Uranus)
@@ -1203,11 +1228,18 @@ async function bootstrap() {
       }
     } // Kết thúc vòng lặp bodies
 
-    applyOrbitSafety(bodies, bodyById, simulationTime, {
-      scene,
-      newtonGravityActive,
-      syncGravityBodyState,
-    });
+    const shouldRunOrbitSafety = !isPaused && (
+      newtonGravityActive ||
+      orbitSafetyInterval <= 1 ||
+      frameCount % orbitSafetyInterval === 0
+    );
+    if (shouldRunOrbitSafety) {
+      applyOrbitSafety(bodies, bodyById, simulationTime, {
+        scene,
+        newtonGravityActive,
+        syncGravityBodyState,
+      });
+    }
 
     // Throttle orbit shader uTime updates — m?i 2 frame (không ?nh h??ng th? giác)
     if (frameCount % 2 === 0) {
@@ -1375,7 +1407,7 @@ async function bootstrap() {
     }
 
     // C?p nh?t nh?n (n?u ?ang hi?n th?) - Throttled ?? t?i ?u hi?u n?ng
-    const labelThrottle = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 6 : 3;
+    const labelThrottle = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 8 : 4;
     if (areLabelsVisible() && frameCount % labelThrottle === 0) {
       updateLabels(camera, renderer);
     }
@@ -1405,7 +1437,9 @@ async function bootstrap() {
     updateZoomIndicator();
 
     // Phase 3.1: Adaptive Exposure
-    updateSunlightExposure();
+    if (frameCount % 3 === 0) {
+      updateSunlightExposure();
+    }
 
     // FPS Counter
     frameCount2++;
@@ -1470,6 +1504,9 @@ async function bootstrap() {
   }
 
   function updateZoomIndicator() {
+    const zoomIndicator = document.getElementById('zoom-indicator');
+    if (!zoomIndicator || zoomIndicator.style.display === 'none') return;
+
     const zoomLevels = document.querySelectorAll('.zoom-level');
     const zoomPointer = document.getElementById('zoom-pointer');
     if (!zoomPointer) return;
