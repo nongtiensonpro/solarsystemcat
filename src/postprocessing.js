@@ -83,6 +83,7 @@ const FilmGrainShader = {
 class SelectiveBloomPass {
   constructor(scene, camera, renderer, options = {}) {
     this.enabled = true;
+    this.needsSwap = true;
     this.scene = scene;
     this.camera = camera;
     this.renderer = renderer;
