@@ -13,6 +13,12 @@ export const QUALITY_PRESETS = {
     maxPixelRatio: 2,
     starCount: 5000,
     asteroidCount: 3000,
+    asteroidOrbitInterval: 2,
+    geometryScale: 1.0,
+    shadowsEnabled: true,
+    shadowMapSize: 2048,
+    bloomEnabled: true,
+    bloomResolutionScale: 0.5,
     bloomStrength: 0.9,
     bloomRadius: 0.45,
     bloomThreshold: 0.85,
@@ -25,6 +31,7 @@ export const QUALITY_PRESETS = {
     antialias: true,
     orbitQuality: 1.5,
     orbitCatmullRom: true,
+    orbitSafetyInterval: 12,
     cinematic: {
       dofEnabled: true,
       vignetteEnabled: true,
@@ -34,9 +41,15 @@ export const QUALITY_PRESETS = {
   },
   balanced: {
     label: 'Cân bằng',
-    maxPixelRatio: 1.5,
+    maxPixelRatio: 1.25,
     starCount: 3000,
-    asteroidCount: 1500,
+    asteroidCount: 1200,
+    asteroidOrbitInterval: 3,
+    geometryScale: 0.75,
+    shadowsEnabled: true,
+    shadowMapSize: 1024,
+    bloomEnabled: true,
+    bloomResolutionScale: 0.5,
     bloomStrength: 0.7,
     bloomRadius: 0.4,
     bloomThreshold: 0.9,
@@ -49,6 +62,7 @@ export const QUALITY_PRESETS = {
     antialias: true,
     orbitQuality: 1.0,
     orbitCatmullRom: true,
+    orbitSafetyInterval: 15,
     cinematic: {
       dofEnabled: false,
       vignetteEnabled: true,
@@ -60,7 +74,13 @@ export const QUALITY_PRESETS = {
     label: 'Thấp',
     maxPixelRatio: 1,
     starCount: 800,
-    asteroidCount: 300,
+    asteroidCount: 250,
+    asteroidOrbitInterval: 5,
+    geometryScale: 0.5,
+    shadowsEnabled: false,
+    shadowMapSize: 512,
+    bloomEnabled: false,
+    bloomResolutionScale: 0.35,
     bloomStrength: 0.4,
     bloomRadius: 0.3,
     bloomThreshold: 1.0,
@@ -73,6 +93,7 @@ export const QUALITY_PRESETS = {
     antialias: false,
     orbitQuality: 0.5,
     orbitCatmullRom: false,
+    orbitSafetyInterval: 20,
     cinematic: {
       dofEnabled: false,
       vignetteEnabled: true,
@@ -92,11 +113,13 @@ function detectDefaultPreset() {
   const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isSmallViewport = window.innerWidth < 768;
   const isHighDPR = window.devicePixelRatio > 2;
+  const cores = navigator.hardwareConcurrency || 4;
+  const memoryGb = navigator.deviceMemory || 4;
 
   if (isMobile || (isSmallViewport && isHighDPR)) {
     return 'low';
   }
-  if (isSmallViewport || isHighDPR) {
+  if (isSmallViewport || isHighDPR || cores < 8 || memoryGb < 8) {
     return 'balanced';
   }
   return 'high';

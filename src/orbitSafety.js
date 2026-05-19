@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { computeOrbitalPosition } from './kepler.js';
+import { computeOrbitalPositionInto } from './kepler.js';
 import { getDisplayOrbitRadius } from './orbitMath.js';
 
 const SOLAR_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant']);
@@ -20,6 +20,11 @@ const _target = new THREE.Vector3();
 const _local = new THREE.Vector3();
 const _otherWorld = new THREE.Vector3();
 const lastWarningAt = new Map();
+const expectedById = new Map();
+const expectedVectorById = new Map();
+let cachedBodiesRef = null;
+let cachedSolarOrbiters = null;
+let cachedSolarBands = null;
 
 function hasOrbit(data) {
   return getDisplayOrbitRadius(data) > 0;
@@ -72,8 +77,7 @@ function getOrbitFrame(body, bodyById) {
 function getExpectedWorldPosition(body, bodyById, simulationTime, out) {
   if (!hasOrbit(body.data)) return null;
 
-  const pos = computeOrbitalPosition(body.data, simulationTime);
-  out.set(pos.x, pos.y, pos.z);
+  computeOrbitalPositionInto(body.data, simulationTime, out);
 
   const frame = getOrbitFrame(body, bodyById);
   if (frame) {
@@ -127,12 +131,21 @@ function guardMoon(body, bodyById, expectedWorld, options, config) {
 }
 
 function getSolarOrbiters(bodies) {
-  return bodies
+  if (cachedBodiesRef === bodies && cachedSolarOrbiters) {
+    return cachedSolarOrbiters;
+  }
+
+  cachedBodiesRef = bodies;
+  cachedSolarBands = null;
+  cachedSolarOrbiters = bodies
     .filter(body => SOLAR_PLANET_TYPES.has(body.data.type) && hasOrbit(body.data))
     .sort((a, b) => getDisplayOrbitRadius(a.data) - getDisplayOrbitRadius(b.data));
+  return cachedSolarOrbiters;
 }
 
 function buildSolarBands(solarOrbiters) {
+  if (cachedSolarBands) return cachedSolarBands;
+
   const bands = new Map();
   for (let i = 0; i < solarOrbiters.length; i++) {
     const body = solarOrbiters[i];
@@ -145,6 +158,7 @@ function buildSolarBands(solarOrbiters) {
       max: next === null ? orbitRadius + Math.max(orbitRadius * 0.8, 1000) : (orbitRadius + next) * 0.5,
     });
   }
+  cachedSolarBands = bands;
   return bands;
 }
 
@@ -214,12 +228,16 @@ export function applyOrbitSafety(bodies, bodyById, simulationTime, options = {})
     options.scene.updateMatrixWorld(true);
   }
 
-  const expectedById = new Map();
+  expectedById.clear();
   for (const body of bodies) {
     if (body.data.type === 'star' || !hasOrbit(body.data)) continue;
-    const expected = new THREE.Vector3();
+    let expected = expectedVectorById.get(body.data.id);
+    if (!expected) {
+      expected = new THREE.Vector3();
+      expectedVectorById.set(body.data.id, expected);
+    }
     if (getExpectedWorldPosition(body, bodyById, simulationTime, expected)) {
-      expectedById.set(body.data.id, expected.clone());
+      expectedById.set(body.data.id, expected);
     }
   }
 
