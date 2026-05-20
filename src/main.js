@@ -5,13 +5,13 @@ import { setPlanetData, planetData } from './planetData.js';
 import { createPlanet } from './createPlanet.js';
 import { computeAllPositions } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
-import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName } from './ui.js';
+import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName, updateBenchmarkProgress, hideBenchmarkOverlay, showBenchmarkReport, syncUIToggles } from './ui.js';
 import { createOrbitLine, createNbodyOrbitLine, updateOrbitLineGeometry, getSegmentCount } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
-import { getCurrentPreset, onPresetChange } from './renderConfig.js';
+import { getCurrentPreset, onPresetChange, getCurrentPresetKey, applyPreset, QUALITY_PRESETS } from './renderConfig.js';
 import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
-import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds, predictTrajectory, syncGravityBodyState } from './gravity.js';
+import { initNewtonGravity, updateNewtonGravity, disableNewtonGravity, setFocusedBodyId, getFocusedBodyIds, predictTrajectory, predictTrajectories, syncGravityBodyState } from './gravity.js';
 import { initSpacetimeGrid, setSpacetimeGridEnabled, updateSpacetimeGrid } from './spacetimeGrid.js';
 import { AU } from './constants.js';
 import { selfRegulatingFactor } from './sunInterior.js';
@@ -62,6 +62,11 @@ async function bootstrap() {
   let orbitSafetyInterval = getCurrentPreset().orbitSafetyInterval ?? 12;
   const nbodyOrbitLines = new Map();
   const NBODY_PREDICTION_INTERVAL = 45;
+
+  // Benchmark State Variables
+  let benchmarkActive = false;
+  let benchmarkFrameSamples = [];
+  let lastBenchmarkFrameTime = 0;
 
   // 3b. Camera Modes
   let cameraMode = 'overview'; // 'overview', 'follow'
@@ -565,6 +570,9 @@ async function bootstrap() {
       cinematicCamera.adjustShotSpeed(factor);
       const newSpeed = cinematicCamera.getShotSpeed();
       updateSpeedDisplay(newSpeed);
+    },
+    onRunBenchmark: (includeNbody) => {
+      runBenchmark(includeNbody);
     }
   });
 
@@ -927,11 +935,11 @@ async function bootstrap() {
     const visualsActive = visualsBtn && visualsBtn.classList.contains('active');
     if (!visualsActive) return;
 
-    // Xác ??nh danh sách thiên th? c?n d? ?oán (focus ho?c t?t c?)
+    // Xác ??nh danh sách thiên th? c?n d? ?oán (focus ho?c chỉ hành tinh chính ở Overview)
     const focusedIds = getFocusedBodyIds();
     const targetBodyIds = focusedIds
       ? Array.from(focusedIds)
-      : bodies.filter(b => b.data.type !== 'star').map(b => b.data.id);
+      : bodies.filter(b => b.data.type !== 'star' && !b.data.isMoon).map(b => b.data.id);
     const targetSet = new Set(targetBodyIds);
 
     // D?n d?p lines c?a thiên th? không còn trong focus
@@ -944,15 +952,22 @@ async function bootstrap() {
       }
     }
 
+    const configs = [];
     for (const bodyId of targetBodyIds) {
       const body = bodyById.get(bodyId);
       if (!body) continue;
 
       const qualityMultiplier = getCurrentPreset().orbitQuality ?? 1;
       const numPoints = getSegmentCount(body.data.eccentricity || 0, body.data.isMoon, qualityMultiplier);
+      configs.push({ bodyId, numPoints });
+    }
 
-      const trajectory = predictTrajectory(bodyId, numPoints);
-      if (trajectory.length < 3) continue;
+    // Chạy mô phỏng tích phân song song chỉ trong một lượt duy nhất
+    const trajectoriesMap = predictTrajectories(configs);
+
+    for (const [bodyId, trajectory] of trajectoriesMap) {
+      const body = bodyById.get(bodyId);
+      if (!body || trajectory.length < 3) continue;
 
       const points = trajectory.map(p => new THREE.Vector3(p.x, p.y, p.z));
 
@@ -961,7 +976,7 @@ async function bootstrap() {
         updateOrbitLineGeometry(orbitLine, points);
         orbitLine.visible = true;
       } else {
-        orbitLine = createNbodyOrbitLine(body.data, numPoints);
+        orbitLine = createNbodyOrbitLine(body.data, points.length);
         nbodyOrbitLines.set(bodyId, orbitLine);
         scene.add(orbitLine);
         orbitLine.visible = true;
@@ -980,6 +995,14 @@ async function bootstrap() {
     requestAnimationFrame(animate);
 
     const deltaTime = clock.getDelta();
+
+    if (benchmarkActive) {
+      const now = performance.now();
+      if (lastBenchmarkFrameTime !== 0) {
+        benchmarkFrameSamples.push(now - lastBenchmarkFrameTime);
+      }
+      lastBenchmarkFrameTime = now;
+    }
     if (!isPaused) {
       simulationTime += deltaTime * timeScale;
     }
@@ -1019,6 +1042,8 @@ async function bootstrap() {
     }
 
     for (const body of bodies) {
+      if (!body.mesh.visible && body.data.type !== 'star') continue;
+
       // A. C?p nh?t v? tr? qu? ??o (Kepler ho?c Gravity) - B? qua M?t Tr?i
       if (body.data.type !== 'star') {
         const hasOrbit = body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0;
@@ -1238,8 +1263,6 @@ async function bootstrap() {
     } // Kết thúc vòng lặp bodies
 
     const shouldRunOrbitSafety = !isPaused && (
-      newtonGravityActive ||
-      orbitSafetyInterval <= 1 ||
       frameCount % orbitSafetyInterval === 0
     );
     if (shouldRunOrbitSafety) {
@@ -1673,7 +1696,552 @@ async function bootstrap() {
     }, 100);
   }
 
-  // B?t ??u v?ng l?p
+  // ==========================================
+  // BENCHMARK ENGINE SYSTEM
+  // ==========================================
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  // --- Phase 1: Baseline Load Setup ---
+  const setupPhase1 = () => {
+    newtonGravityActive = false;
+    disableNewtonGravity(bodies, scene);
+    restoreAllMeshesVisibility();
+    applyPreset('balanced');
+    
+    isMagneticFieldEnabled = false;
+    isAuroraEnabled = false;
+    isCloudsEnabled = false;
+    for (const body of bodies) {
+      if (body.magneticFieldGroup) body.magneticFieldGroup.visible = false;
+      if (body.auroraGroup) body.auroraGroup.visible = false;
+      if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = false;
+    }
+    toggleSunlightPaths(false);
+    setSpacetimeGridEnabled(scene, false, bodies);
+    
+    cameraMode = 'overview';
+    trackedBody = null;
+    cinematicCamera.disable();
+    setCinematicMode(true);
+    
+    camera.position.set(200, 100, 200);
+    controls.target.set(0, 0, 0);
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    
+    timeScale = 86400; // 1 Day/s
+    isPaused = false;
+  };
+
+  const logPhase1 = (elapsed) => {
+    return `Đang đo tải cơ sở với mô phỏng Keplerian...\n` +
+           `- Thiết lập đồ họa: Balanced (Cân bằng)\n` +
+           `- Số lượng thiên thể mô phỏng: ${bodies.length}\n` +
+           `- Tiến trình: ${(elapsed / 1000).toFixed(1)}s / 5.0s`;
+  };
+
+  // --- Phase 2: N-body Physics Setup (Optional) ---
+  const setupPhase2 = () => {
+    newtonGravityActive = true;
+    initNewtonGravity(bodies, scene, simulationTime, bodyById);
+    applyPreset('balanced');
+    setSpacetimeGridEnabled(scene, true, bodies);
+    
+    isMagneticFieldEnabled = false;
+    isAuroraEnabled = false;
+    isCloudsEnabled = false;
+    for (const body of bodies) {
+      if (body.magneticFieldGroup) body.magneticFieldGroup.visible = false;
+      if (body.auroraGroup) body.auroraGroup.visible = false;
+      if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = false;
+    }
+    toggleSunlightPaths(false);
+    
+    cameraMode = 'overview';
+    trackedBody = null;
+    cinematicCamera.disable();
+    setCinematicMode(true);
+    
+    camera.position.set(220, 110, 220);
+    controls.target.set(0, 0, 0);
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    
+    timeScale = 86400;
+    isPaused = false;
+  };
+
+  const logPhase2 = (elapsed) => {
+    return `Đang đo tải xử lý vật lý hấp dẫn Newton N-body...\n` +
+           `- Đang giải tương tác đa vật thể trực tiếp...\n` +
+           `- Lưới không-thời gian: Kích hoạt\n` +
+           `- Tiến trình: ${(elapsed / 1000).toFixed(1)}s / 5.0s`;
+  };
+
+  // --- Phase 3: Particle & GPU Stress Setup ---
+  const setupPhase3 = () => {
+    newtonGravityActive = false;
+    disableNewtonGravity(bodies, scene);
+    restoreAllMeshesVisibility();
+    applyPreset('cinematicUltra'); // Loads 10,000 asteroids
+    toggleSunlightPaths(true);
+    setSpacetimeGridEnabled(scene, false, bodies);
+    
+    isMagneticFieldEnabled = false;
+    isAuroraEnabled = false;
+    isCloudsEnabled = false;
+    for (const body of bodies) {
+      if (body.magneticFieldGroup) body.magneticFieldGroup.visible = false;
+      if (body.auroraGroup) body.auroraGroup.visible = false;
+      if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = false;
+    }
+    
+    cameraMode = 'overview';
+    trackedBody = null;
+    cinematicCamera.disable();
+    setCinematicMode(true);
+    
+    camera.position.set(250, 130, 250);
+    controls.target.set(0, 0, 0);
+    camera.fov = 45;
+    camera.updateProjectionMatrix();
+    
+    timeScale = 86400;
+    isPaused = false;
+  };
+
+  const logPhase3 = (elapsed) => {
+    return `Đang áp tải nặng hạt và tính toán đổ bóng GPU...\n` +
+           `- Vẽ và cập nhật quỹ đạo: 10,000 tiểu hành tinh\n` +
+           `- Đường truyền ánh sáng Mặt Trời: Kích hoạt\n` +
+           `- Tiến trình: ${(elapsed / 1000).toFixed(1)}s / 5.0s`;
+  };
+
+  // --- Phase 4: Cinematic Ultra Setup ---
+  const setupPhase4 = () => {
+    newtonGravityActive = false;
+    disableNewtonGravity(bodies, scene);
+    restoreAllMeshesVisibility();
+    applyPreset('cinematicUltra');
+    
+    isMagneticFieldEnabled = true;
+    for (const body of bodies) {
+      if (body.magneticFieldGroup) body.magneticFieldGroup.visible = true;
+    }
+    
+    isAuroraEnabled = true;
+    for (const body of bodies) {
+      if (body.auroraGroup) body.auroraGroup.visible = true;
+    }
+    
+    isCloudsEnabled = true;
+    for (const body of bodies) {
+      if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = true;
+    }
+    
+    toggleSunlightPaths(false);
+    setSpacetimeGridEnabled(scene, false, bodies);
+    
+    isAutoDirectorActive = true;
+    autoDirectorTimer = 0;
+    
+    cameraMode = 'follow';
+    trackedBody = bodyById.get('earth');
+    cinematicCamera.setTarget(trackedBody);
+    cinematicCamera.enable('targetLock');
+    setCinematicMode(true);
+    
+    timeScale = 86400;
+    isPaused = false;
+  };
+
+  const logPhase4 = (elapsed) => {
+    const trackingName = trackedBody ? (trackedBody.data.name.vi || trackedBody.data.name) : "Trái Đất";
+    return `Đang đo tải đồ họa cực hạn Cinematic Ultra...\n` +
+           `- Máy ảnh đạo diễn tự động: Đang bám sát ${trackingName}\n` +
+           `- Hiệu ứng khí quyển, Cực quang, Từ trường & Mây thể tích: BẬT\n` +
+           `- Tiến trình: ${(elapsed / 1000).toFixed(1)}s / 5.0s`;
+  };
+
+  // --- Phase Execution Engine ---
+  async function runPhase(phaseNum, totalPhases, phaseName, phaseTag, setupFn, logGenerator) {
+    setupFn();
+    
+    // Warm-up for 300ms without recording
+    benchmarkActive = false;
+    lastBenchmarkFrameTime = 0;
+    benchmarkFrameSamples = [];
+    
+    const phaseStartTime = performance.now();
+    const phaseDuration = 5000; // 5 seconds
+    const warmUpDuration = 300;
+    
+    await sleep(warmUpDuration);
+    
+    // Start recording
+    benchmarkActive = true;
+    lastBenchmarkFrameTime = performance.now();
+    
+    const sampleInterval = 100;
+    
+    while (true) {
+      const elapsed = performance.now() - phaseStartTime;
+      if (elapsed >= phaseDuration) break;
+      
+      const progressPct = ((phaseNum - 1) / totalPhases * 100) + (elapsed / phaseDuration * (100 / totalPhases));
+      
+      let liveFps = 60;
+      if (benchmarkFrameSamples.length > 0) {
+        const lastSamples = benchmarkFrameSamples.slice(-10);
+        const avgFrameTime = lastSamples.reduce((a, b) => a + b, 0) / lastSamples.length;
+        liveFps = avgFrameTime > 0 ? 1000 / avgFrameTime : 60;
+      }
+      
+      const logText = logGenerator(elapsed);
+      updateBenchmarkProgress(phaseName, phaseTag, progressPct, liveFps, logText);
+      
+      await sleep(sampleInterval);
+    }
+    
+    benchmarkActive = false;
+    return [...benchmarkFrameSamples];
+  }
+
+  // --- Generate Markdown Report ---
+  function generateMarkdownReport(data) {
+    const dateStr = new Date().toLocaleString('vi-VN');
+    const nbodyStatus = data.includeNbody ? "Có kích hoạt (Tùy chọn phụ)" : "Không kích hoạt";
+    
+    let phaseTable = `
+| Giai đoạn | Tải áp dụng | FPS Trung bình |
+| :--- | :--- | :---: |
+| 1. Baseline Load | Đồ họa Cân bằng (Keplerian) | ${data.phaseFps[0].toFixed(1)} FPS |
+`;
+
+    let idx = 1;
+    if (data.includeNbody) {
+      phaseTable += `| 2. Physics Stress | Mô phỏng vật lý N-body | ${data.phaseFps[1].toFixed(1)} FPS |\n`;
+      idx = 2;
+    }
+    
+    phaseTable += `| ${idx + 1}. Particle Stress | 10,000 Tiểu hành tinh & Đường ánh sáng | ${data.phaseFps[idx].toFixed(1)} FPS |\n`;
+    phaseTable += `| ${idx + 2}. Cinematic Ultra | Máy ảnh đạo diễn & Volumetric Effects | ${data.phaseFps[idx + 1].toFixed(1)} FPS |`;
+
+    return `# BÁO CÁO HIỆU NĂNG THIẾT BỊ
+**Trình mô phỏng Hệ Mặt Trời 3D (3D Solar System)**
+
+---
+
+## 📊 THÔNG TIN TỔNG QUAN
+- **Thời gian đánh giá:** ${dateStr}
+- **Độ phân giải hiển thị:** ${data.resolution}
+- **Tỷ lệ điểm ảnh (DPR):** ${data.pixelRatio}x
+- **Tổng điểm hiệu năng:** **${Math.round(data.score)}**
+- **Phân hạng thiết bị:** **${data.tierLabel}**
+
+---
+
+## ⚡ CHỈ SỐ HIỆU NĂNG CHI TIẾT
+| Chỉ số | Giá trị | Ý nghĩa thực tế |
+| :--- | :--- | :--- |
+| **FPS Trung bình (Average)** | **${data.avgFps.toFixed(1)} FPS** | Số khung hình hiển thị trung bình mỗi giây. |
+| **1% Low FPS** | **${data.low1pcFps.toFixed(1)} FPS** | Độ mượt mà thực tế (khử hiện tượng giật khung hình). |
+| **FPS Thấp nhất (Min)** | **${data.minFps.toFixed(1)} FPS** | Tốc độ khung hình chậm nhất ghi nhận được. |
+| **Độ ổn định Frame Pacing** | **${data.standardDeviation.toFixed(1)} ms** | Độ lệch chuẩn thời gian vẽ khung hình (Càng thấp càng tốt). |
+| **Vật lý N-body Gravity** | **${nbodyStatus}** | Trạng thái của mô phỏng hấp dẫn Newton đa vật thể. |
+
+---
+
+## 📈 KẾT QUẢ THEO GIAI ĐOẠN (STRESS-TEST PHASES)
+${phaseTable}
+
+---
+
+## 💡 KHUYẾN NGHỊ CẤU HÌNH TỐI ƯU
+**Phân tích từ hệ thống:**
+> ${data.recommendation}
+
+---
+*Báo cáo được tạo tự động bởi Hệ Thống Benchmark Tích Hợp của 3D Solar System Simulator.*`;
+  }
+
+  // --- Main runBenchmark Function ---
+  async function runBenchmark(includeNbody) {
+    showNotification("Chuẩn bị bắt đầu đánh giá hiệu năng thiết bị...", 2000);
+    await sleep(1500);
+    
+    // Save original states
+    const originalPresetKey = getCurrentPresetKey();
+    const originalNewtonActive = newtonGravityActive;
+    const originalGridActive = document.getElementById('toggle-spacetime')?.classList.contains('active') || false;
+    const originalMagneticActive = isMagneticFieldEnabled;
+    const originalAuroraActive = isAuroraEnabled;
+    const originalCloudsActive = isCloudsEnabled;
+    const originalSunlightActive = document.getElementById('toggle-sunlight')?.classList.contains('active') || false;
+    const originalVisualsActive = document.getElementById('toggle-visuals')?.classList.contains('active') || false;
+    const originalSliceActive = isAutoSliceEnabled;
+    const originalHudActive = document.getElementById('toggle-hud')?.classList.contains('active') || false;
+    const originalFpsActive = document.getElementById('toggle-fps')?.classList.contains('active') || false;
+    const originalPerfActive = isPerfStatsEnabled;
+
+    const originalCameraMode = cameraMode;
+    const originalTrackedBody = trackedBody;
+    const originalTimeScale = timeScale;
+    const originalPaused = isPaused;
+    const originalAutoDirector = isAutoDirectorActive;
+    const originalControlsEnabled = controls.enabled;
+    const originalCameraPos = camera.position.clone();
+    const originalControlsTarget = controls.target.clone();
+    const originalCameraFov = camera.fov;
+
+    // Lock UI controls
+    controls.enabled = false;
+    
+    let allSamples = [];
+    let phaseResults = []; // average FPS per phase
+    
+    const totalPhases = includeNbody ? 4 : 3;
+    
+    // Restore helper function
+    function restoreOriginalStates() {
+      timeScale = originalTimeScale;
+      isPaused = originalPaused;
+      isPerfStatsEnabled = originalPerfActive;
+      isAutoSliceEnabled = originalSliceActive;
+
+      newtonGravityActive = originalNewtonActive;
+      if (newtonGravityActive) {
+        initNewtonGravity(bodies, scene, simulationTime, bodyById);
+      } else {
+        disableNewtonGravity(bodies, scene);
+        restoreAllMeshesVisibility();
+      }
+      setSpacetimeGridEnabled(scene, originalGridActive, bodies);
+
+      applyPreset(originalPresetKey);
+      
+      isMagneticFieldEnabled = originalMagneticActive;
+      for (const body of bodies) {
+        if (body.magneticFieldGroup) body.magneticFieldGroup.visible = originalMagneticActive;
+      }
+
+      isAuroraEnabled = originalAuroraActive;
+      for (const body of bodies) {
+        if (body.auroraGroup) body.auroraGroup.visible = originalAuroraActive;
+      }
+
+      isCloudsEnabled = originalCloudsActive;
+      for (const body of bodies) {
+        if (body.volumetricCloudMesh) body.volumetricCloudMesh.visible = originalCloudsActive;
+      }
+
+      toggleSunlightPaths(originalSunlightActive);
+
+      toggleLabels(originalVisualsActive);
+      for (const orbit of orbits) {
+        orbit.visible = originalVisualsActive;
+      }
+
+      controls.enabled = originalControlsEnabled;
+      cameraMode = originalCameraMode;
+      trackedBody = originalTrackedBody;
+      
+      isAutoDirectorActive = originalAutoDirector;
+      if (originalAutoDirector) {
+        cinematicCamera.setTarget(trackedBody);
+        cinematicCamera.enable(trackedBody ? 'targetLock' : 'free');
+        setCinematicMode(true);
+      } else {
+        cinematicCamera.disable();
+        setCinematicMode(false);
+      }
+
+      camera.position.copy(originalCameraPos);
+      controls.target.copy(originalControlsTarget);
+      camera.fov = originalCameraFov;
+      camera.updateProjectionMatrix();
+
+      // Visual UI sync
+      syncUIToggles({
+        visuals: originalVisualsActive,
+        magnet: originalMagneticActive,
+        aurora: originalAuroraActive,
+        clouds: originalCloudsActive,
+        sunlight: originalSunlightActive,
+        slice: originalSliceActive,
+        hud: originalHudActive,
+        fps: originalFpsActive,
+        perfStats: originalPerfActive,
+        newton: originalNewtonActive,
+        spacetime: originalGridActive
+      });
+
+      const minimap = document.getElementById('minimap-container');
+      if (minimap) minimap.style.display = originalHudActive ? 'block' : 'none';
+      const zoom = document.getElementById('zoom-indicator');
+      if (zoom) zoom.style.display = originalHudActive ? 'flex' : 'none';
+      const fpsEl = document.getElementById('fps-counter');
+      if (fpsEl) fpsEl.style.display = originalFpsActive ? 'block' : 'none';
+      const perfEl = document.getElementById('perf-stats');
+      if (perfEl) perfEl.style.display = originalPerfActive ? 'flex' : 'none';
+      
+      const timeSelect = document.getElementById('time-select');
+      if (timeSelect) timeSelect.value = String(originalTimeScale);
+      
+      const btnPause = document.getElementById('btn-pause');
+      if (btnPause) {
+        btnPause.textContent = originalPaused ? '▶' : '⏸';
+        btnPause.classList.toggle('active', originalPaused);
+      }
+    }
+    
+    try {
+      // Phase 1: Baseline Load
+      let p1Samples = await runPhase(
+        1,
+        totalPhases,
+        "Đo tải cơ sở",
+        `Giai đoạn 1/${totalPhases}`,
+        setupPhase1,
+        logPhase1
+      );
+      allSamples.push(...p1Samples);
+      phaseResults.push(p1Samples.length > 0 ? (1000 * p1Samples.length / p1Samples.reduce((a, b) => a + b, 0)) : 60);
+      
+      // Phase 2 (Optional): N-body Physics Stress
+      if (includeNbody) {
+        let p2Samples = await runPhase(
+          2,
+          totalPhases,
+          "Tải nặng CPU (Vật lý N-body)",
+          `Giai đoạn 2/${totalPhases}`,
+          setupPhase2,
+          logPhase2
+        );
+        allSamples.push(...p2Samples);
+        phaseResults.push(p2Samples.length > 0 ? (1000 * p2Samples.length / p2Samples.reduce((a, b) => a + b, 0)) : 60);
+      }
+      
+      // Phase 3: Particle & GPU Stress
+      const p3PhaseNum = includeNbody ? 3 : 2;
+      let p3Samples = await runPhase(
+        p3PhaseNum,
+        totalPhases,
+        "Tải nặng GPU & Hạt",
+        `Giai đoạn ${p3PhaseNum}/${totalPhases}`,
+        setupPhase3,
+        logPhase3
+      );
+      allSamples.push(...p3Samples);
+      phaseResults.push(p3Samples.length > 0 ? (1000 * p3Samples.length / p3Samples.reduce((a, b) => a + b, 0)) : 60);
+      
+      // Phase 4: Cinematic Ultra Stress
+      const p4PhaseNum = includeNbody ? 4 : 3;
+      let p4Samples = await runPhase(
+        p4PhaseNum,
+        totalPhases,
+        "Đồ họa Đạo diễn (Cinematic Ultra)",
+        `Giai đoạn ${p4PhaseNum}/${totalPhases}`,
+        setupPhase4,
+        logPhase4
+      );
+      allSamples.push(...p4Samples);
+      phaseResults.push(p4Samples.length > 0 ? (1000 * p4Samples.length / p4Samples.reduce((a, b) => a + b, 0)) : 60);
+      
+      hideBenchmarkOverlay();
+      
+      if (allSamples.length === 0) {
+        throw new Error("Không thu thập được mẫu khung hình nào!");
+      }
+      
+      // Calculate statistics
+      const totalFrames = allSamples.length;
+      const totalDurationMs = allSamples.reduce((a, b) => a + b, 0);
+      const avgFps = 1000 * totalFrames / totalDurationMs;
+      
+      const sortedSamples = [...allSamples].sort((a, b) => a - b);
+      const low1pcIndex = Math.floor(sortedSamples.length * 0.99);
+      const low1pcFrameTime = sortedSamples[low1pcIndex];
+      const low1pcFps = 1000 / low1pcFrameTime;
+      
+      const maxFrameTime = sortedSamples[sortedSamples.length - 1];
+      const minFps = 1000 / maxFrameTime;
+      
+      const meanFrameTime = totalDurationMs / totalFrames;
+      const variance = allSamples.reduce((acc, ft) => acc + Math.pow(ft - meanFrameTime, 2), 0) / totalFrames;
+      const stdDev = Math.sqrt(variance);
+      
+      const renderedPixels = window.innerWidth * window.innerHeight * window.devicePixelRatio * window.devicePixelRatio;
+      const FHD_Pixels = 1920 * 1080;
+      const resolutionScale = Math.sqrt(renderedPixels / FHD_Pixels);
+      const score = (avgFps * 0.7 + low1pcFps * 0.3) * resolutionScale * 100;
+      
+      let tierLabel = "Mid-Range";
+      let tierClass = "tier-mid";
+      let recommendation = "";
+      
+      if (score >= 9000 || avgFps >= 100) {
+        tierLabel = "Ultra High-End";
+        tierClass = "tier-ultra";
+        recommendation = "Thiết bị của bạn cực kỳ mạnh mẽ! Bạn có thể kích hoạt cấu hình Cinematic Ultra cùng với tất cả các hiệu ứng nâng cao (Từ trường, Cực quang, Mây thể tích) mà vẫn giữ được độ mượt mà tuyệt đối ở tần số quét cao.";
+      } else if (score >= 6000 || avgFps >= 75) {
+        tierLabel = "High-End";
+        tierClass = "tier-high";
+        recommendation = "Cấu hình mạnh mẽ. Khuyên dùng thiết lập Cinematic hoặc Cinematic Ultra. Có thể bật Mây thể tích và các hiệu ứng từ trường một cách mượt mà ở mức 60-90 FPS.";
+      } else if (score >= 3000 || avgFps >= 40) {
+        tierLabel = "Mid-Range";
+        tierClass = "tier-mid";
+        recommendation = "Hiệu năng khá ổn. Khuyên dùng thiết lập Balanced (Cân bằng) hoặc Cinematic với một số hiệu ứng phụ được tắt bớt để duy trì mức FPS ổn định trên 60.";
+      } else {
+        tierLabel = "Low-End / Mobile";
+        tierClass = "tier-low";
+        recommendation = "Thiết bị thuộc nhóm phổ thông hoặc thiết bị di động tiết kiệm năng lượng. Khuyên dùng thiết lập Performance (Tối ưu hiệu năng) hoặc Balanced, tắt các hiệu ứng nặng như Mây thể tích và Từ trường để tránh giật lag.";
+      }
+      
+      const reportData = {
+        score,
+        tierLabel,
+        tierClass,
+        resolution: `${window.innerWidth}x${window.innerHeight}`,
+        pixelRatio: window.devicePixelRatio.toFixed(2),
+        includeNbody,
+        phaseFps: phaseResults,
+        avgFps,
+        low1pcFps,
+        minFps,
+        standardDeviation: stdDev,
+        recommendation
+      };
+      
+      showBenchmarkReport(
+        reportData,
+        () => {
+          const markdownText = generateMarkdownReport(reportData);
+          const blob = new Blob([markdownText], { type: 'text/markdown;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `SolarSystem_Benchmark_${Date.now()}.md`;
+          link.click();
+          URL.revokeObjectURL(url);
+          showNotification("Đã tải xuống báo cáo Markdown thành công!", 3000);
+        },
+        () => {
+          restoreOriginalStates();
+          showNotification("Đã phục hồi cấu hình mô phỏng ban đầu.", 3000);
+        }
+      );
+      
+    } catch (error) {
+      console.error("Benchmark failed:", error);
+      hideBenchmarkOverlay();
+      showNotification("Đánh giá hiệu năng thất bại: " + error.message, 4000);
+      restoreOriginalStates();
+    }
+  }
+
+  // Bắt đầu vòng lập
   let frameCount = 0;
   animate();
 

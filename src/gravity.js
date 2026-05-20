@@ -6,6 +6,7 @@ const SOLAR_MASS = 1.989e30;
 const YEAR_SECONDS = 31557600;
 const G_NORM = (4 * Math.PI * Math.PI * AU * AU * AU) / (YEAR_SECONDS * YEAR_SECONDS);
 const MAX_SUBSTEP = 3600;
+const MAX_SIM_PER_FRAME = 86400;
 const SOFTENING = 0.01;
 
 // ── Adaptive Timestep ──
@@ -44,6 +45,10 @@ let focusedBodyId = null;
 let bodyByIdRef = null;
 const state = new Map();
 const savedParents = new Map();
+
+// ── Pre-allocated work areas (zero GC) ──
+const _accelMap = new Map();
+const _entriesCache = [];
 
 export function isNewtonGravityEnabled() {
   return enabled;
@@ -134,13 +139,26 @@ export function initNewtonGravity(bodies, scene, simulationTime, bodyById) {
 export function updateNewtonGravity(bodies, deltaTime) {
   if (!enabled) return;
 
-  let remaining = deltaTime;
-  while (remaining > 0) {
-    const entries = getRelevantEntries();
-    const maxStep = computeAdaptiveStep(entries);
+  const entries = getRelevantEntries();
+  const { epsSq, maxAccel } = computeAdaptiveParams(entries);
+
+  let remaining = Math.min(deltaTime, MAX_SIM_PER_FRAME);
+  const MAX_ITERATIONS = 300;
+  let iterationCount = 0;
+
+  while (remaining > 0 && iterationCount < MAX_ITERATIONS) {
+    let maxStep = computeAdaptiveStep(entries, maxAccel);
+    
+    // Safety cap: adjust step size if it's too small to prevent browser freeze
+    const minStepAllowed = remaining / (MAX_ITERATIONS - iterationCount);
+    if (maxStep < minStepAllowed) {
+      maxStep = minStepAllowed;
+    }
+
     const step = Math.min(remaining, maxStep);
-    gravitySubstep(step);
+    gravitySubstep(step, entries, epsSq);
     remaining -= step;
+    iterationCount++;
   }
 
   energyLogCount++;
@@ -191,9 +209,17 @@ export function syncGravityBodyState(bodyId, position, options = {}) {
 function getRelevantEntries() {
   if (focusedBodyId && bodyByIdRef) {
     const group = getFocusedGroupSet(focusedBodyId);
-    return Array.from(state.entries()).filter(([id]) => group.has(id));
+    _entriesCache.length = 0;
+    for (const entry of state) {
+      if (group.has(entry[0])) _entriesCache.push(entry);
+    }
+    return _entriesCache;
   }
-  return Array.from(state.entries());
+  _entriesCache.length = 0;
+  for (const entry of state) {
+    _entriesCache.push(entry);
+  }
+  return _entriesCache;
 }
 
 // ── Energy & Angular Momentum Diagnostics ──
@@ -230,14 +256,14 @@ export function _computePotentialFromEntries(entries) {
 }
 
 export function computeSystemEnergy() {
-  const entries = Array.from(state.entries());
+  const entries = getRelevantEntries();
   const kinetic = _computeKineticFromEntries(entries);
   const potential = _computePotentialFromEntries(entries);
   return { kinetic, potential, total: kinetic + potential };
 }
 
 export function computeSystemAngularMomentum() {
-  const entries = Array.from(state.entries());
+  const entries = getRelevantEntries();
   let Lx = 0, Ly = 0, Lz = 0;
   for (const [, s] of entries) {
     if (s.gravityAffected && s.massNorm > 0) {
@@ -279,7 +305,7 @@ export function computeMaxPairwiseAccel(entries) {
       const distSq = dx * dx + dy * dy + dz * dz;
       if (distSq < 1e-12) continue;
       const totalMass = s_i.massNorm + s_j.massNorm;
-      const accel = G_NORM * totalMass / (distSq + SOFTENING);
+      const accel = G_NORM * totalMass / distSq;
       if (accel > maxAccel) maxAccel = accel;
     }
   }
@@ -295,10 +321,37 @@ function hasActiveMoons(entries) {
   return false;
 }
 
-function computeAdaptiveStep(entries) {
+// ── Combined single-pass: computes both maxAccel and epsSq ──
+function computeAdaptiveParams(entries) {
+  let maxAccel = 0;
+  let minDistSq = Infinity;
+  for (let i = 0; i < entries.length; i++) {
+    const [, s_i] = entries[i];
+    if (s_i.massNorm === 0) continue;
+    for (let j = i + 1; j < entries.length; j++) {
+      const [, s_j] = entries[j];
+      if (s_j.massNorm === 0) continue;
+      const dx = s_j.px - s_i.px;
+      const dy = s_j.py - s_i.py;
+      const dz = s_j.pz - s_i.pz;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq < 1e-12) continue;
+      if (distSq < minDistSq) minDistSq = distSq;
+      const totalMass = s_i.massNorm + s_j.massNorm;
+      const accel = G_NORM * totalMass / distSq;
+      if (accel > maxAccel) maxAccel = accel;
+    }
+  }
+  const baseEpsSq = SOFTENING;
+  const epsSq = minDistSq === Infinity
+    ? baseEpsSq
+    : Math.max(baseEpsSq, 0.01 * minDistSq);
+  return { epsSq, maxAccel };
+}
+
+function computeAdaptiveStep(entries, maxAccel) {
   let maxStep = MAX_SUBSTEP;
 
-  const maxAccel = computeMaxPairwiseAccel(entries);
   if (maxAccel > 0) {
     maxStep = Math.max(MIN_SUBSTEP, Math.min(maxStep, ADAPTIVE_SAFETY_FACTOR * Math.sqrt(SOFTENING / maxAccel)));
   }
@@ -315,7 +368,12 @@ function computeAdaptiveStep(entries) {
 function initAccelerations(entries, acc) {
   for (const [id, s] of entries) {
     if (s.gravityAffected) {
-      acc.set(id, { ax: 0, ay: 0, az: 0 });
+      const existing = acc.get(id);
+      if (existing) {
+        existing.ax = 0; existing.ay = 0; existing.az = 0;
+      } else {
+        acc.set(id, { ax: 0, ay: 0, az: 0 });
+      }
     }
   }
 }
@@ -326,33 +384,6 @@ function resetAccelerations(acc) {
   }
 }
 
-function computeMinDistSq(entries) {
-  let minDistSq = Infinity;
-  for (let i = 0; i < entries.length; i++) {
-    const [, s_i] = entries[i];
-    if (s_i.massNorm === 0) continue;
-    for (let j = i + 1; j < entries.length; j++) {
-      const [, s_j] = entries[j];
-      if (s_j.massNorm === 0) continue;
-      const dx = s_j.px - s_i.px;
-      const dy = s_j.py - s_i.py;
-      const dz = s_j.pz - s_i.pz;
-      const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq > 0 && distSq < minDistSq) minDistSq = distSq;
-    }
-  }
-  return minDistSq;
-}
-
-function getEffectiveSoftening(entries) {
-  const minDistSq = computeMinDistSq(entries);
-  const baseEpsSq = SOFTENING;
-  if (minDistSq === Infinity) return baseEpsSq;
-  // Adaptive: ensure softening never exceeds 10% of the closest pair distance
-  const adaptiveEpsSq = 0.01 * minDistSq;
-  return Math.max(baseEpsSq, adaptiveEpsSq);
-}
-
 function computeAccelerations(entries, acc, epsSq) {
   for (let i = 0; i < entries.length; i++) {
     const [id_i, s_i] = entries[i];
@@ -360,19 +391,22 @@ function computeAccelerations(entries, acc, epsSq) {
     const ai = acc.get(id_i);
     if (!ai) continue;
 
+    const px_i = s_i.px, py_i = s_i.py, pz_i = s_i.pz;
+
     for (let j = 0; j < entries.length; j++) {
       if (i === j) continue;
       const [id_j, s_j] = entries[j];
       if (s_j.massNorm === 0) continue;
 
-      const dx = s_j.px - s_i.px;
-      const dy = s_j.py - s_i.py;
-      const dz = s_j.pz - s_i.pz;
+      const dx = s_j.px - px_i;
+      const dy = s_j.py - py_i;
+      const dz = s_j.pz - pz_i;
       const distSq = dx * dx + dy * dy + dz * dz;
       const dist = Math.sqrt(distSq);
+      if (dist < 1e-15) continue;
+      const invDist = 1 / dist;
 
       const force = G_NORM * s_j.massNorm / (distSq + epsSq);
-      const invDist = dist > 0 ? 1 / dist : 0;
 
       ai.ax += force * dx * invDist;
       ai.ay += force * dy * invDist;
@@ -449,33 +483,30 @@ function checkCollisions(entries) {
   }
 }
 
-function gravitySubstep(dt) {
-  const entries = getRelevantEntries();
-  const acc = new Map();
+function gravitySubstep(dt, entries, epsSq) {
+  const acc = _accelMap;
   initAccelerations(entries, acc);
-
-  const currentEpsSq = getEffectiveSoftening(entries);
 
   // Yoshida 4th-order symplectic: S₄(h) = S₂(w₁·h) ∘ S₂(w₀·h) ∘ S₂(w₁·h)
   // 7-stage composition: kick(c₁), drift(d₁), kick(c₂), drift(d₂),
   //                      kick(c₂), drift(d₁), kick(c₁)
 
-  computeAccelerations(entries, acc, currentEpsSq);
+  computeAccelerations(entries, acc, epsSq);
   applyVelocityKick(entries, acc, YOSHIDA_C1 * dt);
   applyPositionDrift(entries, YOSHIDA_D1 * dt);
 
   resetAccelerations(acc);
-  computeAccelerations(entries, acc, currentEpsSq);
+  computeAccelerations(entries, acc, epsSq);
   applyVelocityKick(entries, acc, YOSHIDA_C2 * dt);
   applyPositionDrift(entries, YOSHIDA_D2 * dt);
 
   resetAccelerations(acc);
-  computeAccelerations(entries, acc, currentEpsSq);
+  computeAccelerations(entries, acc, epsSq);
   applyVelocityKick(entries, acc, YOSHIDA_C2 * dt);
   applyPositionDrift(entries, YOSHIDA_D1 * dt);
 
   resetAccelerations(acc);
-  computeAccelerations(entries, acc, currentEpsSq);
+  computeAccelerations(entries, acc, epsSq);
   applyVelocityKick(entries, acc, YOSHIDA_C1 * dt);
 
   checkCollisions(entries);
@@ -502,8 +533,8 @@ export function disableNewtonGravity(bodies, scene) {
 // D? ?oán qu? ??o t??ng lai b?ng cách tích phân forward,
 // sau ?ó khôi ph?c l?i tr?ng thái g?c.
 
-const PREDICT_MAX_STEPS = 2000;
-const PREDICT_MAX_STEPS_LONG = 100000;
+const PREDICT_MAX_STEPS = 1200;
+const PREDICT_MAX_STEPS_LONG = 3000;
 
 /**
 * T?nh s? b??c tích phân c?n thi?t ?? d? ?oán ?úng 1 chu k? qu? ??o.
@@ -522,22 +553,14 @@ function computePredictionSteps(bodyId) {
 }
 
 /**
-* Tích phân forward t? tr?ng thái hi?n t?i, ghi l?i qu? ??o c?a bodyId.
-* Không làm ?nh h??ng ??n tr?ng thái mô ph?ng th?c t?.
-* T? ??ng tính s? b??c n?u là qu? ??o dài (Halley).
-*
-* @param {string} bodyId - ID c?a thi?n th? c?n d? ?oán
-* @param {number} numPoints - S? ?i?m qu? ??o mong mu?n
-* @param {number} [maxSteps=null] - S? b??c tích phân t?i ?a (null = t? tính)
-* @returns {Array<{x:number,y:number,z:number}>} M?ng t?a ??
+* Tích phân forward đơn luồng tích hợp song song cho nhiều thiên thể cần dự đoán.
+* @param {Array<{bodyId: string, numPoints: number, maxSteps?: number}>} configs
+* @returns {Map<string, Array<{x:number, y:number, z:number}>>} Map chứa tọa độ dự đoán
 */
-export function predictTrajectory(bodyId, numPoints, maxSteps = null) {
-  if (maxSteps === null) {
-    maxSteps = computePredictionSteps(bodyId);
-  }
-  if (!state.has(bodyId) || maxSteps <= 0) return [];
+export function predictTrajectories(configs) {
+  if (configs.length === 0) return new Map();
 
-  // L?u tr?ng thái hi?n t?i
+  // 1. Lưu trạng thái hiện tại của toàn bộ hệ thống
   const savedState = [];
   for (const [id, s] of state) {
     savedState.push({
@@ -549,21 +572,54 @@ export function predictTrajectory(bodyId, numPoints, maxSteps = null) {
     });
   }
 
-  const trajectory = [];
-  const recordInterval = Math.max(1, Math.floor(maxSteps / numPoints));
+  // 2. Chuẩn bị dữ liệu tích phân riêng cho các thiên thể đích và xác định globalMaxSteps
+  let globalMaxSteps = 0;
+  const bodyData = [];
+  const neededIds = new Set(['sun']); // Luôn bao gồm Mặt Trời
 
-  for (let i = 0; i < maxSteps; i++) {
-    const entries = getRelevantEntries();
-    const stepSize = computeAdaptiveStep(entries);
-    gravitySubstep(stepSize);
+  for (const config of configs) {
+    const { bodyId, numPoints } = config;
+    if (!state.has(bodyId)) continue;
+    
+    let maxSteps = config.maxSteps;
+    if (maxSteps === null || maxSteps === undefined) {
+      maxSteps = computePredictionSteps(bodyId);
+    }
+    if (maxSteps <= 0) continue;
+    if (maxSteps > globalMaxSteps) globalMaxSteps = maxSteps;
+    
+    const recordInterval = Math.max(1, Math.floor(maxSteps / numPoints));
+    bodyData.push({ bodyId, maxSteps, recordInterval, trajectory: [] });
+    neededIds.add(bodyId);
+  }
 
-    if (i % recordInterval === 0) {
-      const s = state.get(bodyId);
-      if (s) trajectory.push({ x: s.px, y: s.py, z: s.pz });
+  // 3. Tối ưu hóa: Chỉ tích phân các thiên thể thực sự cần thiết cho quỹ đạo đang xét
+  const filteredEntries = [];
+  for (const entry of state) {
+    if (neededIds.has(entry[0])) {
+      filteredEntries.push(entry);
     }
   }
 
-  // Khôi ph?c tr?ng thái g?c
+  // 4. Chạy mô phỏng tích phân N-body duy nhất một lượt
+  if (globalMaxSteps > 0 && filteredEntries.length > 0) {
+    const { epsSq, maxAccel } = computeAdaptiveParams(filteredEntries);
+    for (let i = 0; i < globalMaxSteps; i++) {
+      const stepSize = computeAdaptiveStep(filteredEntries, maxAccel);
+      gravitySubstep(stepSize, filteredEntries, epsSq);
+
+      // Ghi lại tọa độ cho từng thiên thể theo chu kỳ riêng
+      for (let j = 0; j < bodyData.length; j++) {
+        const bd = bodyData[j];
+        if (i < bd.maxSteps && i % bd.recordInterval === 0) {
+          const s = state.get(bd.bodyId);
+          if (s) bd.trajectory.push({ x: s.px, y: s.py, z: s.pz });
+        }
+      }
+    }
+  }
+
+  // 5. Khôi phục lại trạng thái ban đầu của hệ thống
   for (const saved of savedState) {
     state.set(saved.id, {
       px: saved.px, py: saved.py, pz: saved.pz,
@@ -573,7 +629,24 @@ export function predictTrajectory(bodyId, numPoints, maxSteps = null) {
     });
   }
 
-  return trajectory;
+  // 6. Trả về Map kết quả
+  const result = new Map();
+  for (const bd of bodyData) {
+    result.set(bd.bodyId, bd.trajectory);
+  }
+  return result;
+}
+
+/**
+* Tích phân forward t? tr?ng thái hi?n t?i, ghi l?i qu? ??o c?a bodyId.
+* @param {string} bodyId - ID c?a thi?n th? c?n d? ?oán
+* @param {number} numPoints - S? ?i?m qu? ??o mong mu?n
+* @param {number} [maxSteps=null] - S? b??c tích phân t?i ?a (null = t? tính)
+* @returns {Array<{x:number,y:number,z:number}>} M?ng t?a ??
+*/
+export function predictTrajectory(bodyId, numPoints, maxSteps = null) {
+  const res = predictTrajectories([{ bodyId, numPoints, maxSteps }]);
+  return res.get(bodyId) || [];
 }
 
 // ── Test helpers ──

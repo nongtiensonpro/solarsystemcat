@@ -155,13 +155,20 @@ export function initUI(callbacks) {
           <span class="toggle-switch" id="toggle-spacetime"></span>
         </label>
       </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Đánh giá hiệu năng</div>
+        <div class="benchmark-option-row">
+          <input type="checkbox" id="benchmark-include-nbody" style="width: auto; margin-right: 8px;">
+          <label for="benchmark-include-nbody" class="benchmark-option-label" style="display: inline; vertical-align: middle;">Kiểm tra vật lý N-body (Không ổn định)</label>
+        </div>
+        <button class="benchmark-btn" id="btn-run-benchmark">🚀 Chạy Đánh giá (Benchmark)</button>
+      </div>
     </div>
   `;
   container.appendChild(settingsPanel);
-
-  // ═══ Search Panel ═══
   const searchPanel = document.createElement('div');
   searchPanel.className = 'glass-panel search-panel';
+
   searchPanel.id = 'search-panel';
   searchPanel.style.display = 'none'; // Ẩn mặc định
   searchPanel.innerHTML = `
@@ -459,6 +466,122 @@ export function initUI(callbacks) {
   `;
   container.appendChild(saturnCameraPanel);
 
+  // ═══ Benchmark Overlay ═══
+  const benchmarkOverlay = document.createElement('div');
+  benchmarkOverlay.id = 'benchmark-overlay';
+  benchmarkOverlay.innerHTML = `
+    <div class="benchmark-overlay-card">
+      <div class="benchmark-overlay-title">Hệ Thống Đánh Giá Hiệu Năng</div>
+      <div class="benchmark-spinner-container">
+        <div class="benchmark-spinner-outer"></div>
+        <div class="benchmark-spinner-inner"></div>
+      </div>
+      <div class="benchmark-phase-tag" id="benchmark-phase-tag">Chuẩn Bị</div>
+      <div class="benchmark-phase-name" id="benchmark-phase-name">Đang khởi tạo các bài Stress-Test...</div>
+      <div class="benchmark-progress-container">
+        <div class="benchmark-progress-bar" id="benchmark-progress-bar"></div>
+      </div>
+      <div class="benchmark-fps-live">FPS hiện tại: <span id="benchmark-fps-val">0</span></div>
+      <div class="benchmark-log-container" id="benchmark-log-container">
+        Đang chuẩn bị môi trường mô phỏng đồ họa...
+      </div>
+    </div>
+  `;
+  container.appendChild(benchmarkOverlay);
+
+  // ═══ Benchmark Report Panel ═══
+  const benchmarkReport = document.createElement('div');
+  benchmarkReport.id = 'benchmark-report';
+  benchmarkReport.innerHTML = `
+    <div class="benchmark-report-header">
+      <h2>Báo Cáo Hiệu Năng Thiết Bị</h2>
+      <button class="btn-close-settings" id="btn-close-benchmark-report" style="position: static; font-size: 20px; background: none; border: none; color: #6b7fa0; cursor: pointer;">✕</button>
+    </div>
+    <div class="benchmark-report-scroll">
+      <!-- Score Box -->
+      <div class="benchmark-score-box">
+        <div class="score-left">
+          <span class="score-title">Điểm Hiệu Năng Tổng Thể</span>
+          <span class="score-value" id="benchmark-score-val">0</span>
+        </div>
+        <div class="score-right">
+          <span class="hardware-tier-tag" id="benchmark-tier-tag">Mid-Range</span>
+          <span class="device-spec-label" id="benchmark-device-resolution">Độ phân giải: 1920x1080 (DPR 1.0)</span>
+        </div>
+      </div>
+
+      <!-- FPS Chart -->
+      <div class="benchmark-chart-container">
+        <div class="chart-title">So sánh FPS theo giai đoạn</div>
+        <div class="chart-bar-row">
+          <div class="bar-label-group">
+            <span class="bar-label-name">Giai đoạn 1: Đo tải cơ sở</span>
+            <span class="bar-label-val" id="chart-fps-p1">0 FPS</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" id="chart-fill-p1"></div></div>
+        </div>
+        <div class="chart-bar-row" id="chart-row-p2" style="display:none;">
+          <div class="bar-label-group">
+            <span class="bar-label-name">Giai đoạn 2: Tải nặng CPU (N-body)</span>
+            <span class="bar-label-val" id="chart-fps-p2">0 FPS</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" id="chart-fill-p2"></div></div>
+        </div>
+        <div class="chart-bar-row">
+          <div class="bar-label-group">
+            <span class="bar-label-name">Giai đoạn 3: Tải nặng Hạt & GPU</span>
+            <span class="bar-label-val" id="chart-fps-p3">0 FPS</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" id="chart-fill-p3"></div></div>
+        </div>
+        <div class="chart-bar-row">
+          <div class="bar-label-group">
+            <span class="bar-label-name">Giai đoạn 4: Đồ họa & Post-processing</span>
+            <span class="bar-label-val" id="chart-fps-p4">0 FPS</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" id="chart-fill-p4"></div></div>
+        </div>
+      </div>
+
+      <!-- Details Grid -->
+      <div class="benchmark-details-grid">
+        <div class="detail-card">
+          <span class="detail-card-title">FPS Trung Bình</span>
+          <span class="detail-card-value" id="benchmark-avg-fps">0.0</span>
+          <span class="detail-card-desc">Khung hình trung bình trên giây xuyên suốt quá trình kiểm tra.</span>
+        </div>
+        <div class="detail-card">
+          <span class="detail-card-title">1% Low FPS</span>
+          <span class="detail-card-value" id="benchmark-1pc-low">0.0</span>
+          <span class="detail-card-desc">Chỉ số trơn tru thực tế, thể hiện hiện tượng giật/đứng khung hình.</span>
+        </div>
+        <div class="detail-card">
+          <span class="detail-card-title">Độ ổn định Frame Pacing</span>
+          <span class="detail-card-value" id="benchmark-stability">0.0 ms</span>
+          <span class="detail-card-desc">Độ lệch chuẩn thời gian vẽ khung hình. Càng thấp càng mượt.</span>
+        </div>
+        <div class="detail-card">
+          <span class="detail-card-title">FPS Thấp Nhất (Min)</span>
+          <span class="detail-card-value" id="benchmark-min-fps">0.0</span>
+          <span class="detail-card-desc">Tốc độ khung hình chậm nhất ghi nhận trong suốt đợt đo đạc.</span>
+        </div>
+      </div>
+
+      <!-- Recommendations Box -->
+      <div class="benchmark-rec-box">
+        <div class="rec-title">💡 Khuyến nghị cấu hình tối ưu</div>
+        <p class="rec-text" id="benchmark-rec-text">Đang phân tích dữ liệu hiệu năng phần cứng để đưa ra khuyến nghị...</p>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="benchmark-report-actions">
+      <button class="btn-report-download" id="btn-benchmark-download">📥 Tải Báo Cáo (.md)</button>
+      <button class="btn-report-close" id="btn-benchmark-close">Đóng Báo Cáo</button>
+    </div>
+  `;
+  container.appendChild(benchmarkReport);
+
   document.getElementById('btn-close-saturn-panel').addEventListener('click', () => {
     saturnCameraPanel.style.display = 'none';
   });
@@ -569,6 +692,19 @@ export function initUI(callbacks) {
       applyPreset(btn.dataset.preset);
     });
   });
+
+  // Benchmark Button in settings panel
+  const btnRunBenchmark = document.getElementById('btn-run-benchmark');
+  if (btnRunBenchmark) {
+    btnRunBenchmark.addEventListener('click', () => {
+      // Close settings panel first
+      toggleSettingsPanel(false);
+      const includeNbody = document.getElementById('benchmark-include-nbody')?.checked || false;
+      if (callbacks.onRunBenchmark) {
+        callbacks.onRunBenchmark(includeNbody);
+      }
+    });
+  }
 
   // Time Select
   const timeSelect = document.getElementById('time-select');
@@ -1239,4 +1375,134 @@ export function updateSpeedDisplay(speed) {
 export function updateCurrentPlanetName(name) {
   const el = document.getElementById('cine-current-planet');
   if (el) el.textContent = name || '—';
+}
+
+export function updateBenchmarkProgress(phaseName, phaseTag, progressPct, currentFps, logText) {
+  const overlay = document.getElementById('benchmark-overlay');
+  if (overlay && overlay.style.display !== 'flex') {
+    overlay.style.display = 'flex';
+  }
+  
+  const nameEl = document.getElementById('benchmark-phase-name');
+  if (nameEl) nameEl.textContent = phaseName;
+
+  const tagEl = document.getElementById('benchmark-phase-tag');
+  if (tagEl) tagEl.textContent = phaseTag;
+
+  const barEl = document.getElementById('benchmark-progress-bar');
+  if (barEl) barEl.style.width = `${progressPct}%`;
+
+  const fpsEl = document.getElementById('benchmark-fps-val');
+  if (fpsEl) fpsEl.textContent = Math.round(currentFps);
+
+  const logEl = document.getElementById('benchmark-log-container');
+  if (logEl) logEl.textContent = logText;
+}
+
+export function hideBenchmarkOverlay() {
+  const overlay = document.getElementById('benchmark-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+export function showBenchmarkReport(data, onDownload, onClose) {
+  const report = document.getElementById('benchmark-report');
+  if (!report) return;
+
+  document.getElementById('benchmark-score-val').textContent = Math.round(data.score);
+  
+  const tierTag = document.getElementById('benchmark-tier-tag');
+  tierTag.textContent = data.tierLabel;
+  tierTag.className = 'hardware-tier-tag ' + data.tierClass;
+
+  document.getElementById('benchmark-device-resolution').textContent = 
+    `Độ phân giải: ${data.resolution} (DPR ${data.pixelRatio})`;
+
+  // Update chart
+  const updateBar = (fpsId, fillId, fps) => {
+    document.getElementById(fpsId).textContent = `${fps.toFixed(1)} FPS`;
+    const fill = document.getElementById(fillId);
+    // Scale relative to 120 FPS max for visualization
+    const pct = Math.min(100, (fps / 120) * 100);
+    fill.style.width = `${pct}%`;
+  };
+
+  updateBar('chart-fps-p1', 'chart-fill-p1', data.phaseFps[0]);
+
+  const p2Row = document.getElementById('chart-row-p2');
+  if (data.includeNbody && data.phaseFps[1] !== undefined) {
+    p2Row.style.display = 'flex';
+    updateBar('chart-fps-p2', 'chart-fill-p2', data.phaseFps[1]);
+  } else {
+    p2Row.style.display = 'none';
+  }
+
+  // Phase 3 and Phase 4 are at indices 2 and 3 if Nbody is included, otherwise they are 1 and 2
+  const p3Fps = data.includeNbody ? data.phaseFps[2] : data.phaseFps[1];
+  const p4Fps = data.includeNbody ? data.phaseFps[3] : data.phaseFps[2];
+
+  updateBar('chart-fps-p3', 'chart-fill-p3', p3Fps);
+  updateBar('chart-fps-p4', 'chart-fill-p4', p4Fps);
+
+  // Update details
+  document.getElementById('benchmark-avg-fps').textContent = data.avgFps.toFixed(1);
+  document.getElementById('benchmark-1pc-low').textContent = data.low1pcFps.toFixed(1);
+  document.getElementById('benchmark-stability').textContent = `${data.standardDeviation.toFixed(1)} ms`;
+  document.getElementById('benchmark-min-fps').textContent = data.minFps.toFixed(1);
+
+  // Recommendations
+  document.getElementById('benchmark-rec-text').textContent = data.recommendation;
+
+  // Show report modal
+  report.style.display = 'flex';
+
+  // Wire up action buttons using cloneNode to prevent multiple listeners
+  const downloadBtn = document.getElementById('btn-benchmark-download');
+  const newDownloadBtn = downloadBtn.cloneNode(true);
+  downloadBtn.parentNode.replaceChild(newDownloadBtn, downloadBtn);
+  newDownloadBtn.addEventListener('click', onDownload);
+
+  const closeBtn = document.getElementById('btn-benchmark-close');
+  const newCloseBtn = closeBtn.cloneNode(true);
+  closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+  
+  const closeIconBtn = document.getElementById('btn-close-benchmark-report');
+  const newCloseIconBtn = closeIconBtn.cloneNode(true);
+  closeIconBtn.parentNode.replaceChild(newCloseIconBtn, closeIconBtn);
+
+  const handleClose = () => {
+    report.style.display = 'none';
+    if (onClose) onClose();
+  };
+
+  newCloseBtn.addEventListener('click', handleClose);
+  newCloseIconBtn.addEventListener('click', handleClose);
+}
+
+/**
+ * Synchronize settings panel switch states visually
+ * @param {Object} states - Object containing switch states { visuals, magnet, aurora, clouds, sunlight, slice, hud, fps, perfStats, newton, spacetime }
+ */
+export function syncUIToggles(states) {
+  const toggleMap = {
+    visuals: 'toggle-visuals',
+    magnet: 'toggle-magnet',
+    aurora: 'toggle-aurora',
+    clouds: 'toggle-clouds',
+    sunlight: 'toggle-sunlight',
+    slice: 'toggle-slice',
+    hud: 'toggle-hud',
+    fps: 'toggle-fps',
+    perfStats: 'toggle-perf-stats',
+    newton: 'toggle-newton',
+    spacetime: 'toggle-spacetime'
+  };
+
+  for (const [key, elementId] of Object.entries(toggleMap)) {
+    if (states[key] !== undefined) {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.classList.toggle('active', !!states[key]);
+      }
+    }
+  }
 }
