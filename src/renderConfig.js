@@ -146,6 +146,22 @@ export function getCurrentPreset() {
 }
 
 /**
+ * Cấu hình chất lượng tối đa cho chế độ chụp ảnh độ phân giải cao.
+ * Chấp nhận độ trễ xuất ảnh lớn để đạt chất lượng cao nhất.
+ * @returns {Object}
+ */
+export function getMaxQualitySettings() {
+  return {
+    maxPixelRatio: 4,
+    shadowMapSize: 4096,
+    bloomResolutionScale: 1.0,
+    bloomStrength: 1.2,
+    bloomRadius: 0.5,
+    bloomThreshold: 0.7,
+  };
+}
+
+/**
  * Lưu preset đã chọn vào localStorage.
  * @param {'high' | 'balanced' | 'low'} key
  */
