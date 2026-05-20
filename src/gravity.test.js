@@ -522,6 +522,40 @@ describe('Yoshida 4th-Order vs Velocity Verlet accuracy', () => {
   });
 });
 
+describe('predictTrajectories()', () => {
+  it('returns empty Map for empty configs', async () => {
+    const { predictTrajectories } = await import('./gravity.js');
+    const result = predictTrajectories([]);
+    expect(result.size).toBe(0);
+  });
+
+  it('runs successfully for single body and returns trajectories Map', async () => {
+    const { predictTrajectories, initNewtonGravity, disableNewtonGravity } = await import('./gravity.js');
+    
+    // We mock the bodies list
+    const bodies = [
+      { data: { id: 'sun', type: 'star' }, pivot: { getWorldPosition: (v) => v.set(0, 0, 0), parent: null, position: { copy: () => {} } } },
+      { data: { id: 'earth', type: 'planet', semiMajorAxis: AU, orbitalPeriod: 365 }, pivot: { getWorldPosition: (v) => v.set(AU, 0, 0), parent: null, position: { copy: () => {} } } }
+    ];
+    const bodyById = new Map(bodies.map(b => [b.data.id, b]));
+
+    initNewtonGravity(bodies, { add: () => {} }, 0, bodyById);
+    
+    const configs = [
+      { bodyId: 'earth', numPoints: 100 }
+    ];
+    
+    const res = predictTrajectories(configs);
+    expect(res.has('earth')).toBe(true);
+    const trajectory = res.get('earth');
+    expect(trajectory.length).toBeGreaterThan(0);
+    expect(trajectory[0]).toHaveProperty('x');
+    expect(trajectory[0]).toHaveProperty('y');
+    
+    disableNewtonGravity(bodies, null);
+  });
+});
+
 // Need computeSingleAccel at module level for the Yoshida tests above
 function computeSingleAccel(body, sunPos) {
   const dx = sunPos.px - body.px;
