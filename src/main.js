@@ -53,6 +53,7 @@ async function bootstrap() {
   let simulationTime = 0;
   let timeScale = 1000; // Gi? tr? m?c ??nh, s? ???c UI slider ghi ??
   let isPaused = false;
+  let isPerfStatsEnabled = false;
   let isAutoSliceEnabled = false;
   let isMagneticFieldEnabled = false;
   let isAuroraEnabled = false;
@@ -426,6 +427,9 @@ async function bootstrap() {
     onScreenshot: () => {
       takeScreenshot();
     },
+    onHighResScreenshot: () => {
+      takeHighResScreenshot();
+    },
     onToggleSlice: (enabled) => {
       isAutoSliceEnabled = enabled;
       // N?u t?t khi ?ang c?t, h?y ??ng m?t c?t ngay l?p t?c
@@ -552,6 +556,11 @@ async function bootstrap() {
       const fpsEl = document.getElementById('fps-counter');
       if (fpsEl) fpsEl.style.display = enabled ? 'block' : 'none';
     },
+    onTogglePerfStats: (enabled) => {
+      const perfEl = document.getElementById('perf-stats');
+      if (perfEl) perfEl.style.display = enabled ? 'flex' : 'none';
+      isPerfStatsEnabled = enabled;
+    },
     onSpeedChange: (factor) => {
       cinematicCamera.adjustShotSpeed(factor);
       const newSpeed = cinematicCamera.getShotSpeed();
@@ -575,7 +584,7 @@ async function bootstrap() {
         'top-bar', 'planet-selector', 'info-panel',
         'minimap-container', 'zoom-indicator', 'settings-panel',
         'search-panel', 'cinematic-panel', 'saturn-camera-panel',
-        'discovery-notification', 'fps-counter',
+        'discovery-notification', 'fps-counter', 'perf-stats',
         'layer-tooltip', 'attribution'
       ];
       savedUIStates = {};
@@ -1441,16 +1450,21 @@ async function bootstrap() {
       updateSunlightExposure();
     }
 
-    // FPS Counter
+    // FPS Counter & Detailed Performance Panel
     frameCount2++;
-    if (Date.now() - fpsLastTime >= 500) {
-      const fps = Math.round(frameCount2 * 1000 / (Date.now() - fpsLastTime));
+    const nowTime = Date.now();
+    const duration = nowTime - fpsLastTime;
+    if (duration >= 500) {
+      const fps = Math.round((frameCount2 * 1000) / duration);
       const fpsEl = document.getElementById('fps-counter');
       if (fpsEl && fpsEl.style.display !== 'none') {
         fpsEl.textContent = fps + ' FPS';
       }
+      if (isPerfStatsEnabled) {
+        updateDetailedPerformanceStats(fps, duration / frameCount2);
+      }
       frameCount2 = 0;
-      fpsLastTime = Date.now();
+      fpsLastTime = nowTime;
     }
 
     // K?t xu?t qua post-processing pipeline (bloom)
@@ -1459,6 +1473,55 @@ async function bootstrap() {
 
   let frameCount2 = 0;
   let fpsLastTime = Date.now();
+
+  function updateDetailedPerformanceStats(fps, avgFrameTime) {
+    const fpsVal = document.getElementById('perf-fps');
+    const timeVal = document.getElementById('perf-frametime');
+    const solverVal = document.getElementById('perf-solver');
+    const bodiesVal = document.getElementById('perf-bodies');
+    const asteroidVal = document.getElementById('perf-asteroids');
+    const resolutionVal = document.getElementById('perf-resolution');
+    
+    if (fpsVal) fpsVal.textContent = fps + ' FPS';
+    if (timeVal) timeVal.textContent = avgFrameTime.toFixed(1) + ' ms';
+    
+    let totalBodies = 0;
+    let fastPathCount = 0;
+    let halleyCount = 0;
+    
+    if (newtonGravityActive) {
+      if (solverVal) solverVal.innerHTML = '<span style="color:#a78bfa;">N-body Gravity</span>';
+      totalBodies = bodies.length;
+    } else {
+      for (const body of bodies) {
+        totalBodies++;
+        if (body.data) {
+          const e = body.data.eccentricity || 0;
+          if (e < 0.15) fastPathCount++;
+          else halleyCount++;
+        }
+      }
+      if (solverVal) {
+        if (fastPathCount + halleyCount > 0) {
+          const percent = Math.round((fastPathCount / (fastPathCount + halleyCount)) * 100);
+          solverVal.innerHTML = `Keplerian (<span style="color:#6ec6ff;">Fast: ${percent}%</span>)`;
+        } else {
+          solverVal.textContent = 'Keplerian';
+        }
+      }
+    }
+    
+    if (bodiesVal) bodiesVal.textContent = totalBodies;
+    
+    const currentPreset = getCurrentPreset();
+    if (asteroidVal) {
+      asteroidVal.textContent = currentPreset ? currentPreset.asteroidCount : '0';
+    }
+    
+    if (resolutionVal) {
+      resolutionVal.textContent = `${window.innerWidth}x${window.innerHeight} (@${window.devicePixelRatio.toFixed(2)}x)`;
+    }
+  }
 
   function updateMinimap() {
     const minimapContainer = document.getElementById('minimap-container');
@@ -1540,12 +1603,74 @@ async function bootstrap() {
   }
 
   function takeScreenshot() {
-    renderer.render(scene, camera);
-    const dataURL = renderer.domElement.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `SolarSystem_${trackedBody?.data.name || 'System'}_${Date.now()}.png`;
-    link.href = dataURL;
-    link.click();
+    try {
+      composer.render();
+      const dataURL = renderer.domElement.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `SolarSystem_${trackedBody?.data.name || 'System'}_${Date.now()}.png`;
+      link.href = dataURL;
+      link.click();
+    } catch (error) {
+      console.error("Screenshot failed:", error);
+      showNotification("Lỗi khi chụp ảnh màn hình: " + error.message, 4000);
+    }
+  }
+
+  function takeHighResScreenshot() {
+    const scale = 3.0; // 3x current resolution
+    const originalWidth = window.innerWidth;
+    const originalHeight = window.innerHeight;
+    const originalPixelRatio = renderer.getPixelRatio();
+    const originalAspect = camera.aspect;
+
+    const highResWidth = originalWidth * scale;
+    const highResHeight = originalHeight * scale;
+
+    showNotification("Đang chuẩn bị chụp ảnh độ phân giải cực cao...", 3000);
+
+    // Yield main thread so the browser renders the notification first
+    setTimeout(() => {
+      try {
+        // Temporarily resize renderer (updateStyle = false to avoid DOM canvas layout shifting)
+        renderer.setSize(highResWidth, highResHeight, false);
+        renderer.setPixelRatio(1);
+
+        camera.aspect = highResWidth / highResHeight;
+        camera.updateProjectionMatrix();
+
+        // Update post-processing composer size
+        composer.setSize(highResWidth, highResHeight);
+
+        // Render high-res frame
+        composer.render();
+
+        // Export data
+        const dataURL = renderer.domElement.toDataURL('image/png');
+
+        // Trigger download
+        const link = document.createElement('a');
+        link.download = `SolarSystem_HighRes_${trackedBody?.data.name || 'System'}_${Date.now()}.png`;
+        link.href = dataURL;
+        link.click();
+
+        showNotification("Đã tải xuống ảnh độ phân giải cực cao thành công!", 3000);
+      } catch (error) {
+        console.error("High-res screenshot failed:", error);
+        showNotification("Lỗi khi chụp ảnh độ phân giải cao: " + error.message, 4000);
+      } finally {
+        // Restore original dimensions and ratio
+        renderer.setPixelRatio(originalPixelRatio);
+        renderer.setSize(originalWidth, originalHeight);
+
+        camera.aspect = originalAspect;
+        camera.updateProjectionMatrix();
+
+        composer.setSize(originalWidth, originalHeight);
+
+        // Restore screen view render
+        composer.render();
+      }
+    }, 100);
   }
 
   // B?t ??u v?ng l?p

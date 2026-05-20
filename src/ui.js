@@ -76,6 +76,7 @@ export function initUI(callbacks) {
       </select>
     </div>
     <button class="btn-icon" id="btn-settings" title="Cài đặt">⚙️</button>
+    <button class="btn-icon btn-imaging-top" id="btn-imaging" title="Chụp ảnh độ phân giải cực cao (chấp nhận độ trễ)">📷</button>
     <button class="btn-icon" id="btn-cinematic-toggle" title="Chế độ Điện ảnh (Tự do)">🎥</button>
   `;
   container.appendChild(topBar);
@@ -137,6 +138,11 @@ export function initUI(callbacks) {
           <span class="toggle-icon">📊</span>
           <span class="toggle-label">Hiển thị FPS</span>
           <span class="toggle-switch" id="toggle-fps"></span>
+        </label>
+        <label class="toggle-row" data-setting="perf-stats">
+          <span class="toggle-icon">⚡</span>
+          <span class="toggle-label">Hiển thị Hiệu năng chi tiết</span>
+          <span class="toggle-switch" id="toggle-perf-stats"></span>
         </label>
         <label class="toggle-row" data-setting="newton">
           <span class="toggle-icon">🌐</span>
@@ -352,6 +358,22 @@ export function initUI(callbacks) {
     <div id="zoom-pointer"></div>
   `;
   container.appendChild(zoomIndicator);
+  
+  // ═══ Detailed Performance Panel ═══
+  const perfPanel = document.createElement('div');
+  perfPanel.id = 'perf-stats';
+  perfPanel.className = 'glass-panel';
+  perfPanel.style.display = 'none';
+  perfPanel.innerHTML = `
+    <div class="perf-title">⚡ HIỆU NĂNG CHI TIẾT</div>
+    <div class="perf-row"><span>FPS:</span> <span id="perf-fps" class="perf-val">0</span></div>
+    <div class="perf-row"><span>Độ trễ khung hình:</span> <span id="perf-frametime" class="perf-val">0.0 ms</span></div>
+    <div class="perf-row"><span>Bộ giải quỹ đạo:</span> <span id="perf-solver" class="perf-val">—</span></div>
+    <div class="perf-row"><span>Thiên thể vẽ:</span> <span id="perf-bodies" class="perf-val">0</span></div>
+    <div class="perf-row"><span>Tiểu hành tinh:</span> <span id="perf-asteroids" class="perf-val">0</span></div>
+    <div class="perf-row"><span>Độ phân giải:</span> <span id="perf-resolution" class="perf-val">0x0</span></div>
+  `;
+  container.appendChild(perfPanel);
 
   // ═══ Cinematic Panel ═══
   const cinematicPanel = document.createElement('div');
@@ -633,6 +655,10 @@ export function initUI(callbacks) {
       on: () => { if (callbacks.onToggleFps) callbacks.onToggleFps(true); },
       off: () => { if (callbacks.onToggleFps) callbacks.onToggleFps(false); }
     },
+    'perf-stats': {
+      on: () => { if (callbacks.onTogglePerfStats) callbacks.onTogglePerfStats(true); },
+      off: () => { if (callbacks.onTogglePerfStats) callbacks.onTogglePerfStats(false); }
+    },
     newton: {
       on: () => { if (callbacks.onToggleNewtonGravity) callbacks.onToggleNewtonGravity(true); },
       off: () => { if (callbacks.onToggleNewtonGravity) callbacks.onToggleNewtonGravity(false); }
@@ -891,6 +917,11 @@ export function initUI(callbacks) {
   const btnScreenshot = document.getElementById('btn-screenshot');
   btnScreenshot.addEventListener('click', () => {
     if (callbacks.onScreenshot) callbacks.onScreenshot();
+  });
+
+  const btnImaging = document.getElementById('btn-imaging');
+  btnImaging.addEventListener('click', () => {
+    if (callbacks.onHighResScreenshot) callbacks.onHighResScreenshot();
   });
 
   // ═══ Info Panel Content ═══
