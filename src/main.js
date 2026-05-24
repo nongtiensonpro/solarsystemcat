@@ -6,7 +6,7 @@ import { createPlanet } from './createPlanet.js';
 import { computeAllPositions } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
 import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName, updateBenchmarkProgress, hideBenchmarkOverlay, showBenchmarkReport, syncUIToggles } from './ui.js';
-import { createOrbitLine, createNbodyOrbitLine, updateOrbitLineGeometry, getSegmentCount } from './orbits.js';
+import { createOrbitLine, createCometOrbitLine, createNbodyOrbitLine, updateOrbitLineGeometry, getSegmentCount } from './orbits.js';
 import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange, getCurrentPresetKey, applyPreset, QUALITY_PRESETS } from './renderConfig.js';
 import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
@@ -18,6 +18,8 @@ import { selfRegulatingFactor } from './sunInterior.js';
 import { createCinematicCameraController } from './cinematicCamera.js';
 import { GhostMoonSystem } from './ghostMoonSystem.js';
 import { applyOrbitSafety } from './orbitSafety.js';
+import { updateCometPositions } from './cometOrbit.js';
+import { updateCometVisuals } from './comets.js';
 
 // ??? Bootstrap ? T?i d? li?u tr??c khi kh?i t?o ???
 async function bootstrap() {
@@ -710,13 +712,18 @@ async function bootstrap() {
         scene.add(body.pivot);
       }
     } else if (data.parentId === 'sun' || data.parentId === null) {
-      // H?nh tinh ho?c M?t Tr?i: g?n tr?c ti?p v?o scene
+      // H?nh tinh, sao chổi ho?c M?t Tr?i: g?n tr?c ti?p v?o scene
       scene.add(body.pivot);
-      // Orbit line cho h?nh tinh quanh M?t Tr?i
-      const orbitLine = createOrbitLine(data);
-      if (orbitLine) {
-        scene.add(orbitLine);
-        orbits.push(orbitLine);
+      // Mặt Trời: luôn ở trung tâm, không cần quỹ đạo
+      if (data.type !== 'star') {
+        // Orbit line: sao chổi dùng hệ thống riêng, hành tinh dùng chung
+        const orbitLine = data.type === 'comet'
+          ? createCometOrbitLine(data, AU)
+          : createOrbitLine(data);
+        if (orbitLine) {
+          scene.add(orbitLine);
+          orbits.push(orbitLine);
+        }
       }
     } else {
       // Tr??ng h?p kh?c (parentId kh?ng ph?i sun, kh?ng ph?i moon)
@@ -741,10 +748,15 @@ async function bootstrap() {
 
   const keplerBodies = bodies.filter(body => (
     body.data.type !== 'star' &&
+    body.data.type !== 'comet' &&  // Sao chổi dùng engine riêng
     (body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0)
   ));
   const keplerBodyData = keplerBodies.map(body => body.data);
   let keplerPositionBuffer = new Float64Array(keplerBodies.length * 3);
+
+  // ── Sao chổi: mảng riêng, engine riêng ──
+  const cometBodies = bodies.filter(body => body.data.type === 'comet');
+  const COMET_THROTTLE_INTERVAL = 4; // Cập nhật mỗi 4 frame (theo yêu cầu)
 
   // 5a. T?o V?nh ?ai ti?u h?nh tinh (Asteroid Belt)
   const asteroidBelt = createAsteroidBelt(5000);
@@ -1031,6 +1043,15 @@ async function bootstrap() {
       }
     }
 
+    // ── Sao chổi: engine quỹ đạo riêng với distance-based throttle ──
+    if (!newtonGravityActive && !isPaused && cometBodies.length) {
+      updateCometPositions(cometBodies, simulationTime, frameCount, AU);
+    }
+    // Cập nhật visual sao chổi (đuôi, quầng, độ sáng) — throttle mỗi 2 frame
+    if (!isPaused && cometBodies.length && frameCount % 2 === 0) {
+      updateCometVisuals(cometBodies, AU);
+    }
+
     // D? ?oán qu? ??o N-body (throttle m?i NBODY_PREDICTION_INTERVAL frame)
     if (newtonGravityActive && frameCount % NBODY_PREDICTION_INTERVAL === 0) {
       updateNbodyPredictions();
@@ -1048,54 +1069,8 @@ async function bootstrap() {
       if (body.data.type !== 'star') {
         const hasOrbit = body.data.semiMajorAxis > 0 || body.data.displayOrbitRadius > 0;
         if (hasOrbit && !isPaused) {
-          // E. C?p nh?t sao ch?i (??u?i, qu?ng, ?? s?ng)
-          if (body.tailMesh) {
-            const awayPos = _v2.copy(body.pivot.position).multiplyScalar(2);
-            body.tailMesh.lookAt(awayPos);
-
-            // ?? s?ng sao ch?i: I = 1/r^2.5 (brightness curve th?c t?)
-            const distAU = body.pivot.position.length() / AU;
-            const r = Math.max(distAU, 0.5);
-            const brightnessFactor = Math.pow(r, -2.5);
-            const maxTailDist = 10.0;
-            let tailOpacity = 1.0 - (distAU / maxTailDist);
-            tailOpacity = Math.max(0, Math.min(1, tailOpacity));
-            const brightness = Math.min(1, brightnessFactor / 0.1);
-
-            // C?p nh?t ??u?i ion
-            body.tailMesh.material.uniforms.uOpacity.value = tailOpacity;
-            body.tailMesh.material.uniforms.uBrightness.value = brightness;
-            body.tailMesh.visible = tailOpacity > 0.05;
-
-            // ?? d?i ??u?i ??ng: 5 ? 25 AU
-            const tailScale = 5 + 20 * tailOpacity;
-            body.tailMesh.scale.z = tailScale / 15;
-
-            // C?p nh?t ??u?i b?i
-            if (body.dustTailMesh) {
-              body.dustTailMesh.lookAt(awayPos);
-              body.dustTailMesh.material.uniforms.uOpacity.value = tailOpacity * 0.5;
-              body.dustTailMesh.material.uniforms.uBrightness.value = brightness * 0.7;
-              body.dustTailMesh.visible = tailOpacity > 0.05;
-              const dustScale = 3 + 9 * tailOpacity;
-              body.dustTailMesh.scale.z = dustScale / 12;
-            }
-
-            // C?p nh?t qu?ng (coma) ??ng
-            if (body.comaMesh) {
-              body.comaMesh.material.uniforms.uOpacity.value = tailOpacity * 0.8;
-              body.comaMesh.material.uniforms.uBrightness.value = brightness;
-              body.comaMesh.visible = tailOpacity > 0.05;
-              const baseScale = body.data.physical.radius * 3.0;
-              const comaFactor = 1 + 1.5 * tailOpacity;
-              body.comaMesh.scale.setScalar(baseScale * comaFactor);
-            }
-
-            // C?p nh?t ?? s?ng l?i (outgassing)
-            if (body.mesh && body.mesh.material) {
-              body.mesh.material.emissiveIntensity = 0.3 + 2.0 * tailOpacity;
-            }
-          }
+          // Sao chổi: visual đã được cập nhật bởi updateCometVisuals() riêng
+          // Không cần xử lý gì thêm ở đây
         }
       }
 

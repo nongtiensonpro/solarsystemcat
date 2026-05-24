@@ -1709,7 +1709,9 @@
         "semiMajorAxis": 17.834,
         "orbitalPeriod": 27503,
         "eccentricity": 0.96714,
-        "inclination": 162.26
+        "inclination": 162.26,
+        "longitudeAscending": 58.42,
+        "argumentPeriapsis": 111.33
       },
       "rotation": {
         "axialTilt": 0,
@@ -1742,7 +1744,9 @@
         "semiMajorAxis": 186,
         "orbitalPeriod": 101647,
         "eccentricity": 0.995,
-        "inclination": 89.4
+        "inclination": 89.4,
+        "longitudeAscending": 282.47,
+        "argumentPeriapsis": 130.59
       },
       "rotation": {
         "axialTilt": 0,
@@ -1775,7 +1779,9 @@
         "semiMajorAxis": 28,
         "orbitalPeriod": 4500,
         "eccentricity": 0.999,
-        "inclination": 128.9
+        "inclination": 128.9,
+        "longitudeAscending": 61.01,
+        "argumentPeriapsis": 37.28
       },
       "rotation": {
         "axialTilt": 0,
@@ -1808,7 +1814,9 @@
         "semiMajorAxis": 3.46,
         "orbitalPeriod": 2512,
         "eccentricity": 0.641,
-        "inclination": 7.04
+        "inclination": 7.04,
+        "longitudeAscending": 50.15,
+        "argumentPeriapsis": 12.78
       },
       "rotation": {
         "axialTilt": 0,
@@ -1841,7 +1849,9 @@
         "semiMajorAxis": 3.15,
         "orbitalPeriod": 2060,
         "eccentricity": 0.510,
-        "inclination": 10.5
+        "inclination": 10.5,
+        "longitudeAscending": 68.93,
+        "argumentPeriapsis": 178.93
       },
       "rotation": {
         "axialTilt": 0,

@@ -126,6 +126,8 @@ function normalizeBody(raw) {
     orbitalPeriod: raw.orbit?.orbitalPeriod ?? 1,
     eccentricity: raw.orbit?.eccentricity ?? 0,
     inclination: raw.orbit?.inclination ?? 0,
+    longitudeAscending: raw.orbit?.longitudeAscending ?? 0,
+    argumentPeriapsis: raw.orbit?.argumentPeriapsis ?? 0,
 
     // ─── Rotation (flatten) ───
     axialTilt: raw.rotation?.axialTilt ?? 0,
