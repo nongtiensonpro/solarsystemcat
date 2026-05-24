@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { solveKepler } from './kepler.js';
 import { getCurrentPreset } from './renderConfig.js';
 import { getDisplayOrbitRadius } from './orbitMath.js';
+import { sampleCometOrbitPath, sampleCometOrbitDistances } from './cometOrbit.js';
 
 /**
 * Xác ??nh s? segment d?a trên ?? l?ch tâm (eccentricity) và preset ch?t l??ng.
@@ -135,6 +136,95 @@ export function createOrbitLine(data) {
 
   const line = new THREE.Line(geometry, material);
   line.name = `${data.id}_orbit`;
+  line.visible = false;
+
+  return line;
+}
+
+// ── Comet Orbit Line — Hệ thống quỹ đạo chuyên biệt cho sao chổi ──
+
+/**
+ * Tạo đường quỹ đạo sao chổi với:
+ * - Full rotation matrix (i, Ω, ω) đồng bộ với cometOrbit.js
+ * - True Anomaly sampling — phân bố đều trên đường cong thực
+ * - Gradient shader: sáng ở perihelion, mờ ở aphelion
+ * - Không dùng CatmullRom (tránh artifact cho e cao)
+ *
+ * @param {Object} data - Dữ liệu sao chổi (đã normalize)
+ * @param {number} auScale - Hệ số AU (constants.AU)
+ * @returns {THREE.Line|null}
+ */
+export function createCometOrbitLine(data, auScale = 400) {
+  const a = getDisplayOrbitRadius(data);
+  if (a <= 0) return null;
+
+  const e = data.eccentricity || 0;
+
+  // Số điểm sampling: nhiều hơn cho e cao
+  const samples = e > 0.95 ? 512 : (e > 0.8 ? 384 : 256);
+
+  // Lấy mẫu đường quỹ đạo từ cometOrbit.js (đã bao gồm full rotation matrix)
+  const pathBuffer = sampleCometOrbitPath(data, samples);
+  const distBuffer = sampleCometOrbitDistances(data, samples);
+
+  // Tạo geometry từ sampled points
+  const positions = new Float32Array(samples * 3);
+  const colors = new Float32Array(samples * 3);
+
+  // Tìm perihelion distance để normalize gradient
+  let minDist = Infinity;
+  let maxDist = 0;
+  for (let i = 0; i < samples; i++) {
+    const d = distBuffer[i];
+    if (d < minDist) minDist = d;
+    if (d > maxDist) maxDist = d;
+  }
+  const distRange = maxDist - minDist || 1;
+
+  // Comet orbit color palette
+  const periColor = new THREE.Color(0x66ccff);  // Xanh sáng ở perihelion
+  const apoColor = new THREE.Color(0x1a2a3a);   // Tối ở aphelion
+  const activeColor = new THREE.Color(0x44aaff); // Vùng hoạt động (< 5 AU)
+
+  for (let i = 0; i < samples; i++) {
+    const base = i * 3;
+    positions[base]     = pathBuffer[base];
+    positions[base + 1] = pathBuffer[base + 1];
+    positions[base + 2] = pathBuffer[base + 2];
+
+    // Gradient: t = 0 (perihelion) → 1 (aphelion)
+    const t = (distBuffer[i] - minDist) / distRange;
+    const distAU = distBuffer[i] / auScale;
+
+    // Sáng hơn nếu nằm trong vùng hoạt động sao chổi (< 5 AU)
+    if (distAU < 5) {
+      const activeFactor = 1 - (distAU / 5);
+      const blended = periColor.clone().lerp(activeColor, activeFactor * 0.5);
+      colors[base]     = blended.r;
+      colors[base + 1] = blended.g;
+      colors[base + 2] = blended.b;
+    } else {
+      const blended = periColor.clone().lerp(apoColor, Math.min(t, 1));
+      colors[base]     = blended.r;
+      colors[base + 1] = blended.g;
+      colors[base + 2] = blended.b;
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const material = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const line = new THREE.Line(geometry, material);
+  line.name = `${data.id}_comet_orbit`;
   line.visible = false;
 
   return line;
