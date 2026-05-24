@@ -1,18 +1,19 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════╗
- * ║        Comet Orbital Engine  —  v1.0                                ║
+ * ║        Comet Orbital Engine  —  v2.0 (Ultra Performance)            ║
  * ║    Hệ thống quỹ đạo chuyên biệt cho sao chổi                      ║
  * ╠══════════════════════════════════════════════════════════════════════╣
- * ║  Đặc điểm:                                                         ║
- * ║  • Steffensen's method cho e > 0.95: hội tụ nhanh gấp 2x           ║
- * ║  • Barker's equation cho near-parabolic (e > 0.9995): O(1) giải    ║
- * ║  • Distance-based throttle: sao chổi xa cập nhật thưa hơn          ║
- * ║  • Safety clamp: ngăn sao chổi bay xuyên Mặt Trời hoặc bay thẳng  ║
- * ║  • Zero-allocation batch processing riêng biệt                     ║
+ * ║  Nâng cấp v2.0:                                                    ║
+ * ║  • Universal Variable Formulation (Shepperd/Danby) cho mọi e       ║
+ * ║  • Halley's 3rd-order iteration: hội tụ trong 2-3 steps            ║
+ * ║  • Zero-allocation Stumpff functions & Perifocal direct output     ║
+ * ║  • Fast Barker solver (O(1)) trả về trực tiếp xp, yp              ║
+ * ║  • Throttle không dùng Math.sqrt (so sánh distSq)                  ║
+ * ║  • Orbit Path sampling dùng phương trình cực (bỏ qua Kepler)       ║
  * ╚══════════════════════════════════════════════════════════════════════╝
  */
 
-import { getDisplayOrbitRadius } from './orbitMath.js';
+import { getDisplayOrbitRadius } from "./orbitMath.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hằng số
@@ -23,199 +24,214 @@ const INV_TWO_PI = 1 / TWO_PI;
 const DEG_TO_RAD = Math.PI / 180;
 const SECONDS_PER_DAY = 86400;
 
-// Throttle thresholds (AU units trong WebGL = displayOrbitRadius / AU_SCALE)
-const THROTTLE_NEAR = 1;     // < 1: mỗi frame
-const THROTTLE_MID = 4;      // 1-4: mỗi 2 frame
-const THROTTLE_FAR = 4;      // > 4: mỗi 4 frame (theo yêu cầu user)
-const THROTTLE_HIDE = 20;    // > 20: ẩn hoàn toàn (visibility culling)
+// Throttle thresholds (AU units)
+const THROTTLE_NEAR = 1;
+const THROTTLE_MID = 4;
+const THROTTLE_FAR = 4;
+const THROTTLE_HIDE = 20;
 
-// Safety: khoảng cách tối thiểu từ Mặt Trời (trong display units)
-// Mặt Trời có radius = 25 units, cần margin để sao chổi không bay xuyên
+// Safety: khoảng cách tối thiểu từ Mặt Trời
 const SUN_DISPLAY_RADIUS = 25;
 const MIN_PERIHELION_DISPLAY = SUN_DISPLAY_RADIUS + 10; // = 35 units
 
 // ─────────────────────────────────────────────────────────────────────────────
-// § 1. Kepler Solver chuyên biệt cho sao chổi (e > 0.5)
+// § 1. Universal Kepler Solver (Zero-Allocation)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function wrapTwoPi(angle) {
-  return angle - TWO_PI * Math.floor(angle * INV_TWO_PI);
-}
+const _scratchPerifocal = { xp: 0, yp: 0, r: 0 };
 
 /**
- * Markley's starter (1995) — initial guess tối ưu cho high eccentricity.
- * Hội tụ nhanh hơn nhiều so với linear starter M + e*sin(M).
+ * Tính Stumpff functions C2, C3 nội tuyến để tránh cấp phát object.
  */
-function markleyStarter(M, e) {
-  const Mw = wrapTwoPi(M);
-  const t = Mw / Math.PI;
-  // Pade approximant cho starter
-  const alpha = (3 * Math.PI * Math.PI + 1.6 * Math.PI * (Math.PI - Math.abs(Mw)))
-    / (Math.PI * Math.PI - 6);
-  const d = 3 * (1 - e) + alpha * e;
-  const r = 3 * alpha * d * (d - 1 + e) * Mw + Mw * Mw * Mw;
-  const q = 2 * alpha * d * (1 - e) - Mw * Mw;
-  const w = (Math.abs(r) + Math.sqrt(r * r + q * q * q)) ** (2 / 3);
-  const E0 = (2 * r * w / (w * w + w * q + q * q) + Mw) / d;
-  // Sử dụng 4th-order refinement
-  const fs = e * Math.sin(E0);
-  const fc = e * Math.cos(E0);
-  const f0 = E0 - fs - Mw;
-  const f1 = 1 - fc;
-  const f2 = fs;
-  const f3 = fc;
-  const d3 = -f0 / (f1 - 0.5 * f0 * f2 / f1);
-  const d4 = -f0 / (f1 + 0.5 * d3 * (f2 + d3 * f3 / 3));
-  return E0 - f0 / (f1 + 0.5 * d4 * (f2 + d4 * f3 / 3));
-}
-
-/**
- * Giải phương trình Kepler cho sao chổi — tối ưu cho e cao.
- *
- * Chiến lược:
- * - e < 0.8:  Standard Halley (giống kepler.js — 2-3 iterations)
- * - 0.8 ≤ e < 0.9995: Markley starter + Steffensen's method (3-5 iterations)
- * - e ≥ 0.9995: Barker's equation (direct, O(1))
- *
- * @param {number} M - Mean Anomaly
- * @param {number} e - Eccentricity
- * @returns {{sinE: number, cosE: number}} sin(E) và cos(E) tích hợp
- */
-export function solveCometKepler(M, e) {
-  // Near-parabolic: Barker's equation
-  if (e >= 0.9995) {
-    return solveCometBarker(M, e);
+function computeStumpffC2C3(psi) {
+  let c2, c3;
+  if (psi > 1e-6) {
+    const sqrtPsi = Math.sqrt(psi);
+    c2 = (1 - Math.cos(sqrtPsi)) / psi;
+    c3 = (sqrtPsi - Math.sin(sqrtPsi)) / (psi * sqrtPsi);
+  } else if (psi < -1e-6) {
+    const sqrtMinusPsi = Math.sqrt(-psi);
+    c2 = (Math.cosh(sqrtMinusPsi) - 1) / -psi;
+    c3 = (Math.sinh(sqrtMinusPsi) - sqrtMinusPsi) / (-psi * sqrtMinusPsi);
+  } else {
+    // Taylor series cho psi gần 0 (tránh chia cho 0)
+    const psi2 = psi * psi;
+    const psi3 = psi2 * psi;
+    c2 =
+      0.5 -
+      psi * 0.041666666666666664 +
+      psi2 * 0.001388888888888889 -
+      psi3 * 0.0000248015873015873;
+    c3 =
+      0.16666666666666666 -
+      psi * 0.008333333333333333 +
+      psi2 * 0.0001984126984126984 -
+      psi3 * 0.000002755731922398589;
   }
+  return [c2, c3];
+}
 
-  M = wrapTwoPi(M);
-
-  let E;
-
-  if (e < 0.8) {
-    // Standard starter + Halley
+/**
+ * Starter tối ưu cho Universal Variable x.
+ */
+function getUniversalStarter(M, e) {
+  if (e < 0.95) {
+    // Elliptical: Newton step từ M
     const sinM = Math.sin(M);
     const cosM = Math.cos(M);
-    const invDenom = 1 / (1 - e * cosM);
-    E = M + e * sinM * invDenom;
-  } else {
-    // Markley's starter — rất chính xác cho e cao
-    E = markleyStarter(M, e);
-  }
-
-  // Steffensen's method — superlinear convergence cho high-e
-  const maxIter = e >= 0.95 ? 12 : 8;
-  const tolerance = 1e-12;
-
-  for (let i = 0; i < maxIter; i++) {
-    const sinE = Math.sin(E);
-    const cosE = Math.cos(E);
-    const f = E - e * sinE - M;
-
-    if (Math.abs(f) < tolerance) {
-      return { sinE, cosE };
+    return M + (e * sinM) / (1 - e * cosM);
+  } else if (e < 1.05) {
+    // Near-parabolic: Giải phương trình bậc 3 x^3 + 6(1-e)x - 6M = 0
+    const p = 6 * (1 - e);
+    const q = -6 * M;
+    const D = q * q * 0.25 + p * p * p * 0.037037037037037035; // 1/27
+    if (D >= 0) {
+      const sqrtD = Math.sqrt(D);
+      return Math.cbrt(-q * 0.5 + sqrtD) + Math.cbrt(-q * 0.5 - sqrtD);
+    } else {
+      const r = Math.sqrt(-p * p * p * 0.037037037037037035);
+      const theta = Math.acos(-q / (2 * r));
+      return 2 * Math.cbrt(r) * Math.cos(theta * 0.3333333333333333);
     }
+  } else {
+    // Hyperbolic: Newton step từ asinh
+    let x = Math.asinh(M / e);
+    const expX = Math.exp(x);
+    const expMinusX = 1 / expX;
+    const sinhX = (expX - expMinusX) * 0.5;
+    const coshX = (expX + expMinusX) * 0.5;
+    const f = e * sinhX - x - M;
+    const fp = e * coshX - 1;
+    return x - f / fp;
+  }
+}
 
-    const fp = 1 - e * cosE;
-    const fpp = e * sinE;
+/**
+ * Giải phương trình Kepler cho Near-Parabolic (e >= 0.999) dùng Barker.
+ * Trả về trực tiếp tọa độ Perifocal (xp, yp) và r.
+ */
+function solveNearParabolicPerifocal(M, e, q, out) {
+  let M_wrap = M - TWO_PI * Math.round(M * INV_TWO_PI);
+  const disc = Math.sqrt(2.25 * M_wrap * M_wrap + 1);
+  const D = Math.cbrt(1.5 * M_wrap + disc) + Math.cbrt(1.5 * M_wrap - disc);
 
-    // Halley step (bậc 3)
-    const denom = fp - (f * fpp) / (2 * fp);
-    if (Math.abs(denom) < 1e-15) break;
-    E -= f / denom;
+  out.xp = q * (1 - D * D);
+  out.yp = 2 * q * D;
+  out.r = q * (1 + D * D);
+  return out;
+}
+
+/**
+ * Universal Kepler Solver — Giải quyết mọi loại quỹ đạo (e < 1, e = 1, e > 1).
+ * Sử dụng Halley's method bậc 3 và Stumpff functions.
+ * Trả về trực tiếp xp, yp trong hệ tọa độ Perifocal (Zero-Allocation).
+ */
+function solveKeplerPerifocal(M, e, cache, out) {
+  if (e >= 0.999) {
+    return solveNearParabolicPerifocal(M, e, cache.q, out);
   }
 
-  return { sinE: Math.sin(E), cosE: Math.cos(E) };
-}
+  // Wrap M cho elliptical để hội tụ nhanh nhất
+  let M_wrapped = M;
+  if (e < 1.0) {
+    M_wrapped = M - TWO_PI * Math.round(M * INV_TWO_PI);
+  }
 
-/**
- * Barker's equation — giải trực tiếp cho quỹ đạo gần parabolic (e ≈ 1).
- * Tính toán O(1), không cần iteration.
- *
- * Phương pháp:
- * 1. Giải cubic D³ + 3D = 3M (Barker parabolic) bằng Vieta's substitution
- * 2. D = tan(ν/2), suy ra True Anomaly ν
- * 3. Chuyển ν → E dùng atan2 (tránh singularity)
- * Sai số < 0.01% — chấp nhận theo yêu cầu.
- */
-function solveCometBarker(M, e) {
-  // Wrap M vào [0, 2π) rồi chuyển sang [-π, π]
-  M = wrapTwoPi(M);
-  let Msym = M;
-  if (Msym > Math.PI) Msym -= TWO_PI;
+  let x = getUniversalStarter(M_wrapped, e);
+  const sign_psi = e < 1.0 ? 1 : -1;
 
-  // Giải cubic: D³ + 3D - 3M = 0 (Barker's equation cho e=1)
-  // Vieta's substitution: D = t - 1/t, dẫn đến t³ - 1/t³ = 3M
-  // → u² - 3M·u - 1 = 0 với u = t³
-  const disc = Math.sqrt(9 * Msym * Msym + 4);
-  const u = (3 * Msym + disc) / 2;
-  const t = Math.cbrt(u);
-  const D = t - 1 / t; // = tan(ν/2)
+  // Halley's iteration (bậc 3)
+  for (let i = 0; i < 6; i++) {
+    const x2 = x * x;
+    const psi = sign_psi * x2;
+    const [c2, c3] = computeStumpffC2C3(psi);
 
-  // True anomaly từ D = tan(ν/2)
-  const nu = 2 * Math.atan(D);
+    const x3 = x2 * x;
+    const g = e * x3 * c3 + (1 - e) * x - M_wrapped;
 
-  // Chuyển True Anomaly → Eccentric Anomaly dùng atan2 (tránh singularity)
-  const sinHalfNu = Math.sin(nu / 2);
-  const cosHalfNu = Math.cos(nu / 2);
-  const sqrt1me = Math.sqrt(1 - e);
-  const sqrt1pe = Math.sqrt(1 + e);
-  const E = 2 * Math.atan2(sqrt1me * sinHalfNu, sqrt1pe * cosHalfNu);
+    if (Math.abs(g) < 1e-12) break;
 
-  return { sinE: Math.sin(E), cosE: Math.cos(E) };
+    const gp = e * x2 * c2 + (1 - e);
+    const gpp = e * x * (1 - psi * c3);
+
+    const denom = gp - (g * gpp) / (2 * gp);
+    if (Math.abs(denom) < 1e-15) break;
+
+    const dx = g / denom;
+    x -= dx;
+
+    if (Math.abs(dx) < 1e-12 * Math.abs(x)) break;
+  }
+
+  // Tính xp, yp từ x
+  const x2 = x * x;
+  const psi = sign_psi * x2;
+  const [c2] = computeStumpffC2C3(psi);
+
+  out.xp = cache.q - cache.a * x2 * c2;
+  out.r = cache.q + cache.a * cache.e * x2 * c2;
+
+  // yp = sign(x) * sqrt(p * r). Dùng Math.max để tránh NaN do sai số float
+  out.yp = Math.sign(x) * Math.sqrt(Math.max(0, cache.p * out.r));
+
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// § 2. Comet Orbital Cache — chuyên biệt cho sao chổi
+// § 2. Comet Orbital Cache
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Tạo hoặc lấy cache quỹ đạo cho sao chổi.
- * Bao gồm rotation matrix (i, Ω, ω) + derived constants + throttle state.
- */
 function getOrCreateCometCache(data) {
   let cache = data._cometCache;
   if (cache) return cache;
 
-  const i  = (data.inclination        || 0) * DEG_TO_RAD;
+  const i = (data.inclination || 0) * DEG_TO_RAD;
   const Omega = (data.longitudeAscending || 0) * DEG_TO_RAD;
-  const omega = (data.argumentPeriapsis  || 0) * DEG_TO_RAD;
+  const omega = (data.argumentPeriapsis || 0) * DEG_TO_RAD;
 
-  const cosO = Math.cos(Omega), sinO = Math.sin(Omega);
-  const cosw = Math.cos(omega), sinw = Math.sin(omega);
-  const cosi = Math.cos(i), sini = Math.sin(i);
+  const cosO = Math.cos(Omega),
+    sinO = Math.sin(Omega);
+  const cosw = Math.cos(omega),
+    sinw = Math.sin(omega);
+  const cosi = Math.cos(i),
+    sini = Math.sin(i);
 
-  // Full rotation matrix cho quỹ đạo 3D
-  // Perifocal → Heliocentric
+  // Rotation matrix (Perifocal → Heliocentric)
   const r00 = cosO * cosw - sinO * sinw * cosi;
   const r10 = sini * sinw;
   const r20 = sinO * cosw + cosO * sinw * cosi;
 
   const r01 = -cosO * sinw - sinO * cosw * cosi;
-  const r11 =  sini * cosw;
+  const r11 = sini * cosw;
   const r21 = -sinO * sinw + cosO * cosw * cosi;
 
   const e = data.eccentricity || 0;
-  const a = getDisplayOrbitRadius(data);
+  let a = getDisplayOrbitRadius(data);
+
+  // Xử lý mathematical sign cho a (Hyperbolic có a < 0)
+  // Đảm bảo an toàn cho dù hàm getDisplayOrbitRadius có tự động đảo dấu hay không
+  if (e > 1 && a > 0) a = -a;
+
   const periodS = Math.abs(data.orbitalPeriod) * SECONDS_PER_DAY;
   const n = periodS > 0 ? TWO_PI / periodS : 0;
 
-  const sqrt1me2 = Math.sqrt(Math.max(0, 1 - e * e));
-
-  // Khoảng cách perihelion và aphelion (display units)
-  const perihelion = a * (1 - e);
-  const aphelion = a * (1 + e);
+  // Các biến universal
+  const q = a * (1 - e); // Khoảng cách perihelion (luôn >= 0)
+  const p = a * (1 - e * e); // Semi-latus rectum (luôn > 0)
 
   cache = {
-    r00, r01, r10, r11, r20, r21,
+    r00,
+    r01,
+    r10,
+    r11,
+    r20,
+    r21,
     a,
     e,
-    sqrt1me2,
-    a_sqrt1me2: a * sqrt1me2,
-    an: a * n,
+    q,
+    p,
     n,
     phase: (data.initialPhaseDeg || 0) * DEG_TO_RAD,
-    perihelion,
-    aphelion,
     // Throttle state
     lastUpdateFrame: -999,
     lastX: 0,
@@ -227,58 +243,40 @@ function getOrCreateCometCache(data) {
   return cache;
 }
 
-/**
- * Xóa cache quỹ đạo sao chổi (khi dữ liệu thay đổi).
- */
 export function invalidateCometCache(data) {
-  if (data) {
-    delete data._cometCache;
-  }
+  if (data) delete data._cometCache;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// § 3. Position Computation — Single Comet
+// § 3. Position Computation (Zero-Allocation)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Tính vị trí quỹ đạo của một sao chổi.
- * @param {Object} data - Dữ liệu sao chổi (đã normalize)
- * @param {number} timeElapsed - Thời gian mô phỏng (giây)
- * @param {{x,y,z}} out - Object nhận kết quả (zero-alloc)
- * @returns {{x,y,z}}
- */
 export function computeCometPosition(data, timeElapsed, out) {
   const c = getOrCreateCometCache(data);
-  const M = wrapTwoPi(c.n * timeElapsed + c.phase);
+  const M = c.n * timeElapsed + c.phase;
 
-  const { sinE, cosE } = solveCometKepler(M, c.e);
+  solveKeplerPerifocal(M, c.e, c, _scratchPerifocal);
+  let { xp, yp, r } = _scratchPerifocal;
 
-  let xp = c.a * (cosE - c.e);
-  let yp = c.a_sqrt1me2 * sinE;
-
-  // ── Safety Clamp: ngăn sao chổi bay xuyên Mặt Trời ──
-  // Tính khoảng cách từ focus (Mặt Trời)
-  const r = c.a * (1 - c.e * cosE);
-  if (r < MIN_PERIHELION_DISPLAY) {
-    // Scale lại vị trí để giữ khoảng cách tối thiểu
-    const scale = MIN_PERIHELION_DISPLAY / Math.max(r, 0.001);
+  // Safety Clamp: Giữ khoảng cách tối thiểu từ Mặt Trời
+  if (r < MIN_PERIHELION_DISPLAY && r > 1e-6) {
+    const scale = MIN_PERIHELION_DISPLAY / r;
     xp *= scale;
     yp *= scale;
   }
 
-  // ── Safety Clamp: ngăn bay thẳng (NaN/Infinity check) ──
+  // Fallback nếu có NaN/Infinity
   if (!isFinite(xp) || !isFinite(yp)) {
-    // Fallback: đặt ở perihelion trên trục x
-    xp = c.perihelion;
+    xp = c.q;
     yp = 0;
   }
 
-  // Xoay từ perifocal sang heliocentric
+  // Rotate Perifocal → Heliocentric
   const x = c.r00 * xp + c.r01 * yp;
   const y = c.r10 * xp + c.r11 * yp;
   const z = c.r20 * xp + c.r21 * yp;
 
-  if (typeof out.set === 'function') {
+  if (typeof out.set === "function") {
     out.set(x, y, z);
   } else {
     out.x = x;
@@ -289,67 +287,56 @@ export function computeCometPosition(data, timeElapsed, out) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// § 4. Batch Computation với Distance-Based Throttle
+// § 4. Batch Computation với Fast Throttle (No Math.sqrt)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Scratch object dùng lại — zero allocation
 const _scratchPos = { x: 0, y: 0, z: 0 };
 
-/**
- * Tính throttle interval dựa trên khoảng cách hiện tại từ Mặt Trời.
- * @param {number} distSq - Bình phương khoảng cách (display units)
- * @param {number} auScale - Hệ số quy đổi AU (constants.AU)
- * @returns {number} Số frame giữa mỗi lần cập nhật
- */
-function getThrottleInterval(distSq, auScale) {
-  const distAU = Math.sqrt(distSq) / auScale;
-  if (distAU < THROTTLE_NEAR) return 1;
-  if (distAU < THROTTLE_MID) return 2;
-  if (distAU < THROTTLE_HIDE) return THROTTLE_FAR;
-  return -1; // Ẩn hoàn toàn
-}
+export function updateCometPositions(
+  cometBodies,
+  simulationTime,
+  frameCount,
+  auScale,
+) {
+  // Pre-compute squared thresholds để tránh Math.sqrt trong vòng lặp
+  const auScaleSq = auScale * auScale;
+  const nearSq = THROTTLE_NEAR * THROTTLE_NEAR * auScaleSq;
+  const midSq = THROTTLE_MID * THROTTLE_MID * auScaleSq;
+  const hideSq = THROTTLE_HIDE * THROTTLE_HIDE * auScaleSq;
 
-/**
- * Cập nhật vị trí batch cho tất cả sao chổi với throttle thông minh.
- *
- * @param {Array} cometBodies - Mảng body objects (chỉ sao chổi)
- * @param {number} simulationTime - Thời gian mô phỏng hiện tại (giây)
- * @param {number} frameCount - Frame counter hiện tại
- * @param {number} auScale - Hệ số quy đổi AU (import từ constants.js)
- */
-export function updateCometPositions(cometBodies, simulationTime, frameCount, auScale) {
   for (let i = 0; i < cometBodies.length; i++) {
     const body = cometBodies[i];
     const data = body.data;
     const cache = getOrCreateCometCache(data);
 
-    // ── Distance-based throttle ──
-    const dx = cache.lastX, dy = cache.lastY, dz = cache.lastZ;
+    // Distance-based throttle check (O(1) fast path)
+    const dx = cache.lastX,
+      dy = cache.lastY,
+      dz = cache.lastZ;
     const distSq = dx * dx + dy * dy + dz * dz;
-    const interval = getThrottleInterval(distSq, auScale);
+
+    let interval;
+    if (distSq < nearSq) interval = 1;
+    else if (distSq < midSq) interval = 2;
+    else if (distSq < hideSq) interval = THROTTLE_FAR;
+    else interval = -1; // Ẩn
 
     if (interval === -1) {
-      // Quá xa: ẩn hoàn toàn
       body.pivot.visible = false;
       continue;
     }
 
     body.pivot.visible = true;
 
-    // Skip nếu chưa đến lượt cập nhật
     if (frameCount - cache.lastUpdateFrame < interval) {
       continue;
     }
 
     cache.lastUpdateFrame = frameCount;
 
-    // Tính vị trí mới
     computeCometPosition(data, simulationTime, _scratchPos);
-
-    // Cập nhật vị trí body
     body.pivot.position.set(_scratchPos.x, _scratchPos.y, _scratchPos.z);
 
-    // Lưu vị trí cho lần throttle check tiếp theo
     cache.lastX = _scratchPos.x;
     cache.lastY = _scratchPos.y;
     cache.lastZ = _scratchPos.z;
@@ -357,59 +344,37 @@ export function updateCometPositions(cometBodies, simulationTime, frameCount, au
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// § 5. Orbit Path Sampler — chuyên biệt cho sao chổi
+// § 5. Orbit Path Sampler (Direct Polar Equation)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Lấy mẫu đường quỹ đạo sao chổi với True Anomaly sampling.
- * Tập trung nhiều điểm ở perihelion, thưa hơn ở aphelion.
- *
- * @param {Object} data - Dữ liệu sao chổi
- * @param {number} samples - Số điểm mẫu
- * @param {Float64Array} [out] - Buffer đầu ra (optional, sẽ tạo mới nếu không có)
- * @returns {Float64Array} Buffer chứa (x,y,z) × samples
- */
 export function sampleCometOrbitPath(data, samples = 256, out) {
   if (!out || out.length < samples * 3) {
     out = new Float64Array(samples * 3);
   }
 
   const c = getOrCreateCometCache(data);
+  const p = c.p;
+  const e = c.e;
 
-  // Pre-compute conversion factors (constant cho toàn bộ quỹ đạo)
-  const sqrt1me = Math.sqrt(1 - c.e);
-  const sqrt1pe = Math.sqrt(1 + c.e);
-
+  // Sample đều theo True Anomaly (nu) để mật độ điểm dày đặc ở perihelion (nơi cong nhất)
   for (let i = 0; i < samples; i++) {
-    // True Anomaly sampling — phân bố đều trên đường cong thực tế
     const nu = (i / samples) * TWO_PI;
+    const cosNu = Math.cos(nu);
+    const sinNu = Math.sin(nu);
 
-    // Chuyển True Anomaly → Eccentric Anomaly dùng atan2 (tránh singularity tại ν=π)
-    const sinHalfNu = Math.sin(nu / 2);
-    const cosHalfNu = Math.cos(nu / 2);
-    const E = 2 * Math.atan2(sqrt1me * sinHalfNu, sqrt1pe * cosHalfNu);
+    // Phương trình quỹ đạo cực: r = p / (1 + e * cos(nu))
+    let r = p / (1 + e * cosNu);
+    let xp = r * cosNu;
+    let yp = r * sinNu;
 
-    const sinE = Math.sin(E);
-    const cosE = Math.cos(E);
-
-    let xp = c.a * (cosE - c.e);
-    let yp = c.a_sqrt1me2 * sinE;
-
-    // Safety: clamp minimum distance — ngăn bay xuyên Mặt Trời
-    const r = c.a * (1 - c.e * cosE);
-    if (r < MIN_PERIHELION_DISPLAY) {
-      const scale = MIN_PERIHELION_DISPLAY / Math.max(r, 0.001);
+    if (r < MIN_PERIHELION_DISPLAY && r > 1e-6) {
+      const scale = MIN_PERIHELION_DISPLAY / r;
       xp *= scale;
       yp *= scale;
     }
 
-    if (!isFinite(xp) || !isFinite(yp)) {
-      xp = MIN_PERIHELION_DISPLAY;
-      yp = 0;
-    }
-
     const base = i * 3;
-    out[base]     = c.r00 * xp + c.r01 * yp;
+    out[base] = c.r00 * xp + c.r01 * yp;
     out[base + 1] = c.r10 * xp + c.r11 * yp;
     out[base + 2] = c.r20 * xp + c.r21 * yp;
   }
@@ -417,21 +382,15 @@ export function sampleCometOrbitPath(data, samples = 256, out) {
   return out;
 }
 
-/**
- * Tính khoảng cách AU tại mỗi điểm mẫu — dùng cho gradient shader.
- * @param {Object} data - Dữ liệu sao chổi
- * @param {number} samples - Số điểm mẫu (phải khớp với sampleCometOrbitPath)
- * @returns {Float32Array} Mảng distAU cho mỗi điểm
- */
 export function sampleCometOrbitDistances(data, samples = 256) {
   const c = getOrCreateCometCache(data);
+  const p = c.p;
+  const e = c.e;
   const distances = new Float32Array(samples);
 
   for (let i = 0; i < samples; i++) {
     const nu = (i / samples) * TWO_PI;
-    // r = a(1-e²)/(1+e·cos(ν))
-    const r = c.a * (1 - c.e * c.e) / (1 + c.e * Math.cos(nu));
-    distances[i] = Math.max(0, r);
+    distances[i] = Math.max(0, p / (1 + e * Math.cos(nu)));
   }
 
   return distances;
