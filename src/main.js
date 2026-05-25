@@ -7,7 +7,7 @@ import { computeAllPositions } from './kepler.js';
 import { initPostProcessing } from './postprocessing.js';
 import { initUI, updateLayerTooltip, showNotification, updateSpeedDisplay, updateCurrentPlanetName, updateBenchmarkProgress, hideBenchmarkOverlay, showBenchmarkReport, syncUIToggles } from './ui.js';
 import { createOrbitLine, createCometOrbitLine, createNbodyOrbitLine, updateOrbitLineGeometry, getSegmentCount } from './orbits.js';
-import { createLabel, updateLabels, toggleLabels, areLabelsVisible } from './labels.js';
+import { createLabel, updateLabels, toggleLabels, toggleCometLabels, areLabelsVisible } from './labels.js';
 import { getCurrentPreset, onPresetChange, getCurrentPresetKey, applyPreset, QUALITY_PRESETS } from './renderConfig.js';
 import { updateAutoCrossSection, toggleCrossSection, clipPlane } from './crossSection.js';
 import { createAsteroidBelt } from './asteroidBelt.js';
@@ -416,9 +416,10 @@ async function bootstrap() {
     },
     onToggleOrbits: (show) => {
       for (const orbit of orbits) {
-        orbit.visible = show;
+        if (!orbit.userData?.isCometOrbit) {
+          orbit.visible = show;
+        }
       }
-      // ??ng b? N-body orbit lines v?i visuals toggle
       if (newtonGravityActive) {
         for (const [, line] of nbodyOrbitLines) {
           line.visible = show;
@@ -430,6 +431,16 @@ async function bootstrap() {
     },
     onToggleLabels: (show) => {
       toggleLabels(show);
+    },
+    onToggleCometOrbits: (show) => {
+      for (const orbit of orbits) {
+        if (orbit.userData?.isCometOrbit) {
+          orbit.visible = show;
+        }
+      }
+    },
+    onToggleCometLabels: (show) => {
+      toggleCometLabels(show);
     },
     onScreenshot: () => {
       takeScreenshot();
@@ -495,9 +506,13 @@ async function bootstrap() {
         disableNewtonGravity(bodies, scene);
         restoreAllMeshesVisibility();
         const visualsBtn = document.getElementById('toggle-visuals');
+        const cometVisualsBtn = document.getElementById('toggle-comet-visuals');
         const visualsActive = visualsBtn && visualsBtn.classList.contains('active');
+        const cometVisualsActive = cometVisualsBtn && cometVisualsBtn.classList.contains('active');
         for (const orbit of orbits) {
-          orbit.visible = !!visualsActive;
+          orbit.visible = orbit.userData?.isCometOrbit
+            ? !!cometVisualsActive
+            : !!visualsActive;
         }
         // D?n d?p N-body orbit lines
         for (const [, line] of nbodyOrbitLines) {
@@ -630,8 +645,8 @@ async function bootstrap() {
         }
       }
 
-      // Hide labels (DOM-intensive) and orbits (shader updates)
       toggleLabels(false);
+      toggleCometLabels(false);
       for (const orbit of orbits) {
         orbit.visible = false;
       }
@@ -666,12 +681,16 @@ async function bootstrap() {
         }
       }
 
-      // Restore labels and orbits based on current toggle
       const visualsBtn = document.getElementById('toggle-visuals');
+      const cometVisualsBtn = document.getElementById('toggle-comet-visuals');
       const visualsActive = visualsBtn && visualsBtn.classList.contains('active');
+      const cometVisualsActive = cometVisualsBtn && cometVisualsBtn.classList.contains('active');
       toggleLabels(!!visualsActive);
+      toggleCometLabels(!!cometVisualsActive);
       for (const orbit of orbits) {
-        orbit.visible = !!visualsActive;
+        orbit.visible = orbit.userData?.isCometOrbit
+          ? !!cometVisualsActive
+          : !!visualsActive;
       }
     }
   }
@@ -721,6 +740,9 @@ async function bootstrap() {
           ? createCometOrbitLine(data, AU)
           : createOrbitLine(data);
         if (orbitLine) {
+          if (data.type === 'comet') {
+            orbitLine.userData.isCometOrbit = true;
+          }
           scene.add(orbitLine);
           orbits.push(orbitLine);
         }
@@ -739,12 +761,12 @@ async function bootstrap() {
     createLabel(data, body.pivot);
   }
 
-  // ??? Kh?i t?o tr?ng thái hi?n th? ?? kh?p v?i toggle "Qu? ?ạo & Nhãn tên"
-  // (toggle m?c ?nh active, c?n ??ng b? v?i actual state)
+  // Khởi tạo: hành tinh/vệ tinh hiện quỹ đạo & nhãn; sao chổi ẩn (toggle riêng tắt mặc định)
   for (const orbit of orbits) {
-    orbit.visible = true;
+    orbit.visible = !orbit.userData?.isCometOrbit;
   }
   toggleLabels(true);
+  toggleCometLabels(false);
 
   const keplerBodies = bodies.filter(body => (
     body.data.type !== 'star' &&
@@ -1955,6 +1977,7 @@ ${phaseTable}
     const originalCloudsActive = isCloudsEnabled;
     const originalSunlightActive = document.getElementById('toggle-sunlight')?.classList.contains('active') || false;
     const originalVisualsActive = document.getElementById('toggle-visuals')?.classList.contains('active') || false;
+    const originalCometVisualsActive = document.getElementById('toggle-comet-visuals')?.classList.contains('active') || false;
     const originalSliceActive = isAutoSliceEnabled;
     const originalHudActive = document.getElementById('toggle-hud')?.classList.contains('active') || false;
     const originalFpsActive = document.getElementById('toggle-fps')?.classList.contains('active') || false;
@@ -2014,8 +2037,11 @@ ${phaseTable}
       toggleSunlightPaths(originalSunlightActive);
 
       toggleLabels(originalVisualsActive);
+      toggleCometLabels(originalCometVisualsActive);
       for (const orbit of orbits) {
-        orbit.visible = originalVisualsActive;
+        orbit.visible = orbit.userData?.isCometOrbit
+          ? originalCometVisualsActive
+          : originalVisualsActive;
       }
 
       controls.enabled = originalControlsEnabled;
@@ -2040,6 +2066,7 @@ ${phaseTable}
       // Visual UI sync
       syncUIToggles({
         visuals: originalVisualsActive,
+        cometVisuals: originalCometVisualsActive,
         magnet: originalMagneticActive,
         aurora: originalAuroraActive,
         clouds: originalCloudsActive,

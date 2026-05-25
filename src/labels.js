@@ -7,6 +7,9 @@ labelContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height
 document.body.appendChild(labelContainer);
 
 const labels = [];
+let labelsEnabled = true;
+let cometLabelsEnabled = false;
+
 const worldPos = new THREE.Vector3();
 const projectedPos = new THREE.Vector3();
 const projectionMatrix = new THREE.Matrix4();
@@ -56,6 +59,12 @@ export function updateLabels(camera, renderer) {
   frustum.setFromProjectionMatrix(projectionMatrix);
 
   for (const label of labels) {
+    const isComet = label.data.type === 'comet';
+    if (isComet ? !cometLabelsEnabled : !labelsEnabled) {
+      label.el.style.display = 'none';
+      continue;
+    }
+
     label.pivot.getWorldPosition(worldPos);
 
     if (!frustum.containsPoint(worldPos)) {
@@ -109,15 +118,38 @@ export function updateLabels(camera, renderer) {
  * @param {boolean} show
  */
 export function toggleLabels(show) {
-  for (const label of labels) {
-    label.el.style.display = show ? 'block' : 'none';
-  }
+  labelsEnabled = show;
   labelContainer.dataset.visible = show ? 'true' : 'false';
+  if (!show) {
+    for (const label of labels) {
+      if (label.data.type !== 'comet') {
+        label.el.style.display = 'none';
+      }
+    }
+  }
+}
+
+/**
+ * Bật/tắt nhãn riêng cho sao chổi (độc lập với nhãn hành tinh/vệ tinh).
+ */
+export function toggleCometLabels(show) {
+  cometLabelsEnabled = show;
+  if (!show) {
+    for (const label of labels) {
+      if (label.data.type === 'comet') {
+        label.el.style.display = 'none';
+      }
+    }
+  }
+}
+
+export function areCometLabelsVisible() {
+  return cometLabelsEnabled;
 }
 
 /**
  * Kiểm tra nhãn có đang bật không
  */
 export function areLabelsVisible() {
-  return labelContainer.dataset.visible === 'true';
+  return labelsEnabled;
 }

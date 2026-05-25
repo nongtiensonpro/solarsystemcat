@@ -104,6 +104,11 @@ export function initUI(callbacks) {
           <span class="toggle-label">Quỹ đạo & Nhãn tên</span>
           <span class="toggle-switch active" id="toggle-visuals"></span>
         </label>
+        <label class="toggle-row" data-setting="comet-visuals">
+          <span class="toggle-icon">☄️</span>
+          <span class="toggle-label">Quỹ đạo & Nhãn sao chổi</span>
+          <span class="toggle-switch" id="toggle-comet-visuals"></span>
+        </label>
         <label class="toggle-row" data-setting="magnet">
           <span class="toggle-icon">🧲</span>
           <span class="toggle-label">Từ trường</span>
@@ -755,6 +760,16 @@ export function initUI(callbacks) {
       off: () => {
         if (callbacks.onToggleOrbits) callbacks.onToggleOrbits(false);
         if (callbacks.onToggleLabels) callbacks.onToggleLabels(false);
+      }
+    },
+    'comet-visuals': {
+      on: () => {
+        if (callbacks.onToggleCometOrbits) callbacks.onToggleCometOrbits(true);
+        if (callbacks.onToggleCometLabels) callbacks.onToggleCometLabels(true);
+      },
+      off: () => {
+        if (callbacks.onToggleCometOrbits) callbacks.onToggleCometOrbits(false);
+        if (callbacks.onToggleCometLabels) callbacks.onToggleCometLabels(false);
       }
     },
     magnet: {
@@ -1485,6 +1500,7 @@ export function showBenchmarkReport(data, onDownload, onClose) {
 export function syncUIToggles(states) {
   const toggleMap = {
     visuals: 'toggle-visuals',
+    cometVisuals: 'toggle-comet-visuals',
     magnet: 'toggle-magnet',
     aurora: 'toggle-aurora',
     clouds: 'toggle-clouds',
