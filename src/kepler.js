@@ -1,6 +1,6 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════╗
- * ║              Kepler Orbital Engine  —  v2.2                        ║
+ * ║              Kepler Orbital Engine  —  v2.3                        ║
  * ║      Động lực học quỹ đạo thiên thể (Keplerian Two-Body)           ║
  * ╠══════════════════════════════════════════════════════════════════════╣
  * ║  Nâng cấp so với v2.1:                                             ║
@@ -8,6 +8,9 @@
  * ║  • Giải lượng giác tích hợp solveKeplerSinCos tránh gọi trùng lặp   ║
  * ║  • Cải tiến thuộc tính ẩn _keplerCache bypass cấu trúc WeakMap      ║
  * ║  • Zero Allocation với bộ đệm scratchSinCos cho hot path           ║
+ * ║  Nâng cấp v2.3:                                                    ║
+ * ║  • Fast-path e<0.15: 1 trig + cập nhật sin/cos tuyến tính        ║
+ * ║  • sampleOrbitPath: điểm đóng + tham số revolutions              ║
  * ╚══════════════════════════════════════════════════════════════════════╝
  */
 
@@ -24,6 +27,9 @@ const SECONDS_PER_DAY = 86400;
 
 // Bộ đệm dùng lại để trả về sin(E) và cos(E) mà không gây rác bộ nhớ (Zero Allocation)
 export const scratchSinCos = { sinE: 0, cosE: 0 };
+
+/** Ngưỡng fast-path: một bước NR + cập nhật sin/cos tuyến tính (đủ chính xác cho hành tinh). */
+const LOW_ECC_THRESHOLD = 0.15;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // § 1. LUT cho initial guess — linear interpolation, cả sin lẫn cos
@@ -70,40 +76,48 @@ function wrapTwoPi(angle) {
   return angle - TWO_PI * Math.floor(angle * INV_TWO_PI);
 }
 
-/**
- * Giải phương trình Kepler elliptic: M = E − e·sin(E)
- * Dùng Halley's method (bậc 3) — hội tụ cubic.
- */
-export function solveKepler(M, e, tolerance = 1e-12, maxIter = 15) {
-  if (e === 0) return wrapTwoPi(M);
-
-  M = wrapTwoPi(M);
-
+/** Initial guess cho E từ M, e (dùng LUT sin/cos của M). */
+function keplerInitialE(M, e) {
   const sinM = lutSin(M);
   const cosM = lutCos(M);
   const invDenom = 1 / (1 - e * cosM);
-
-  let E;
   if (e < 0.8) {
-    E = M + e * sinM * invDenom;
-  } else {
-    const delta = e * sinM * invDenom;
-    E = M + delta / (1 + 0.15 * delta * delta * invDenom);
+    return M + e * sinM * invDenom;
   }
+  const delta = e * sinM * invDenom;
+  return M + delta / (1 + 0.15 * delta * delta * invDenom);
+}
 
-  // Fast-path cho độ lệch tâm thấp (e < 0.15) — 1 bước Newton-Raphson
-  if (e < 0.15) {
-    const sinE = Math.sin(E);
-    const cosE = Math.cos(E);
-    return E - (E - e * sinE - M) / (1 - e * cosE);
-  }
+/** Một bước Newton-Raphson trên phương trình Kepler. */
+function keplerNewtonStep(E, e, M) {
+  const sinE = Math.sin(E);
+  const cosE = Math.cos(E);
+  return E - (E - e * sinE - M) / (1 - e * cosE);
+}
 
+/**
+ * Fast-path: 1× sin/cos rồi cập nhật sin(E), cos(E) tuyến tính sau bước NR.
+ * Đủ chính xác cho e < LOW_ECC_THRESHOLD (sai số ~O(delta²), delta rất nhỏ).
+ */
+function keplerLowEccSinCos(E, e, M, out) {
+  const sinE = Math.sin(E);
+  const cosE = Math.cos(E);
+  const fp = 1 - e * cosE;
+  const delta = (E - e * sinE - M) / fp;
+  out.sinE = sinE - delta * cosE;
+  out.cosE = cosE + delta * sinE;
+}
+
+/** Halley iteration; trả về sinE, cosE tại E cuối. */
+function keplerHalleySinCos(E, e, M, tolerance, maxIter) {
+  let sinE = 0;
+  let cosE = 0;
   for (let i = 0; i < maxIter; i++) {
-    const sinE = Math.sin(E);
-    const cosE = Math.cos(E);
-    const f    = E - e * sinE - M;
-    const fp   = 1 - e * cosE;
-    const fpp  = e * sinE;
+    sinE = Math.sin(E);
+    cosE = Math.cos(E);
+    const f = E - e * sinE - M;
+    const fp = 1 - e * cosE;
+    const fpp = e * sinE;
 
     const denom = fp - (f * fpp) / (2 * fp);
     if (Math.abs(denom) < 1e-15) break;
@@ -113,8 +127,27 @@ export function solveKepler(M, e, tolerance = 1e-12, maxIter = 15) {
 
     if (Math.abs(delta) < tolerance) break;
   }
+  sinE = Math.sin(E);
+  cosE = Math.cos(E);
+  return { E, sinE, cosE };
+}
 
-  return E;
+/**
+ * Giải phương trình Kepler elliptic: M = E − e·sin(E)
+ * Dùng Halley's method (bậc 3) — hội tụ cubic.
+ */
+export function solveKepler(M, e, tolerance = 1e-12, maxIter = 15) {
+  if (e === 0) return wrapTwoPi(M);
+
+  M = wrapTwoPi(M);
+  let E = keplerInitialE(M, e);
+
+  if (e < LOW_ECC_THRESHOLD) {
+    return keplerNewtonStep(E, e, M);
+  }
+
+  const result = keplerHalleySinCos(E, e, M, tolerance, maxIter);
+  return result.E;
 }
 
 /**
@@ -130,52 +163,16 @@ export function solveKeplerSinCos(M, e, tolerance = 1e-12, maxIter = 15) {
   }
 
   M = wrapTwoPi(M);
+  let E = keplerInitialE(M, e);
 
-  const sinM = lutSin(M);
-  const cosM = lutCos(M);
-  const invDenom = 1 / (1 - e * cosM);
-
-  let E;
-  if (e < 0.8) {
-    E = M + e * sinM * invDenom;
-  } else {
-    const delta = e * sinM * invDenom;
-    E = M + delta / (1 + 0.15 * delta * delta * invDenom);
-  }
-
-  // Fast-path lượng độ lệch tâm thấp: e < 0.15 — 1 bước Newton-Raphson cực nhanh và chính xác
-  if (e < 0.15) {
-    const sinE = Math.sin(E);
-    const cosE = Math.cos(E);
-    E -= (E - e * sinE - M) / (1 - e * cosE);
-    scratchSinCos.sinE = Math.sin(E);
-    scratchSinCos.cosE = Math.cos(E);
+  if (e < LOW_ECC_THRESHOLD) {
+    keplerLowEccSinCos(E, e, M, scratchSinCos);
     return;
   }
 
-  let sinE = 0, cosE = 0;
-  for (let i = 0; i < maxIter; i++) {
-    sinE = Math.sin(E);
-    cosE = Math.cos(E);
-    const f    = E - e * sinE - M;
-    const fp   = 1 - e * cosE;
-    const fpp  = e * sinE;
-
-    const denom = fp - (f * fpp) / (2 * fp);
-    if (Math.abs(denom) < 1e-15) break;
-
-    const delta = f / denom;
-    E -= delta;
-
-    if (Math.abs(delta) < tolerance) {
-      sinE = Math.sin(E);
-      cosE = Math.cos(E);
-      break;
-    }
-  }
-
-  scratchSinCos.sinE = sinE;
-  scratchSinCos.cosE = cosE;
+  const result = keplerHalleySinCos(E, e, M, tolerance, maxIter);
+  scratchSinCos.sinE = result.sinE;
+  scratchSinCos.cosE = result.cosE;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -484,15 +481,22 @@ export function computeAllStates(planets, timeElapsed, out) {
 // § 8. Orbit Path Sampler
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function sampleOrbitPath(data, samples = 128, uniformAngle = false, out) {
-  if (!out || out.length < samples * 3) {
-    out = new Float64Array(samples * 3);
+/**
+ * Lấy mẫu đường quỹ đạo 3D (mean anomaly hoặc true anomaly đều).
+ * @param {number} segmentCount - Số đoạn; sinh segmentCount+1 điểm (đường đóng).
+ * @param {number} [revolutions=1] - Số vòng quỹ đạo (cho e cao, hiển thị multi-rev).
+ */
+export function sampleOrbitPath(data, segmentCount = 128, uniformAngle = false, out, revolutions = 1) {
+  const pointCount = segmentCount + 1;
+  if (!out || out.length < pointCount * 3) {
+    out = new Float64Array(pointCount * 3);
   }
 
   const c = getOrCreateCache(data);
+  const revs = revolutions > 0 ? revolutions : 1;
 
-  for (let i = 0; i < samples; i++) {
-    const t = (i / samples) * TWO_PI;
+  for (let i = 0; i < pointCount; i++) {
+    const t = segmentCount > 0 ? (i / segmentCount) * TWO_PI * revs : 0;
     let xp, yp;
 
     if (uniformAngle) {

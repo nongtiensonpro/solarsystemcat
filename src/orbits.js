@@ -1,6 +1,6 @@
 // T?o ???ng qu? ??o elip cho c?c thi?n th? (h?nh tinh + v? tinh)
 import * as THREE from 'three';
-import { solveKepler } from './kepler.js';
+import { sampleOrbitPath } from './kepler.js';
 import { getCurrentPreset } from './renderConfig.js';
 import { getDisplayOrbitRadius } from './orbitMath.js';
 import { sampleCometOrbitPath, sampleCometOrbitDistances } from './cometOrbit.js';
@@ -37,7 +37,6 @@ export function createOrbitLine(data) {
 
   if (a <= 0) return null;
   const e = data.eccentricity || 0;
-  const incRad = (data.inclination || 0) * Math.PI / 180;
 
   // L?y c?u hình t? quality preset
   const preset = getCurrentPreset();
@@ -52,23 +51,19 @@ export function createOrbitLine(data) {
   // V?i e > 0.98 (Hale-Bopp, NEOWISE) ch? dùng 1 vòng ?? tránh nhi?u CatmullRom
   const revolutions = (e >= 0.9 && !data.isMoon) ? (e > 0.98 ? 1 : 3) : 1;
 
-  const rawPoints = [];
-
-  // Sampling theo Mean Anomaly (M) — t? nhiên t?p trung ?i?m ? c?n ?i?m
-  // V?i e r?t cao (>0.95), t?ng s? ?i?m ?? ???ng cong m??t h?n
   const effectiveSegs = e > 0.95 ? Math.max(segments, 512) : segments;
   const totalSegs = effectiveSegs * revolutions;
+
+  // Ma trận quay 3D đầy đủ từ kepler cache (Ω, ω, i) — tránh solveKepler + trig lặp
+  const pathBuffer = sampleOrbitPath(data, totalSegs, false, null, revolutions);
+  const rawPoints = [];
   for (let i = 0; i <= totalSegs; i++) {
-    const M = (i / totalSegs) * Math.PI * 2 * revolutions;
-    const E = solveKepler(M, e);
-    const xLocal = a * (Math.cos(E) - e);
-    const zLocal = a * Math.sqrt(1 - e * e) * Math.sin(E);
-
-    const x = xLocal;
-    const y = zLocal * Math.sin(incRad);
-    const z = zLocal * Math.cos(incRad);
-
-    rawPoints.push(new THREE.Vector3(x, y, z));
+    const base = i * 3;
+    rawPoints.push(new THREE.Vector3(
+      pathBuffer[base],
+      pathBuffer[base + 1],
+      pathBuffer[base + 2]
+    ));
   }
 
   // CatmullRom n?i suy ?? ???ng cong m??t h?n, gi?m hi?n t??ng "g?p khúc"
@@ -225,6 +220,7 @@ export function createCometOrbitLine(data, auScale = 400) {
 
   const line = new THREE.Line(geometry, material);
   line.name = `${data.id}_comet_orbit`;
+  line.userData.isCometOrbit = true;
   line.visible = false;
 
   return line;
