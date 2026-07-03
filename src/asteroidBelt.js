@@ -175,14 +175,15 @@ export function createAsteroidBelt(maxCount = 5000) {
       orbitInterval = Math.max(1, Math.floor(interval || 1));
     },
     update: (simulationTime, deltaTime) => {
-      const doOrbit = (_orbitFrame++ % orbitInterval) === 0;
+      const currentMod = _orbitFrame % orbitInterval;
+      _orbitFrame++;
       const array = instancedMesh.instanceMatrix.array;
       const count = instancedMesh.count;
 
       for (let i = 0; i < count; i++) {
         const data = asteroidData[i];
 
-        if (doOrbit) {
+        if (i % orbitInterval === currentMod) {
           const meanAnomaly = data.meanMotion * simulationTime + data.initialTheta;
           const e = data.eccentricity;
           const E = meanAnomaly + e * Math.sin(meanAnomaly);

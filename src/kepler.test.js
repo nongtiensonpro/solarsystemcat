@@ -63,6 +63,17 @@ describe('computeOrbitalPositionInto', () => {
 });
 
 describe('sampleOrbitPath', () => {
+  it('chuẩn hóa segmentCount/revolutions không hợp lệ', () => {
+    const data = {
+      semiMajorAxis: 1,
+      eccentricity: 0.01,
+      orbitalPeriod: 365,
+      displayOrbitRadius: 10,
+    };
+    const buf = sampleOrbitPath(data, 0, false, null, 0);
+    expect(buf.length).toBe(6);
+  });
+
   it('điểm đầu và cuối gần nhau trên quỹ đạo đóng (e nhỏ)', () => {
     const data = {
       semiMajorAxis: 1,

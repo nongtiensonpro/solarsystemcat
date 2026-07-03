@@ -49,6 +49,19 @@ const savedParents = new Map();
 // ── Pre-allocated work areas (zero GC) ──
 const _accelMap = new Map();
 const _entriesCache = [];
+const _savedStatePool = [];
+const _filteredEntriesCache = [];
+const _pointPool = [];
+let _pointPoolIdx = 0;
+
+function getPointFromPool(x, y, z) {
+  if (_pointPoolIdx >= _pointPool.length) {
+    _pointPool.push({ x: 0, y: 0, z: 0 });
+  }
+  const p = _pointPool[_pointPoolIdx++];
+  p.x = x; p.y = y; p.z = z;
+  return p;
+}
 
 export function isNewtonGravityEnabled() {
   return enabled;
@@ -181,6 +194,11 @@ export function updateNewtonGravity(bodies, deltaTime) {
     if (s) {
       body.pivot.position.set(s.px, s.py, s.pz);
     }
+  }
+
+  // Chỉ kiểm tra va chạm 15 frames một lần ở main loop thay vì mỗi substep
+  if (energyLogCount % 15 === 0) {
+    checkCollisions(entries);
   }
 }
 
@@ -387,14 +405,11 @@ function resetAccelerations(acc) {
 function computeAccelerations(entries, acc, epsSq) {
   for (let i = 0; i < entries.length; i++) {
     const [id_i, s_i] = entries[i];
-    if (!s_i.gravityAffected || s_i.massNorm === 0) continue;
-    const ai = acc.get(id_i);
-    if (!ai) continue;
-
+    if (s_i.massNorm === 0) continue;
+    const ai = s_i.gravityAffected ? acc.get(id_i) : null;
     const px_i = s_i.px, py_i = s_i.py, pz_i = s_i.pz;
 
-    for (let j = 0; j < entries.length; j++) {
-      if (i === j) continue;
+    for (let j = i + 1; j < entries.length; j++) {
       const [id_j, s_j] = entries[j];
       if (s_j.massNorm === 0) continue;
 
@@ -406,11 +421,24 @@ function computeAccelerations(entries, acc, epsSq) {
       if (dist < 1e-15) continue;
       const invDist = 1 / dist;
 
-      const force = G_NORM * s_j.massNorm / (distSq + epsSq);
+      // Gia tốc cho i do j gây ra
+      const force_i = G_NORM * s_j.massNorm / (distSq + epsSq);
+      if (ai) {
+        ai.ax += force_i * dx * invDist;
+        ai.ay += force_i * dy * invDist;
+        ai.az += force_i * dz * invDist;
+      }
 
-      ai.ax += force * dx * invDist;
-      ai.ay += force * dy * invDist;
-      ai.az += force * dz * invDist;
+      // Gia tốc cho j do i gây ra (Định luật 3 Newton)
+      if (s_j.gravityAffected) {
+        const aj = acc.get(id_j);
+        if (aj) {
+          const force_j = G_NORM * s_i.massNorm / (distSq + epsSq);
+          aj.ax -= force_j * dx * invDist;
+          aj.ay -= force_j * dy * invDist;
+          aj.az -= force_j * dz * invDist;
+        }
+      }
 
       if (usePostNewtonian) {
         const vx = s_i.vx - s_j.vx;
@@ -418,11 +446,26 @@ function computeAccelerations(entries, acc, epsSq) {
         const vz = s_i.vz - s_j.vz;
         const v2 = vx * vx + vy * vy + vz * vz;
         const rDotV = dx * vx + dy * vy + dz * vz;
-        const termA = 4 * G_NORM * s_j.massNorm / (dist * C_LIGHT_SQ) - v2 / C_LIGHT_SQ;
-        const termB = 4 * rDotV / (dist * C_LIGHT_SQ);
-        ai.ax += force * (termA * dx * invDist + termB * vx);
-        ai.ay += force * (termA * dy * invDist + termB * vy);
-        ai.az += force * (termA * dz * invDist + termB * vz);
+
+        if (ai) {
+          const termA_i = 4 * G_NORM * s_j.massNorm / (dist * C_LIGHT_SQ) - v2 / C_LIGHT_SQ;
+          const termB = 4 * rDotV / (dist * C_LIGHT_SQ);
+          ai.ax += force_i * (termA_i * dx * invDist + termB * vx);
+          ai.ay += force_i * (termA_i * dy * invDist + termB * vy);
+          ai.az += force_i * (termA_i * dz * invDist + termB * vz);
+        }
+
+        if (s_j.gravityAffected) {
+          const aj = acc.get(id_j);
+          if (aj) {
+            const force_j = G_NORM * s_i.massNorm / (distSq + epsSq);
+            const termA_j = 4 * G_NORM * s_i.massNorm / (dist * C_LIGHT_SQ) - v2 / C_LIGHT_SQ;
+            const termB = 4 * rDotV / (dist * C_LIGHT_SQ);
+            aj.ax -= force_j * (termA_j * dx * invDist + termB * vx);
+            aj.ay -= force_j * (termA_j * dy * invDist + termB * vy);
+            aj.az -= force_j * (termA_j * dz * invDist + termB * vz);
+          }
+        }
       }
     }
   }
@@ -508,8 +551,6 @@ function gravitySubstep(dt, entries, epsSq) {
   resetAccelerations(acc);
   computeAccelerations(entries, acc, epsSq);
   applyVelocityKick(entries, acc, YOSHIDA_C1 * dt);
-
-  checkCollisions(entries);
 }
 
 export function disableNewtonGravity(bodies, scene) {
@@ -560,17 +601,24 @@ function computePredictionSteps(bodyId) {
 export function predictTrajectories(configs) {
   if (configs.length === 0) return new Map();
 
-  // 1. Lưu trạng thái hiện tại của toàn bộ hệ thống
-  const savedState = [];
+  _pointPoolIdx = 0;
+
+  // 1. Lưu trạng thái hiện tại của toàn bộ hệ thống (dùng pool để tránh allocation)
+  let savedIdx = 0;
   for (const [id, s] of state) {
-    savedState.push({
-      id,
-      px: s.px, py: s.py, pz: s.pz,
-      vx: s.vx, vy: s.vy, vz: s.vz,
-      massNorm: s.massNorm,
-      gravityAffected: s.gravityAffected
-    });
+    let saved = _savedStatePool[savedIdx];
+    if (!saved) {
+      saved = { id: '', px: 0, py: 0, pz: 0, vx: 0, vy: 0, vz: 0, massNorm: 0, gravityAffected: false };
+      _savedStatePool.push(saved);
+    }
+    saved.id = id;
+    saved.px = s.px; saved.py = s.py; saved.pz = s.pz;
+    saved.vx = s.vx; saved.vy = s.vy; saved.vz = s.vz;
+    saved.massNorm = s.massNorm;
+    saved.gravityAffected = s.gravityAffected;
+    savedIdx++;
   }
+  const savedStateLength = savedIdx;
 
   // 2. Chuẩn bị dữ liệu tích phân riêng cho các thiên thể đích và xác định globalMaxSteps
   let globalMaxSteps = 0;
@@ -593,40 +641,42 @@ export function predictTrajectories(configs) {
     neededIds.add(bodyId);
   }
 
-  // 3. Tối ưu hóa: Chỉ tích phân các thiên thể thực sự cần thiết cho quỹ đạo đang xét
-  const filteredEntries = [];
+  // 3. Tối ưu hóa: Chỉ tích phân các thiên thể thực sự cần thiết cho quỹ đạo đang xét (reuse mảng lọc)
+  _filteredEntriesCache.length = 0;
   for (const entry of state) {
     if (neededIds.has(entry[0])) {
-      filteredEntries.push(entry);
+      _filteredEntriesCache.push(entry);
     }
   }
 
   // 4. Chạy mô phỏng tích phân N-body duy nhất một lượt
-  if (globalMaxSteps > 0 && filteredEntries.length > 0) {
-    const { epsSq, maxAccel } = computeAdaptiveParams(filteredEntries);
+  if (globalMaxSteps > 0 && _filteredEntriesCache.length > 0) {
+    const { epsSq, maxAccel } = computeAdaptiveParams(_filteredEntriesCache);
     for (let i = 0; i < globalMaxSteps; i++) {
-      const stepSize = computeAdaptiveStep(filteredEntries, maxAccel);
-      gravitySubstep(stepSize, filteredEntries, epsSq);
+      const stepSize = computeAdaptiveStep(_filteredEntriesCache, maxAccel);
+      gravitySubstep(stepSize, _filteredEntriesCache, epsSq);
 
-      // Ghi lại tọa độ cho từng thiên thể theo chu kỳ riêng
+      // Ghi lại tọa độ cho từng thiên thể theo chu kỳ riêng (dùng pool)
       for (let j = 0; j < bodyData.length; j++) {
         const bd = bodyData[j];
         if (i < bd.maxSteps && i % bd.recordInterval === 0) {
           const s = state.get(bd.bodyId);
-          if (s) bd.trajectory.push({ x: s.px, y: s.py, z: s.pz });
+          if (s) bd.trajectory.push(getPointFromPool(s.px, s.py, s.pz));
         }
       }
     }
   }
 
   // 5. Khôi phục lại trạng thái ban đầu của hệ thống
-  for (const saved of savedState) {
-    state.set(saved.id, {
-      px: saved.px, py: saved.py, pz: saved.pz,
-      vx: saved.vx, vy: saved.vy, vz: saved.vz,
-      massNorm: saved.massNorm,
-      gravityAffected: saved.gravityAffected
-    });
+  for (let i = 0; i < savedStateLength; i++) {
+    const saved = _savedStatePool[i];
+    const s = state.get(saved.id);
+    if (s) {
+      s.px = saved.px; s.py = saved.py; s.pz = saved.pz;
+      s.vx = saved.vx; s.vy = saved.vy; s.vz = saved.vz;
+      s.massNorm = saved.massNorm;
+      s.gravityAffected = saved.gravityAffected;
+    }
   }
 
   // 6. Trả về Map kết quả
