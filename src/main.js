@@ -962,6 +962,19 @@ async function bootstrap() {
   }
 
   // ── N-body Trajectory Prediction (c?p nh?t ???ng qu? ??o ??ng) ──
+  // Vector3 pool cho việc vẽ quỹ đạo N-body
+  const _nbodyVectorPool = [];
+  let _nbodyVectorPoolIdx = 0;
+
+  function getNbodyVectorFromPool(x, y, z) {
+    if (_nbodyVectorPoolIdx >= _nbodyVectorPool.length) {
+      _nbodyVectorPool.push(new THREE.Vector3());
+    }
+    const v = _nbodyVectorPool[_nbodyVectorPoolIdx++];
+    v.set(x, y, z);
+    return v;
+  }
+
   function updateNbodyPredictions() {
     if (!newtonGravityActive) return;
 
@@ -999,11 +1012,17 @@ async function bootstrap() {
     // Chạy mô phỏng tích phân song song chỉ trong một lượt duy nhất
     const trajectoriesMap = predictTrajectories(configs);
 
+    _nbodyVectorPoolIdx = 0; // Reset pool index
+
     for (const [bodyId, trajectory] of trajectoriesMap) {
       const body = bodyById.get(bodyId);
       if (!body || trajectory.length < 3) continue;
 
-      const points = trajectory.map(p => new THREE.Vector3(p.x, p.y, p.z));
+      const points = [];
+      for (let i = 0; i < trajectory.length; i++) {
+        const p = trajectory[i];
+        points.push(getNbodyVectorFromPool(p.x, p.y, p.z));
+      }
 
       let orbitLine = nbodyOrbitLines.get(bodyId);
       if (orbitLine) {
@@ -1024,6 +1043,7 @@ async function bootstrap() {
   const _v3 = new THREE.Vector3();
   const _sunDir = new THREE.Vector3();
   let _cachedTime = 0;
+  let _lastTooltipVisible = false;
 
   function animate() {
     requestAnimationFrame(animate);
@@ -1307,8 +1327,10 @@ async function bootstrap() {
       }
     } else {
       if (!cinematicCamera.isActive()) {
-        camera.fov = 45;
-        camera.updateProjectionMatrix();
+        if (camera.fov !== 45) {
+          camera.fov = 45;
+          camera.updateProjectionMatrix();
+        }
       }
 
       if (cameraMode === 'follow' && trackedBody) {
@@ -1326,68 +1348,95 @@ async function bootstrap() {
     }
 
     // -- Raycasting cho Tooltip --
-    let tooltipVisible = false;
+    let tooltipVisible = _lastTooltipVisible;
 
-    // -- Ring Tooltip Logic (Phase 7) --
-    if (trackedBody?.data?.id === 'saturn' && trackedBody.ringMesh) {
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObject(trackedBody.ringMesh);
-      if (intersects.length > 0) {
-        const hitPoint = intersects[0].point;
-        trackedBody.pivot.getWorldPosition(_v2);
-        const distUnits = hitPoint.distanceTo(_v2);
-        const scaleFactor = 9.45 / 58232;
-        const distKm = distUnits / scaleFactor;
+    if (frameCount % 3 === 0) {
+      tooltipVisible = false;
 
-        let ringName = '';
-        let ringDesc = '';
+      // -- Ring Tooltip Logic (Phase 7) --
+      if (trackedBody?.data?.id === 'saturn' && trackedBody.ringMesh) {
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(trackedBody.ringMesh);
+        if (intersects.length > 0) {
+          const hitPoint = intersects[0].point;
+          trackedBody.pivot.getWorldPosition(_v2);
+          const distUnits = hitPoint.distanceTo(_v2);
+          const scaleFactor = 9.45 / 58232;
+          const distKm = distUnits / scaleFactor;
 
-        if (distKm < 74500) { ringName = 'Vành D'; ringDesc = 'Vành đai mờ nhất, nằm gần sát bầu khí quyển.'; }
-        else if (distKm < 92000) { ringName = 'Vành C'; ringDesc = 'Vành đai tối, chứa nhiều bụi đá và vật chất hữu cơ.'; }
-        else if (distKm < 117580) { ringName = 'Vành B'; ringDesc = 'Vành đai lớn nhất, sáng nhất và dày đặc nhất.'; }
-        else if (distKm < 122170) { ringName = 'Phân cách Cassini'; ringDesc = 'Khoảng trống rộng 4,800km do lực hấp dẫn của Mimas.'; }
-        else if (distKm < 136775) { 
-          if (distKm > 133400 && distKm < 133800) { ringName = 'Khoảng trống Encke'; ringDesc = 'Khe hở nhỏ nơi vệ tinh Pan đang chăn dắt.'; }
-          else { ringName = 'Vành A'; ringDesc = 'Vành đai ngoài cùng trong nhóm chính.'; }
-        }
-        else if (distKm > 140000 && distKm < 140400) { ringName = 'Vành F'; ringDesc = 'Vành đai hẹp, bện xoắn kỳ lạ nằm ngoài cùng.'; }
+          let ringName = '';
+          let ringDesc = '';
 
-        if (ringName) {
-          tooltipVisible = true;
-          updateLayerTooltip(true, mouseClientX, mouseClientY, ringName, ringDesc);
+          if (distKm < 74500) { ringName = 'Vành D'; ringDesc = 'Vành đai mờ nhất, nằm gần sát bầu khí quyển.'; }
+          else if (distKm < 92000) { ringName = 'Vành C'; ringDesc = 'Vành đai tối, chứa nhiều bụi đá và vật chất hữu cơ.'; }
+          else if (distKm < 117580) { ringName = 'Vành B'; ringDesc = 'Vành đai lớn nhất, sáng nhất và dày đặc nhất.'; }
+          else if (distKm < 122170) { ringName = 'Phân cách Cassini'; ringDesc = 'Khoảng trống rộng 4,800km do lực hấp dẫn của Mimas.'; }
+          else if (distKm < 136775) { 
+            if (distKm > 133400 && distKm < 133800) { ringName = 'Khoảng trống Encke'; ringDesc = 'Khe hở nhỏ nơi vệ tinh Pan đang chăn dắt.'; }
+            else { ringName = 'Vành A'; ringDesc = 'Vành đai ngoài cùng trong nhóm chính.'; }
+          }
+          else if (distKm > 140000 && distKm < 140400) { ringName = 'Vành F'; ringDesc = 'Vành đai hẹp, bện xoắn kỳ lạ nằm ngoài cùng.'; }
+
+          if (ringName) {
+            tooltipVisible = true;
+            updateLayerTooltip(true, mouseClientX, mouseClientY, ringName, ringDesc);
+          }
         }
       }
+
+      // -- Uranus Ring Tooltip --
+      if (trackedBody?.data?.id === 'uranus' && trackedBody.ringMesh) {
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(trackedBody.ringMesh);
+        if (intersects.length > 0) {
+          const hitPoint = intersects[0].point;
+          trackedBody.pivot.getWorldPosition(_v2);
+          const distUnits = hitPoint.distanceTo(_v2);
+
+          let ringName = '';
+          let ringDesc = '';
+
+          if (distUnits < 6.40) { ringName = 'Vành ζ (1986U2R)'; ringDesc = 'Vành bụi trong cùng, rất mờ, được phát hiện năm 1986.'; }
+          else if (distUnits < 6.65) { ringName = 'Vành 6'; ringDesc = 'Vành hẹp nhất trong hệ thống vành đai Uranus.'; }
+          else if (distUnits < 6.72) { ringName = 'Vành 5'; ringDesc = 'Vành hẹp, tối, cấu tạo từ băng nước và bụi.'; }
+          else if (distUnits < 6.96) { ringName = 'Vành 4'; ringDesc = 'Vành hẹp tương tự vành 5 và 6.'; }
+          else if (distUnits < 7.28) { ringName = 'Vành α (Alpha)'; ringDesc = 'Vành sáng nhất trong nhóm vành chính, rộng 7-12 km.'; }
+          else if (distUnits < 7.54) { ringName = 'Vành β (Beta)'; ringDesc = 'Vành sáng thứ hai, rộng 7-12 km.'; }
+          else if (distUnits < 7.75) { ringName = 'Vành η (Eta)'; ringDesc = 'Vành rất hẹp, chứa nhiều bụi, chỉ rộng 0-2 km.'; }
+          else if (distUnits < 7.88) { ringName = 'Vành γ (Gamma)'; ringDesc = 'Vành hẹp sắc nét, rộng 1-4 km.'; }
+          else if (distUnits < 8.15) { ringName = 'Vành δ (Delta)'; ringDesc = 'Vành hẹp, rộng 3-7 km.'; }
+          else if (distUnits < 8.48) { ringName = 'Vành λ (Lambda)'; ringDesc = 'Vành bụi mờ, cấu tạo từ hạt micrometre.'; }
+          else { ringName = 'Vành ε (Epsilon)'; ringDesc = 'Vành sáng nhất và rộng nhất (20-100 km), hơi elip.'; }
+
+          if (ringName) {
+            tooltipVisible = true;
+            updateLayerTooltip(true, mouseClientX, mouseClientY, ringName, ringDesc);
+          }
+        }
+      }
+
+      // -- Raycasting cho Interior Tooltip --
+      if (trackedBody && trackedBody.isCrossSectionActive) {
+        const interiorGroup = trackedBody.tiltGroup.getObjectByName('cross_section_layers');
+        if (interiorGroup) {
+          raycaster.setFromCamera(mouse, camera);
+          const intersects = raycaster.intersectObjects(interiorGroup.children, false);
+          
+          // T?m ?i?m giao c?t kh?ng b? clipping
+          const validHit = intersects.find(hit => clipPlane.distanceToPoint(hit.point) >= 0);
+          
+          if (validHit && validHit.object.userData.layerData) {
+            tooltipVisible = true;
+            updateLayerTooltip(true, mouseClientX, mouseClientY, validHit.object.userData.layerData.name, validHit.object.userData.layerData.desc);
+          }
+        }
+      }
+
+      _lastTooltipVisible = tooltipVisible;
     }
 
-    // -- Uranus Ring Tooltip --
-    if (trackedBody?.data?.id === 'uranus' && trackedBody.ringMesh) {
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObject(trackedBody.ringMesh);
-      if (intersects.length > 0) {
-        const hitPoint = intersects[0].point;
-        trackedBody.pivot.getWorldPosition(_v2);
-        const distUnits = hitPoint.distanceTo(_v2);
-
-        let ringName = '';
-        let ringDesc = '';
-
-        if (distUnits < 6.40) { ringName = 'Vành ζ (1986U2R)'; ringDesc = 'Vành bụi trong cùng, rất mờ, được phát hiện năm 1986.'; }
-        else if (distUnits < 6.65) { ringName = 'Vành 6'; ringDesc = 'Vành hẹp nhất trong hệ thống vành đai Uranus.'; }
-        else if (distUnits < 6.72) { ringName = 'Vành 5'; ringDesc = 'Vành hẹp, tối, cấu tạo từ băng nước và bụi.'; }
-        else if (distUnits < 6.96) { ringName = 'Vành 4'; ringDesc = 'Vành hẹp tương tự vành 5 và 6.'; }
-        else if (distUnits < 7.28) { ringName = 'Vành α (Alpha)'; ringDesc = 'Vành sáng nhất trong nhóm vành chính, rộng 7-12 km.'; }
-        else if (distUnits < 7.54) { ringName = 'Vành β (Beta)'; ringDesc = 'Vành sáng thứ hai, rộng 7-12 km.'; }
-        else if (distUnits < 7.75) { ringName = 'Vành η (Eta)'; ringDesc = 'Vành rất hẹp, chứa nhiều bụi, chỉ rộng 0-2 km.'; }
-        else if (distUnits < 7.88) { ringName = 'Vành γ (Gamma)'; ringDesc = 'Vành hẹp sắc nét, rộng 1-4 km.'; }
-        else if (distUnits < 8.15) { ringName = 'Vành δ (Delta)'; ringDesc = 'Vành hẹp, rộng 3-7 km.'; }
-        else if (distUnits < 8.48) { ringName = 'Vành λ (Lambda)'; ringDesc = 'Vành bụi mờ, cấu tạo từ hạt micrometre.'; }
-        else { ringName = 'Vành ε (Epsilon)'; ringDesc = 'Vành sáng nhất và rộng nhất (20-100 km), hơi elip.'; }
-
-        if (ringName) {
-          tooltipVisible = true;
-          updateLayerTooltip(true, mouseClientX, mouseClientY, ringName, ringDesc);
-        }
-      }
+    if (!tooltipVisible) {
+      updateLayerTooltip(false);
     }
 
     // Cập nhật Cinematic Camera nếu đang active
@@ -1408,31 +1457,11 @@ async function bootstrap() {
       controls.update();
     }
 
-    // C?p nh?t Ghost Moon System
+    // Cập nhật Ghost Moon System
     if (saturnGhostSystem && trackedBody?.data?.id === 'saturn') {
       trackedBody.pivot.getWorldPosition(_v2);
       const ghostDist = camera.position.distanceTo(_v2);
       saturnGhostSystem.update(deltaTime, timeScale, ghostDist);
-    }
-
-    // -- Raycasting cho Interior Tooltip --
-    if (trackedBody && trackedBody.isCrossSectionActive) {
-      const interiorGroup = trackedBody.tiltGroup.getObjectByName('cross_section_layers');
-      if (interiorGroup) {
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(interiorGroup.children, false);
-        
-        // T?m ?i?m giao c?t kh?ng b? clipping
-        const validHit = intersects.find(hit => clipPlane.distanceToPoint(hit.point) >= 0);
-        
-        if (validHit && validHit.object.userData.layerData) {
-          tooltipVisible = true;
-          updateLayerTooltip(true, mouseClientX, mouseClientY, validHit.object.userData.layerData.name, validHit.object.userData.layerData.desc);
-        }
-      }
-    }
-    if (!tooltipVisible) {
-      updateLayerTooltip(false);
     }
 
     // C?p nh?t nh?n (n?u ?ang hi?n th?) - Throttled ?? t?i ?u hi?u n?ng

@@ -481,22 +481,38 @@ export function computeAllStates(planets, timeElapsed, out) {
 // § 8. Orbit Path Sampler
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Ép segmentCount thành số nguyên ≥ 1. */
+function normalizeSegmentCount(segmentCount) {
+  const n = Math.floor(Number(segmentCount));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
+}
+
+/** Ép revolutions thành số nguyên ≥ 1. */
+function normalizeRevolutions(revolutions) {
+  const n = Math.floor(Number(revolutions));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return n;
+}
+
 /**
  * Lấy mẫu đường quỹ đạo 3D (mean anomaly hoặc true anomaly đều).
  * @param {number} segmentCount - Số đoạn; sinh segmentCount+1 điểm (đường đóng).
  * @param {number} [revolutions=1] - Số vòng quỹ đạo (cho e cao, hiển thị multi-rev).
  */
 export function sampleOrbitPath(data, segmentCount = 128, uniformAngle = false, out, revolutions = 1) {
-  const pointCount = segmentCount + 1;
+  const segments = normalizeSegmentCount(segmentCount);
+  const revs = normalizeRevolutions(revolutions);
+  const pointCount = segments + 1;
+
   if (!out || out.length < pointCount * 3) {
     out = new Float64Array(pointCount * 3);
   }
 
   const c = getOrCreateCache(data);
-  const revs = revolutions > 0 ? revolutions : 1;
 
   for (let i = 0; i < pointCount; i++) {
-    const t = segmentCount > 0 ? (i / segmentCount) * TWO_PI * revs : 0;
+    const t = (i / segments) * TWO_PI * revs;
     let xp, yp;
 
     if (uniformAngle) {

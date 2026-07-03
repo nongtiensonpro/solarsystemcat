@@ -52,9 +52,9 @@ export function createOrbitLine(data) {
   const revolutions = (e >= 0.9 && !data.isMoon) ? (e > 0.98 ? 1 : 3) : 1;
 
   const effectiveSegs = e > 0.95 ? Math.max(segments, 512) : segments;
-  const totalSegs = effectiveSegs * revolutions;
+  const totalSegs = effectiveSegs;
 
-  // Ma trận quay 3D đầy đủ từ kepler cache (Ω, ω, i) — tránh solveKepler + trig lặp
+  // sampleOrbitPath nhân góc theo revolutions — không nhân totalSegs trước đó
   const pathBuffer = sampleOrbitPath(data, totalSegs, false, null, revolutions);
   const rawPoints = [];
   for (let i = 0; i <= totalSegs; i++) {
@@ -71,7 +71,7 @@ export function createOrbitLine(data) {
   let finalPoints = rawPoints;
   if (useCatmullRom && e <= 0.98) {
     const curve = new THREE.CatmullRomCurve3(rawPoints, revolutions > 1);
-    finalPoints = curve.getPoints(totalSegs * 2);
+    finalPoints = curve.getPoints(totalSegs * revolutions * 2);
   }
 
   const geometry = new THREE.BufferGeometry().setFromPoints(finalPoints);
